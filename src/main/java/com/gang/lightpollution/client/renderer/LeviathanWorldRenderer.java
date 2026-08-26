@@ -138,7 +138,10 @@ public final class LeviathanWorldRenderer {
 
     @SubscribeEvent
     public static void render(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+        // A shader pack composites over the main target after this
+        // stage, so under one the draw has to move to AFTER_LEVEL.
+        if (!SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
         List<LeviathanEntity> effects = SpellLightEmitter.collectLeviathans();
@@ -159,7 +162,7 @@ public final class LeviathanWorldRenderer {
         modelView.pushPose();
         try {
             modelView.setIdentity();
-            modelView.mulPoseMatrix(event.getPoseStack().last().pose());
+            modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
 
             for (LeviathanEntity entity : effects) {

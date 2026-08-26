@@ -74,7 +74,10 @@ public final class EclipseSeveranceWorldRenderer {
                 && EclipseSeveranceShaders.particleShader() != null) {
             return;
         }
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
+        // A shader pack composites over the main target after this
+        // stage, so under one the draw has to move to AFTER_LEVEL.
+        if (!SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_PARTICLES)) {
             return;
         }
 
@@ -93,7 +96,7 @@ public final class EclipseSeveranceWorldRenderer {
         RenderStateSnapshot state = RenderStateSnapshot.capture();
         BufferBuilder builder = Tesselator.getInstance().getBuilder();
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        GeometryBatch batch = new GeometryBatch(builder, event.getPoseStack().last().pose());
+        GeometryBatch batch = new GeometryBatch(builder, SpellRenderStage.levelPose(event));
 
         try {
             configureAdditiveWorldState();

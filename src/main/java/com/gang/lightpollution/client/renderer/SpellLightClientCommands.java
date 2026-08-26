@@ -70,6 +70,18 @@ public final class SpellLightClientCommands {
         // Shows one term of the lighting pass unfiltered. This is what tells a
         // missing shadow apart from a shadow the denoiser smeared, and a light
         // that never reached a surface from one attenuated away.
+        // Dumps the framebuffer state at every render stage for one frame. Run it
+        // with and without a shader pack: the diff is what says whether this mod's
+        // screen-space passes can work under Oculus/Iris at all.
+        dispatcher.register(Commands.literal("lightpollution_probe_pipeline")
+                .executes(context -> {
+                    ShaderPipelineProbe.arm();
+                    context.getSource().sendSuccess(() -> Component.literal(
+                            "Probing the render pipeline for one frame -- see the log. "
+                                    + "Shader pack: " + ShaderPackState.describe()), false);
+                    return 1;
+                }));
+
         dispatcher.register(Commands.literal("lightpollution_debug")
                 .then(Commands.argument("mode", IntegerArgumentType.integer(0, 4))
                         .executes(context -> {

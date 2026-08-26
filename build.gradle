@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'me.modmuss50.mod-publish-plugin' version '2.2.0'
 }
 
 version = mod_version
@@ -167,6 +168,16 @@ dependencies {
         implementation fg.deobf('local:irons_spellbooks:1.20.1-3.16.1')
         runtimeOnly fg.deobf('local:irons_lib:1.20.1-1.1.0')
         runtimeOnly fg.deobf('local:player-animation-lib-forge:1.0.2-rc1+1.20')
+
+        // Oculus (the Forge port of Iris) plus the Embeddium it requires, for
+        // testing how this mod behaves under a shader pack. Off unless asked for:
+        // these two replace the renderer wholesale, so leaving them in every run
+        // would mean every unrelated bug gets debugged against a non-standard
+        // pipeline. Enable with:  ./gradlew runClient -PwithShaders
+        if (project.hasProperty('withShaders')) {
+            runtimeOnly fg.deobf('local:embeddium:0.3.31+mc1.20.1')
+            runtimeOnly fg.deobf('local:oculus-mc1.20.1:1.8.0')
+        }
     } else {
         implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:4.8.4")
         implementation fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1")
@@ -248,4 +259,56 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// ---------------------------------------------------------------------------
+// Publishing to CurseForge and Modrinth.
+//
+// Tokens are never written here. They are read from Gradle properties, which
+// belong in ~/.gradle/gradle.properties -- outside the repository, so they cannot
+// be committed by accident:
+//
+//     curseforgeToken=...
+//     modrinthToken=...
+//
+// Publish with:  ./gradlew publishMods
+// Dry run with:  ./gradlew publishMods --dry-run    (validates, uploads nothing)
+// ---------------------------------------------------------------------------
+publishMods {
+    // ForgeGradle reobfuscates the jar task in place, so this is the shippable jar.
+    file = tasks.named('jar').flatMap { it.archiveFile }
+    version = mod_version
+    displayName = "${mod_name} ${mod_version} (Forge ${minecraft_version})"
+    // Only the newest section: everything below the second heading is history that
+    // the platforms already have on earlier releases.
+    changelog = provider {
+        def notes = file('CHANGELOG.md').text
+        def sections = notes.split('(?m)^## ')
+        sections.length > 1 ? '## ' + sections[1].trim() : notes
+    }
+    type = STABLE
+    modLoaders.add('forge')
+    // Validates everything and contacts nothing. Gradle's own --dry-run only prints
+    // the task graph, so it would not exercise this plugin at all.
+    //   ./gradlew publishMods -PpublishDryRun
+    dryRun = project.hasProperty('publishDryRun')
+
+    // Both platforms need the same dependency declared, so players are told they
+    // need the base mod rather than finding out from a crash.
+    curseforge {
+        projectId = '1666561'
+        accessToken = providers.gradleProperty('curseforgeToken')
+        // Required on both sides: the spells register entities and damage types on
+        // the server and the visuals are client-side, so half an install is broken.
+        clientRequired = true
+        serverRequired = true
+        minecraftVersions.add(minecraft_version)
+        requires { slug = 'irons-spells-n-spellbooks' }
+    }
+    modrinth {
+        projectId = 'NoQdOUIm'
+        accessToken = providers.gradleProperty('modrinthToken')
+        minecraftVersions.add(minecraft_version)
+        requires { slug = 'irons-spells-n-spellbooks' }
+    }
 }

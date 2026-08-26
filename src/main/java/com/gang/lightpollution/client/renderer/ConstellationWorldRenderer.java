@@ -53,7 +53,10 @@ public final class ConstellationWorldRenderer {
 
     @SubscribeEvent
     public static void render(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+        // A shader pack composites over the main target after this
+        // stage, so under one the draw has to move to AFTER_LEVEL.
+        if (!SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
         List<ConstellationEntity> stars = SpellLightEmitter.collectConstellations();
@@ -67,7 +70,6 @@ public final class ConstellationWorldRenderer {
 
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
-        PoseStack poseStack = event.getPoseStack();
 
         // The camera rotation belongs in ModelViewMat, and the vertices below are
         // submitted raw in camera-relative space -- the same convention as
@@ -80,7 +82,7 @@ public final class ConstellationWorldRenderer {
         modelView.pushPose();
         try {
             modelView.setIdentity();
-            modelView.mulPoseMatrix(poseStack.last().pose());
+            modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
             for (ConstellationEntity entity : stars) {
                 for (int star = 0; star < ConstellationEntity.STAR_COUNT; star++) {

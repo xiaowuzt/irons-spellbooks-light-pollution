@@ -129,7 +129,7 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
         poseStack.translate(0.0F, y, 0.0F);
         poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
         poseStack.scale(radius * scale, radius * scale, radius * scale);
-        VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityTranslucentEmissive(texture));
+        VertexConsumer consumer = bufferSource.getBuffer(emissiveLayer(texture));
         PoseStack.Pose transformed = poseStack.last();
         vertex(consumer, transformed, -1.0F, 0.0F, -1.0F, 0.0F, 1.0F, alpha, 0.0F, 1.0F, 0.0F);
         vertex(consumer, transformed, 1.0F, 0.0F, -1.0F, 1.0F, 1.0F, alpha, 0.0F, 1.0F, 0.0F);
@@ -152,7 +152,7 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
         poseStack.pushPose();
         poseStack.translate(0.0F, y, 0.0F);
         poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
-        VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityTranslucentEmissive(BODY_RING));
+        VertexConsumer consumer = bufferSource.getBuffer(emissiveLayer(BODY_RING));
         PoseStack.Pose pose = poseStack.last();
         int sides = 32;
         for (int i = 0; i < sides; i++) {
@@ -185,7 +185,7 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
         }
         poseStack.pushPose();
         poseStack.mulPose(Axis.YP.rotationDegrees(rotation));
-        VertexConsumer consumer = bufferSource.getBuffer(RenderType.entityTranslucentEmissive(BEAM));
+        VertexConsumer consumer = bufferSource.getBuffer(emissiveLayer(BEAM));
         PoseStack.Pose pose = poseStack.last();
         int sides = 16;
         for (int i = 0; i < sides; i++) {
@@ -231,5 +231,25 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
     @Override
     public ResourceLocation getTextureLocation(CelestialJudgmentEntity entity) {
         return TOP_OUTER;
+    }
+
+    /**
+     * The layer these emissive quads ride on.
+     *
+     * <p>{@code entityTranslucentEmissive} is a Forge addition, and Oculus swaps in a
+     * shader pack's programs by looking the render type up in a fixed table of the
+     * ones it knows about. This one is not in that table, so a pack replaces nothing
+     * and every quad drawn on it vanishes — the same failure Oculus issue 630
+     * describes for Forge's unlit entity shader. The vanilla translucent layer *is* in
+     * the table, so falling back to it keeps the spell visible.</p>
+     *
+     * <p>The cost is that it stops being unlit: the circles and the beam pick up world
+     * lighting and dim at night instead of staying white. Visible, but a long way
+     * better than the whole spell being invisible.</p>
+     */
+    private static RenderType emissiveLayer(ResourceLocation texture) {
+        return ShaderPackState.packActive()
+                ? RenderType.entityTranslucent(texture)
+                : RenderType.entityTranslucentEmissive(texture);
     }
 }

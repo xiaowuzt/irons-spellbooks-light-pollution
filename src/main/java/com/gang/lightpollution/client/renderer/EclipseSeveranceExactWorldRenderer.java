@@ -63,9 +63,14 @@ public final class EclipseSeveranceExactWorldRenderer {
 
     @SubscribeEvent
     public static void renderEffects(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
+        // Two separate ifs rather than if/else: under a shader pack the geometry
+        // moves to AFTER_LEVEL, so both halves land in the same invocation and the
+        // geometry has to run before the pass that reads the colour buffer.
+        if (SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_PARTICLES)) {
             renderWorldGeometry(event);
-        } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
+        }
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             renderScreenPost();
         }
     }
@@ -94,7 +99,7 @@ public final class EclipseSeveranceExactWorldRenderer {
                 if (!visual.isAlive(age)) {
                     continue;
                 }
-                renderOne(event.getPoseStack(), event.getCamera(), cameraPosition, visual, age);
+                renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition, visual, age);
             }
         } finally {
             state.restore();

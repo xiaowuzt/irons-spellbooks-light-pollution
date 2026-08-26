@@ -127,7 +127,15 @@ public final class SpellLightEvents {
         }
     }
 
-    @SubscribeEvent
+    /**
+     * Lowest priority so this runs after every effect has drawn.
+     *
+     * <p>Under a shader pack all the world geometry moves to {@code AFTER_LEVEL},
+     * which is also where this screen-space pass runs. Handler order within a stage
+     * is otherwise undefined, and this pass reads the colour buffer — so it has to be
+     * last or it lights a frame that is still half-empty.</p>
+     */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void renderLights(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
             // This PoseStack is the same world->view stack passed to

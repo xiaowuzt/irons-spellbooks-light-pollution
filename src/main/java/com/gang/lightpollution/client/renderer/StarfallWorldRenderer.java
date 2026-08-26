@@ -84,7 +84,10 @@ public final class StarfallWorldRenderer {
 
     @SubscribeEvent
     public static void render(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+        // A shader pack composites over the main target after this
+        // stage, so under one the draw has to move to AFTER_LEVEL.
+        if (!SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
         List<StarfallEntity> showers = SpellLightEmitter.collectStarfalls();
@@ -110,7 +113,7 @@ public final class StarfallWorldRenderer {
         modelView.pushPose();
         try {
             modelView.setIdentity();
-            modelView.mulPoseMatrix(event.getPoseStack().last().pose());
+            modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
             drawTrailsAndShocks(showers, camera, partialTick, meteorShader);
             drawHeads(showers, camera, partialTick, headShader);
@@ -616,4 +619,5 @@ public final class StarfallWorldRenderer {
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }
+
 }

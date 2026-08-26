@@ -1,5 +1,6 @@
 package com.gang.lightpollution.client;
 
+import com.gang.lightpollution.client.renderer.SpellRenderStage;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.StargraveSingularityEntity;
 import com.mojang.blaze3d.pipeline.RenderTarget;
@@ -73,7 +74,12 @@ public final class StargraveSingularityWorldRenderer {
             }
             return;
         }
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) {
+        // The depth capture above stays where it is -- depth is valid and
+        // shared from AFTER_SOLID_BLOCKS on, even under a shader pack. Only
+        // the draw has to move, because a pack composites over the main
+        // target after AFTER_WEATHER.
+        if (!SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
         if (!opaqueDepthCapturedThisFrame || FRAME_SINGULARITIES.isEmpty()) {
@@ -112,7 +118,7 @@ public final class StargraveSingularityWorldRenderer {
         modelViewStack.pushPose();
         try {
             modelViewStack.setIdentity();
-            modelViewStack.mulPoseMatrix(event.getPoseStack().last().pose());
+            modelViewStack.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
 
             RenderSystem.disableBlend();

@@ -99,9 +99,14 @@ public final class GeminiKillEffectWorldRenderer {
 
     @SubscribeEvent
     public static void render(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
+        // Two separate ifs rather than if/else: under a shader pack the geometry
+        // moves to AFTER_LEVEL, so both halves land in the same invocation and the
+        // geometry has to run before the pass that reads the colour buffer.
+        if (SpellRenderStage.shouldDraw(
+                event, RenderLevelStageEvent.Stage.AFTER_PARTICLES)) {
             renderWorld(event);
-        } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
+        }
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             renderPost();
         }
     }
@@ -147,7 +152,7 @@ public final class GeminiKillEffectWorldRenderer {
                         || cameraPosition.distanceToSqr(entity.position()) > RENDER_DISTANCE_SQR) {
                     continue;
                 }
-                renderOne(event.getPoseStack(), event.getCamera(), cameraPosition, visual, age);
+                renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition, visual, age);
                 rendered++;
             }
         } finally {
