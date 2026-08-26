@@ -1,0 +1,31 @@
+{
+  "replace": false,
+  "values": [
+    "irons_spellbooks_light_pollution:stargrave_singularity",
+    "irons_spellbooks:arrow_volley",
+    "irons_spellbooks:black_hole",
+    "irons_spellbooks:blizzard_aoe",
+    "irons_spellbooks:chain_lightning",
+    "irons_spellbooks:cone_of_cold",
+    "irons_spellbooks:devour_jaw",
+    "irons_spellbooks:dragon_breath",
+    "irons_spellbooks:dragon_breath_pool",
+    "irons_spellbooks:earthquake_aoe",
+    "irons_spellbooks:echoing_strike",
+    "irons_spellbooks:electrocute",
+    "irons_spellbooks:fang_swirl",
+    "irons_spellbooks:fire_breath",
+    "irons_spellbooks:fire_eruption",
+    "irons_spellbooks:fire_field",
+    "irons_spellbooks:frost_field",
+    "irons_spellbooks:gust",
+    "irons_spellbooks:healing_aoe",
+    "irons_spellbooks:ice_spike",
+    "irons_spellbooks:lightning_strike",
+    "irons_spellbooks:poison_breath",
+    "irons_spellbooks:poison_cloud",
+    "irons_spellbooks:poison_splash",
+    "irons_spellbooks:stomp_aoe",
+    "irons_spellbooks:sunbeam"
+  ]
+}

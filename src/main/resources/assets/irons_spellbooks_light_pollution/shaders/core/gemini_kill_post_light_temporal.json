@@ -1,0 +1,30 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:gemini_kill_post",
+  "fragment": "irons_spellbooks_light_pollution:gemini_kill_post_light_temporal",
+  "samplers": [
+    {"name": "SceneSampler"},
+    {"name": "DepthSampler"},
+    {"name": "NormalSampler"},
+    {"name": "PreviousNormalSampler"},
+    {"name": "PreviousDepthSampler"},
+    {"name": "PreviousFrameSampler"},
+    {"name": "PreviousRadianceSampler"}
+  ],
+  "attributes": ["Position", "UV0"],
+  "uniforms": [
+    {"name": "Params", "type": "float", "count": 4, "values": [1, 1, 0, 0]},
+    {"name": "MiscParams", "type": "float", "count": 4, "values": [0, 0, 0, 0]},
+    {"name": "InverseViewProjectionMat", "type": "matrix4x4", "count": 16,
+      "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+    {"name": "InverseViewMat", "type": "matrix4x4", "count": 16,
+      "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+    {"name": "PreviousProjectionMat", "type": "matrix4x4", "count": 16,
+      "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+    {"name": "PreviousViewMat", "type": "matrix4x4", "count": 16,
+      "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]},
+    {"name": "CameraWorldPos", "type": "float", "count": 4,
+      "values": [0, 0, 0, 1]},
+    {"name": "PreviousCameraWorldPos", "type": "float", "count": 4,
+      "values": [0, 0, 0, 1]}
+  ]
+}

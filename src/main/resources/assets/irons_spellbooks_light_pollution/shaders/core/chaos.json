@@ -1,0 +1,23 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "1-srcalpha"
+  },
+  "vertex": "irons_spellbooks_light_pollution:chaos",
+  "fragment": "irons_spellbooks_light_pollution:chaos",
+  "attributes": [
+    "Position",
+    "Color",
+    "Normal"
+  ],
+  "uniforms": [
+    { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "time", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "screenSize", "type": "float", "count": 2, "values": [ 1980.0, 1080.0 ] },
+    { "name": "useType", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "yaw", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "pitch", "type": "float", "count": 1, "values": [ 0.0 ] }
+  ]
+}

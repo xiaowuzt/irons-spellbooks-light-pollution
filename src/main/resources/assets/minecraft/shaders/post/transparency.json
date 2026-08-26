@@ -1,0 +1,346 @@
+{
+    "targets": [
+        "water",
+        "translucent",
+        "itemEntity",
+        "particles",
+        "clouds",
+        "weather",
+        "normals",
+        "swap",
+        { "name": "voxels", "width": 2048, "height": 2048 },
+        { "name": "voxelCache", "width": 2048, "height": 2048 },
+        { "name": "voxelLod", "width": 128, "height": 2048 },
+        "final",
+        "temporal",
+        "spatial",
+        "spatial2",
+        "previousTemporal",
+        "previousDepth",
+        "previousNormals",
+        "previousData"
+    ],
+    "passes": [
+        {
+            "name": "normals",
+            "intarget": "minecraft:main",
+            "outtarget": "normals",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
+            "name": "voxelize",
+            "intarget": "minecraft:main",
+            "outtarget": "voxels",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VoxelCacheSampler",
+                    "id": "voxelCache"
+                }
+            ]
+        },
+        {
+            "name": "build_lod",
+            "intarget": "voxels",
+            "outtarget": "voxelLod"
+        },
+        {
+            "name": "shade",
+            "intarget": "minecraft:main",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VoxelSampler",
+                    "id": "voxels"
+                },
+                {
+                    "name": "VoxelLodSampler",
+                    "id": "voxelLod"
+                }
+            ]
+        },
+
+        {
+            "name": "temporal",
+            "intarget": "minecraft:main",
+            "outtarget": "temporal",
+            "auxtargets": [
+                {
+                    "name": "RadianceSampler",
+                    "id": "swap"
+                },
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "PreviousDataSampler",
+                    "id": "previousData"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "PreviousNormalSampler",
+                    "id": "previousNormals"
+                },
+                {
+                    "name": "PreviousFrameSampler",
+                    "id": "previousTemporal:depth"
+                },
+                {
+                    "name": "PreviousRadianceSampler",
+                    "id": "previousTemporal"
+                },
+                {
+                    "name": "PreviousDepthSampler",
+                    "id": "previousDepth"
+                }
+            ]
+        },
+        {
+            "name": "spatial",
+            "intarget": "minecraft:main",
+            "outtarget": "spatial",
+            "auxtargets": [
+                {
+                    "name": "RadianceSampler",
+                    "id": "temporal"
+                },
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "PreviousDataSampler",
+                    "id": "previousData"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [ 1.0 ]
+                }
+            ]
+        },
+        {
+            "name": "spatial",
+            "intarget": "minecraft:main",
+            "outtarget": "spatial2",
+            "auxtargets": [
+                {
+                    "name": "RadianceSampler",
+                    "id": "spatial"
+                },
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "PreviousDataSampler",
+                    "id": "previousData"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [ 2.0 ]
+                }
+            ]
+        },
+        {
+            "name": "spatial",
+            "intarget": "minecraft:main",
+            "outtarget": "spatial",
+            "auxtargets": [
+                {
+                    "name": "RadianceSampler",
+                    "id": "spatial2"
+                },
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "PreviousDataSampler",
+                    "id": "previousData"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [ 4.0 ]
+                }
+            ]
+        },
+        {
+            "name": "spatial",
+            "intarget": "minecraft:main",
+            "outtarget": "spatial2",
+            "auxtargets": [
+                {
+                    "name": "RadianceSampler",
+                    "id": "spatial"
+                },
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "PreviousDataSampler",
+                    "id": "previousData"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [ 8.0 ]
+                }
+            ]
+        },
+        
+        {
+            "name": "copy",
+            "intarget": "voxels",
+            "outtarget": "voxelCache"
+        },
+        {
+            "name": "copy",
+            "intarget": "normals",
+            "outtarget": "previousNormals"
+        },
+        {
+            "name": "copy_depth",
+            "intarget": "minecraft:main",
+            "outtarget": "previousDepth",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
+            "name": "copy",
+            "intarget": "temporal",
+            "outtarget": "previousTemporal",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "temporal:depth"
+                }
+            ]
+        },
+        {
+            "name": "copy",
+            "intarget": "minecraft:main",
+            "outtarget": "previousData"
+        },
+
+        {
+            "name": "blend",
+            "intarget": "minecraft:main",
+            "outtarget": "final",
+            "auxtargets": [
+                {
+                    "name": "LightSampler",
+                    "id": "spatial2"
+                }
+            ]
+        },
+
+        {
+            "name": "transparency",
+            "intarget": "final",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "TranslucentSampler",
+                    "id": "translucent"
+                },
+                {
+                    "name": "TranslucentDepthSampler",
+                    "id": "translucent:depth"
+                },
+                {
+                    "name": "ItemEntitySampler",
+                    "id": "itemEntity"
+                },
+                {
+                    "name": "ItemEntityDepthSampler",
+                    "id": "itemEntity:depth"
+                },
+                {
+                    "name": "ParticlesSampler",
+                    "id": "particles"
+                },
+                {
+                    "name": "ParticlesDepthSampler",
+                    "id": "particles:depth"
+                },
+                {
+                    "name": "CloudsSampler",
+                    "id": "clouds"
+                },
+                {
+                    "name": "CloudsDepthSampler",
+                    "id": "clouds:depth"
+                },
+                {
+                    "name": "WeatherSampler",
+                    "id": "weather"
+                },
+                {
+                    "name": "WeatherDepthSampler",
+                    "id": "weather:depth"
+                }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "swap",
+            "outtarget": "minecraft:main"
+        }
+    ]
+}

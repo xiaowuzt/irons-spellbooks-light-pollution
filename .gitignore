@@ -1,0 +1,35 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+# Files from Forge MDK
+forge*changelog.txt
+
+# Scratch from decompiling vanilla and Forge to check call sites. Regenerable,
+# and nothing in the mod reads it.
+.tmp_*
+
+# Third-party mod jars for offline development. Deliberately untracked:
+# irons_spellbooks and irons_lib are All Rights Reserved, so committing them
+# would redistribute them to whatever host this repo lives on. build.gradle
+# already falls back to the upstream Maven coordinates when libs/ is absent.
+libs/

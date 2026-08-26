@@ -1,0 +1,29 @@
+{
+    "vertex":  "irons_spellbooks_light_pollution:gemini_kill_post",
+    "fragment":  "irons_spellbooks_light_pollution:gemini_kill_post_composite",
+    "samplers":  [
+                     {
+                         "name":  "SceneSampler"
+                     },
+                     {
+                         "name":  "BloomSampler"
+                     }
+                 ],
+    "attributes":  [
+                       "Position",
+                       "UV0"
+                   ],
+    "uniforms":  [
+                     {
+                         "name":  "Params",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     }
+                 ]
+}

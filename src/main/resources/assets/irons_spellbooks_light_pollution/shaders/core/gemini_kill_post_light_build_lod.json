@@ -1,0 +1,8 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:gemini_kill_post",
+  "fragment": "irons_spellbooks_light_pollution:gemini_kill_post_light_build_lod",
+  "samplers": [
+    {"name": "VoxelSampler"}
+  ],
+  "attributes": ["Position", "UV0"]
+}

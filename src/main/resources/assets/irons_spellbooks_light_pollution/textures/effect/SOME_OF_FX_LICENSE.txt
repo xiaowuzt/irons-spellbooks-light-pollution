@@ -1,0 +1,38 @@
+Some of FX assets
+=================
+
+`noise_tile.png` and `singularity_core.png` are from Some of FX
+(https://github.com/YangMao-Minister/some_of_fx), MIT licensed,
+Copyright (c) 2026 Pizuka.
+
+`noise_tile.png` is used unchanged. It backs the lightning and shockwave
+distortion: the procedural hash noise this mod used first has visible banding at
+low frequencies, and the bolts read as smooth ribbons because of it.
+
+`singularity_core.png` is `textures/item/singularity_bomb.png` renamed. The
+nested-cube geometry it is mapped onto is a hand-rewrite of that project's
+`models/item/sigularity_bomb.json` for Forge 1.20.1: the original targets
+`format_version` 1.21.6 and the newer `items/` definition format, neither of
+which loads here, so only the UV layout and the cube nesting were carried over.
+
+MIT License
+
+Copyright (c) 2026 Pizuka
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

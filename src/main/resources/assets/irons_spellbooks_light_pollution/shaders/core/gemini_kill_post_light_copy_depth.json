@@ -1,0 +1,8 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:gemini_kill_post",
+  "fragment": "irons_spellbooks_light_pollution:gemini_kill_post_light_copy_depth",
+  "samplers": [
+    {"name": "DepthSampler"}
+  ],
+  "attributes": ["Position", "UV0"]
+}

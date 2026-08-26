@@ -1,0 +1,44 @@
+{
+  "singularity.charge": {
+    "subtitle": "subtitles.irons_spellbooks_light_pollution.singularity.charge",
+    "sounds": [
+      {
+        "name": "irons_spellbooks_light_pollution:singularity_charge",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "singularity.active": {
+    "subtitle": "subtitles.irons_spellbooks_light_pollution.singularity.active",
+    "sounds": [
+      {
+        "name": "irons_spellbooks_light_pollution:singularity_active",
+        "attenuation_distance": 64
+      }
+    ]
+  },
+  "singularity.explode": {
+    "subtitle": "subtitles.irons_spellbooks_light_pollution.singularity.explode",
+    "sounds": [
+      {
+        "name": "irons_spellbooks_light_pollution:singularity_explode",
+        "attenuation_distance": 128
+      }
+    ]
+  },
+  "tinnitus": {
+    "subtitle": "subtitles.irons_spellbooks_light_pollution.tinnitus",
+    "sounds": [
+      "irons_spellbooks_light_pollution:tinnitus"
+    ]
+  },
+  "lightning.arc": {
+    "subtitle": "subtitles.irons_spellbooks_light_pollution.lightning.arc",
+    "sounds": [
+      {
+        "name": "irons_spellbooks_light_pollution:arc",
+        "attenuation_distance": 48
+      }
+    ]
+  }
+}

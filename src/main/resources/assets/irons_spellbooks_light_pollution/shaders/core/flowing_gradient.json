@@ -1,0 +1,41 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "one",
+    "dstrgb": "one"
+  },
+  "vertex": "irons_spellbooks_light_pollution:flowing_gradient",
+  "fragment": "irons_spellbooks_light_pollution:flowing_gradient",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    { "name": "Sampler0" }
+  ],
+  "uniforms": [
+    { "name": "ModelViewMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+    { "name": "time", "type": "float", "count": 1, "values": [ 0.0 ] },
+    { "name": "FlowSpeed", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "colorCount", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "alpha", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "gradientSpan", "type": "float", "count": 1, "values": [ 1.0 ] },
+    { "name": "color1", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color2", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color3", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color4", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color5", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color6", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color7", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color8", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color9", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color10", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color11", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color12", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color13", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color14", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color15", "type": "int", "count": 1, "values": [ 0 ] },
+    { "name": "color16", "type": "int", "count": 1, "values": [ 0 ] }
+  ]
+}

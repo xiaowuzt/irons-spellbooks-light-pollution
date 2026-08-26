@@ -1,0 +1,84 @@
+{
+    "vertex":  "irons_spellbooks_light_pollution:gemini_kill_post",
+    "fragment":  "irons_spellbooks_light_pollution:gemini_kill_post_volumetric_godray",
+    "samplers":  [
+                     {
+                         "name":  "SceneSampler"
+                     },
+                     {
+                         "name":  "DepthSampler"
+                     }
+                 ],
+    "attributes":  [
+                       "Position",
+                       "UV0"
+                   ],
+    "uniforms":  [
+                     {
+                         "name":  "TimePack",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     },
+                     {
+                         "name":  "PassParams",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     },
+                     {
+                         "name":  "CameraParams",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     },
+                     {
+                         "name":  "LightViewPos",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     },
+                     {
+                         "name":  "LightColor",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     },
+                     {
+                         "name":  "MiscParams",
+                         "type":  "float",
+                         "count":  4,
+                         "values":  [
+                                        0,
+                                        0,
+                                        0,
+                                        0
+                                    ]
+                     }
+                 ]
+}

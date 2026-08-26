@@ -1,0 +1,25 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:eclipse_sweep_arc",
+  "fragment": "irons_spellbooks_light_pollution:eclipse_sweep_arc",
+  "blend": {
+    "func": "add",
+    "srcrgb": "srcalpha",
+    "dstrgb": "one",
+    "srcalpha": "one",
+    "dstalpha": "zero"
+  },
+  "attributes": ["Position", "UV0", "Color"],
+  "uniforms": [
+    {"name":"ModelViewMat","type":"matrix4x4","count":16,"values":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]},
+    {"name":"ProjMat","type":"matrix4x4","count":16,"values":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]},
+    {"name":"ColorModulator","type":"float","count":4,"values":[1,1,1,1]},
+    {"name":"Params","type":"float","count":4,"values":[0,0,0,1.25]},
+    {"name":"Geometry","type":"float","count":4,"values":[2.35,0.82,0.42,1.55]},
+    {"name":"Style","type":"float","count":4,"values":[1,1,4,0.35]},
+    {"name":"Motion","type":"float","count":4,"values":[1.25,0.075,0.34,3]},
+    {"name":"Primary","type":"float","count":4,"values":[0.39215687,0.84705883,1,0.92]},
+    {"name":"Accent","type":"float","count":4,"values":[0.7607843,0.4862745,1,0]},
+    {"name":"Core","type":"float","count":4,"values":[1,1,1,0]},
+    {"name":"Misc","type":"float","count":4,"values":[1.45,0.95,0.028,0]}
+  ]
+}

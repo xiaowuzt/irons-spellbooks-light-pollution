@@ -1,0 +1,23 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:gemini_kill_post",
+  "fragment": "irons_spellbooks_light_pollution:gemini_kill_post_light_voxelize",
+  "samplers": [
+    { "name": "DepthSampler" },
+    { "name": "NormalSampler" },
+    { "name": "VoxelCacheSampler" },
+    { "name": "StateVolumeSampler" },
+    { "name": "ModelMaskSampler" }
+  ],
+  "attributes": ["Position", "UV0"],
+  "uniforms": [
+    { "name": "CameraWorldPos", "type": "float", "count": 4, "values": [0, 0, 0, 1] },
+    { "name": "VoxelOrigin", "type": "float", "count": 4, "values": [0, 0, 0, 1] },
+    { "name": "PreviousVoxelOrigin", "type": "float", "count": 4, "values": [0, 0, 0, 0] },
+    { "name": "StateVolumeWrap", "type": "float", "count": 4, "values": [0, 0, 0, 0] },
+    { "name": "CacheParams", "type": "float", "count": 4, "values": [1, 0, 0, 0] },
+    { "name": "ProjectionMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+    { "name": "ViewMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+    { "name": "InverseProjectionMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+    { "name": "InverseViewMat", "type": "matrix4x4", "count": 16, "values": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }
+  ]
+}
