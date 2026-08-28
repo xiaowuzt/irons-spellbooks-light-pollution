@@ -177,6 +177,18 @@ public final class SpellLightEvents {
         SpellLightPostProcessor.renderSingularityLenses(
                 SpellLightEmitter.collectSingularities(),
                 projection, view, event.getCamera(), event.getPartialTick());
+        // Gargantua goes last of all. It reads the finished frame twice — once for
+        // the pixel it is on, once along the bent ray — so everything else has to
+        // already be in the buffer for the lensed background to contain it.
+        SpellLightPostProcessor.renderGargantua(
+                SpellLightEmitter.collectGargantuas(),
+                projection, view, event.getCamera(), event.getPartialTick());
+        // And after that, the horseshoe. It reads the finished frame along its deflected
+        // ray the same way, so it wants everything else already in the buffer — including
+        // a Gargantua, if both are up, so one lens can be seen through the other.
+        SpellLightPostProcessor.renderCosmicHorseshoe(
+                SpellLightEmitter.collectCosmicHorseshoes(),
+                projection, view, event.getCamera(), event.getPartialTick());
     }
 
     @SubscribeEvent

@@ -22,7 +22,7 @@ float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-float noise2(vec2 p) {
+float slNoise2(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -49,7 +49,7 @@ float arcCenter(float u, int style) {
     if (style == 1) return 0.58 + 0.13 * sin(u * 3.14159265);
     if (style == 2) return 0.64 + 0.045 * sin(u * TAU * 4.0);
     if (style == 3) {
-        float turbulence = noise2(vec2(u * 14.0 - Params.x * Motion.x, Misc.w));
+        float turbulence = slNoise2(vec2(u * 14.0 - Params.x * Motion.x, Misc.w));
         return 0.61 + (turbulence - 0.5) * 0.18 * Style.w;
     }
     if (style == 4) {
@@ -91,7 +91,7 @@ vec4 arcMode() {
         energy += runeRail * cells * 0.75;
         color += Accent.rgb * runeRail * cells * 1.4;
     } else if (style == 3) {
-        float plasma = noise2(vec2(u * 24.0 - Params.x * Motion.x * 2.2,
+        float plasma = slNoise2(vec2(u * 24.0 - Params.x * Motion.x * 2.2,
                                   v * 11.0 + Misc.w));
         energy *= 0.62 + plasma * 0.9;
         color *= 0.72 + plasma * 1.15;
@@ -105,7 +105,7 @@ vec4 arcMode() {
     float edge = smoothstep(0.0, 0.045, u) * smoothstep(0.0, 0.08, 1.0 - u);
     float traveling = 0.72 + 0.28 * sin(u * 34.0 - Params.x * Motion.x * 7.0);
     float noiseFlow = mix(1.0,
-            0.58 + noise2(vec2(u * 19.0 - Params.x * Motion.x * 1.8,
+            0.58 + slNoise2(vec2(u * 19.0 - Params.x * Motion.x * 1.8,
                                 v * 8.0 + Misc.w)),
             clamp(Style.w, 0.0, 1.0));
     energy *= edge * traveling * noiseFlow;

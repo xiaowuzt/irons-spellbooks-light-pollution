@@ -76,9 +76,9 @@ public final class ConstellationEntity extends Entity {
     /** Ticks between burn applications, so the damage is a rate and not a spike. */
     private static final int BURN_INTERVAL_TICKS = 10;
     /** Max-health fraction per burn at the very edge of the pull. */
-    private static final float BURN_MIN_FRACTION = 0.012F;
+    private static final float BURN_MIN_FRACTION = 0.010F;
     /** Max-health fraction per burn for anything held against the star. */
-    private static final float BURN_MAX_FRACTION = 0.05F;
+    private static final float BURN_MAX_FRACTION = 0.052F;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             ConstellationEntity.class, EntityDataSerializers.INT);

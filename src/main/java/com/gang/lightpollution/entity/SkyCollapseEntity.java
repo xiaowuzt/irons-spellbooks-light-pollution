@@ -60,8 +60,8 @@ public final class SkyCollapseEntity extends Entity {
 
     public static final double SHARD_BLAST_RADIUS = 6.0D;
     public static final double KEYSTONE_BLAST_RADIUS = 14.0D;
-    private static final float SHARD_DAMAGE_FRACTION = 0.07F;
-    private static final float KEYSTONE_DAMAGE_FRACTION = 0.34F;
+    private static final float SHARD_DAMAGE_FRACTION = 0.065F;
+    private static final float KEYSTONE_DAMAGE_FRACTION = 0.37F;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             SkyCollapseEntity.class, EntityDataSerializers.INT);

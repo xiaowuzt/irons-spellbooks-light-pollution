@@ -19,7 +19,7 @@ float hash12(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-float noise2(vec2 x) {
+float slNoise2(vec2 x) {
     vec2 i = floor(x);
     vec2 f = fract(x);
     f = f * f * (3.0 - 2.0 * f);
@@ -47,19 +47,19 @@ void main() {
         float around = uvCoord.y;
 
         // The torn rim, ragged around the outline.
-        float ragged = 0.86 + 0.14 * noise2(vec2(around * 9.0, progress * 0.6));
+        float ragged = 0.86 + 0.14 * slNoise2(vec2(around * 9.0, progress * 0.6));
         float rim = exp(-pow((edge - ragged) / 0.17, 2.0));
         // A thinner white-hot line right at the break.
         rim += exp(-pow((edge - ragged) / 0.055, 2.0)) * 1.4;
 
         // Cracks running inward from the rim, so the slab still looks like it is
         // coming apart on the way down.
-        float inward = noise2(vec2(around * 5.0, edge * 3.4 + progress * 0.7));
+        float inward = slNoise2(vec2(around * 5.0, edge * 3.4 + progress * 0.7));
         float veins = exp(-abs(inward - 0.5) * 13.0)
                 * smoothstep(0.15, 1.0, edge) * 0.85;
 
         // The face itself: dim, cold, and slightly mottled.
-        float face = (0.1 + 0.06 * noise2(vec2(around * 7.0, edge * 6.0)))
+        float face = (0.1 + 0.06 * slNoise2(vec2(around * 7.0, edge * 6.0)))
                 * step(edge, ragged);
 
         float brightness = (rim + veins + face) * intensity;
@@ -97,8 +97,8 @@ void main() {
     float reach = 1.0 - fromCentre / max(spread, 0.001);
     float gap = 0.42 * smoothstep(0.0, 0.55, reach) * spread;
     // Torn, not cut: the two edges wander independently.
-    float tearA = gap * (0.78 + 0.34 * noise2(vec2(along * 26.0, 1.0)));
-    float tearB = gap * (0.78 + 0.34 * noise2(vec2(along * 26.0, 9.0)));
+    float tearA = gap * (0.78 + 0.34 * slNoise2(vec2(along * 26.0, 1.0)));
+    float tearB = gap * (0.78 + 0.34 * slNoise2(vec2(along * 26.0, 9.0)));
     float tear = across < 0.0 ? tearA : tearB;
 
     float brightness;
@@ -106,7 +106,7 @@ void main() {
     if (offset < tear) {
         // Inside the gap. Whatever is behind the sky is brighter than the sky.
         float depth = 1.0 - offset / max(tear, 0.001);
-        float churn = 0.7 + 0.3 * noise2(vec2(along * 14.0, offset * 20.0));
+        float churn = 0.7 + 0.3 * slNoise2(vec2(along * 14.0, offset * 20.0));
         brightness = (0.55 + depth * 1.5) * churn * intensity;
         rgb = mix(vec3(0.72, 0.86, 1.0), vec3(1.0, 1.0, 0.99), depth) * brightness;
     } else {

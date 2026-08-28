@@ -63,11 +63,11 @@ public final class StellarConvergenceEntity extends Entity {
     public static final double EFFECT_RADIUS = SHELL_RADIUS + COLUMN_RADIUS + 2.0D;
 
     /** Max-health fraction per beam tick while the column holds. */
-    private static final float BEAM_DAMAGE_FRACTION = 0.03F;
+    private static final float BEAM_DAMAGE_FRACTION = 0.033F;
     /** Ticks between beam damage applications. */
     private static final int BEAM_INTERVAL_TICKS = 10;
     /** Max-health fraction of the final burst. */
-    private static final float BURST_DAMAGE_FRACTION = 0.42F;
+    private static final float BURST_DAMAGE_FRACTION = 0.44F;
     /** Radius of the final burst, in blocks. */
     private static final double BURST_RADIUS = 12.0D;
 

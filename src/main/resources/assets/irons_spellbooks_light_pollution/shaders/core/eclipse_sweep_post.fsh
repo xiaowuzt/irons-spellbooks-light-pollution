@@ -14,7 +14,7 @@ float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-float noise2(vec2 p) {
+float slNoise2(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     f = f * f * (3.0 - 2.0 * f);
@@ -28,7 +28,7 @@ void main() {
     vec2 direction = centerVector / max(distanceToCenter, 0.0001);
     float lens = exp(-distanceToCenter * distanceToCenter * 5.0);
     float wave = sin(distanceToCenter * 52.0 - Params.z * 13.0);
-    float grain = noise2(vUv * vec2(70.0, 42.0) + Params.z * 0.7) - 0.5;
+    float grain = slNoise2(vUv * vec2(70.0, 42.0) + Params.z * 0.7) - 0.5;
     float distortion = Strength.x * 0.018 * lens * (wave * 0.62 + grain * 0.38);
     vec2 warpedUv = clamp(vUv + direction * distortion, vec2(0.001), vec2(0.999));
 

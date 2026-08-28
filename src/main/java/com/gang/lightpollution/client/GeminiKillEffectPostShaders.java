@@ -99,7 +99,9 @@ public final class GeminiKillEffectPostShaders {
         ACES("aces"),
         STARLESS("starless"),
         METEOR_SHOCK("meteor_shock"),
-        SINGULARITY_LENS("singularity_lens");
+        SINGULARITY_LENS("singularity_lens"),
+        GARGANTUA_LENS("gargantua_lens"),
+        COSMIC_HORSESHOE_LENS("cosmic_horseshoe_lens");
 
         private final String path;
 

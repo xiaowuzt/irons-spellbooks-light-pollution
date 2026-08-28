@@ -49,6 +49,33 @@ public final class ModItems {
     public static final RegistryObject<Item> WORLD_TREE_SCROLL = registerSpellScroll(
             "world_tree_scroll", ModSpells.WORLD_TREE);
 
+    public static final RegistryObject<Item> GARGANTUA_SCROLL = registerSpellScroll(
+            "gargantua_scroll", ModSpells.GARGANTUA);
+
+    public static final RegistryObject<Item> COSMIC_HORSESHOE_SCROLL = registerSpellScroll(
+            "cosmic_horseshoe_scroll", ModSpells.COSMIC_HORSESHOE);
+
+    public static final RegistryObject<Item> MICROQUASAR_SCROLL = registerSpellScroll(
+            "microquasar_scroll", ModSpells.MICROQUASAR);
+
+    public static final RegistryObject<Item> HELIX_NEBULA_SCROLL = registerSpellScroll(
+            "helix_nebula_scroll", ModSpells.HELIX_NEBULA);
+
+    public static final RegistryObject<Item> MAGNETAR_SCROLL = registerSpellScroll(
+            "magnetar_scroll", ModSpells.MAGNETAR);
+
+    public static final RegistryObject<Item> TIDAL_DISRUPTION_SCROLL = registerSpellScroll(
+            "tidal_disruption_scroll", ModSpells.TIDAL_DISRUPTION);
+
+    public static final RegistryObject<Item> QUASAR_JET_SCROLL = registerSpellScroll(
+            "quasar_jet_scroll", ModSpells.QUASAR_JET);
+
+    public static final RegistryObject<Item> PINWHEEL_SCROLL = registerSpellScroll(
+            "pinwheel_scroll", ModSpells.PINWHEEL);
+
+    public static final RegistryObject<Item> CRAB_NEBULA_SCROLL = registerSpellScroll(
+            "crab_nebula_scroll", ModSpells.CRAB_NEBULA);
+
     private static RegistryObject<Item> registerSpellScroll(
             String id,
             RegistryObject<? extends io.redspace.ironsspellbooks.api.spells.AbstractSpell> spell) {

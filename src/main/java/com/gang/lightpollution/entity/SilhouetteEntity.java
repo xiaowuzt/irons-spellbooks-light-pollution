@@ -49,7 +49,7 @@ public final class SilhouetteEntity extends Entity {
     /** Ticks between shadow damage applications. */
     private static final int DAMAGE_INTERVAL_TICKS = 20;
     /** Max-health fraction per damage tick for anything standing in shadow. */
-    private static final float SHADOW_DAMAGE_FRACTION = 0.04F;
+    private static final float SHADOW_DAMAGE_FRACTION = 0.030F;
     /**
      * A target closer than this to any of the caster's spell lights counts as
      * lit, and is therefore safe. Matches the reach of a typical spell light.

@@ -27,7 +27,7 @@ float hash13(vec3 p) {
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-float noise3(vec3 x) {
+float slNoise3(vec3 x) {
     vec3 i = floor(x);
     vec3 f = fract(x);
     f = f * f * (3.0 - 2.0 * f);
@@ -40,9 +40,9 @@ float noise3(vec3 x) {
 }
 
 float granulation(vec3 dir, float t) {
-    float n = noise3(dir * 7.0 + vec3(0.0, t * 0.35, 0.0)) * 0.6;
-    n += noise3(dir * 17.0 - vec3(t * 0.22, 0.0, t * 0.17)) * 0.3;
-    n += noise3(dir * 41.0 + vec3(t * 0.5)) * 0.1;
+    float n = slNoise3(dir * 7.0 + vec3(0.0, t * 0.35, 0.0)) * 0.6;
+    n += slNoise3(dir * 17.0 - vec3(t * 0.22, 0.0, t * 0.17)) * 0.3;
+    n += slNoise3(dir * 41.0 + vec3(t * 0.5)) * 0.1;
     return n;
 }
 
@@ -82,8 +82,8 @@ void main() {
                 - centre * dot(vViewPos, centre) + vec3(1e-5));
         float around = atan(offAxis.y, offAxis.x);
         float streamers = 0.62
-                + 0.38 * noise3(vec3(around * 2.4, seed * 0.35, 1.7));
-        streamers *= 0.75 + 0.45 * noise3(vec3(around * 7.0, seed * 0.6, 4.3));
+                + 0.38 * slNoise3(vec3(around * 2.4, seed * 0.35, 1.7));
+        streamers *= 0.75 + 0.45 * slNoise3(vec3(around * 7.0, seed * 0.6, 4.3));
 
         vec3 rgb = edgeColour * glow * streamers * brightness * 0.5;
         // Prominences: short arcs standing off the limb, brightest just outside

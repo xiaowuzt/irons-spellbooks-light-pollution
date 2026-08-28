@@ -132,13 +132,13 @@ public final class WorldTreeEntity extends Entity {
     private static final double CROWN_RADIUS = 20.0D;
 
     /** Max-health fraction per root strike. */
-    private static final float ROOT_DAMAGE_FRACTION = 0.05F;
+    private static final float ROOT_DAMAGE_FRACTION = 0.040F;
     /** Ticks between root strikes while they spread. */
     private static final int ROOT_INTERVAL_TICKS = 6;
     /** Max-health fraction when the trunk spears up. */
-    private static final float TRUNK_DAMAGE_FRACTION = 0.28F;
+    private static final float TRUNK_DAMAGE_FRACTION = 0.25F;
     /** Max-health fraction of the crown's pulse. */
-    private static final float CROWN_DAMAGE_FRACTION = 0.34F;
+    private static final float CROWN_DAMAGE_FRACTION = 0.39F;
     /** Ticks of rooting applied while the trunk holds. */
     private static final int ROOTED_TICKS = 60;
 

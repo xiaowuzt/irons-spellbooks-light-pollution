@@ -382,7 +382,7 @@ public class StargraveSingularityEntity extends Entity {
         private static CollapseTarget capture(LivingEntity target) {
             float maxHealth = target.getMaxHealth();
             float healthBefore = target.getHealth();
-            float damage = Math.max(0.0F, maxHealth * 0.90F);
+            float damage = Math.max(0.0F, maxHealth * 0.93F);
             float desiredHealth = Math.max(0.0F, healthBefore - damage);
             return new CollapseTarget(target, damage, desiredHealth);
         }

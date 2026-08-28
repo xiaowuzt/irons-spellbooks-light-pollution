@@ -34,6 +34,15 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.SINGULARITY_SCROLL.get().getDefaultInstance());
                         output.accept(ModItems.LEVIATHAN_SCROLL.get().getDefaultInstance());
                         output.accept(ModItems.WORLD_TREE_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.GARGANTUA_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.COSMIC_HORSESHOE_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.MICROQUASAR_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.HELIX_NEBULA_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.MAGNETAR_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.TIDAL_DISRUPTION_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.QUASAR_JET_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.PINWHEEL_SCROLL.get().getDefaultInstance());
+                        output.accept(ModItems.CRAB_NEBULA_SCROLL.get().getDefaultInstance());
                     })
                     .build());
 

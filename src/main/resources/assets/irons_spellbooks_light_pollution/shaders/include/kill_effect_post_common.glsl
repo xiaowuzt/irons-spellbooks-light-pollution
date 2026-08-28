@@ -3033,7 +3033,8 @@ void main() {
     && !defined(BLACK_HOLE) && !defined(GLOW_FLASH) && !defined(SHOCKWAVE) \
     && !defined(FLASH_SCREEN) && !defined(AFTERIMAGE) \
     && !defined(ACES) && !defined(COMPOSITE) && !defined(STARLESS) \
-    && !defined(METEOR_SHOCK) && !defined(SINGULARITY_LENS)
+    && !defined(METEOR_SHOCK) && !defined(SINGULARITY_LENS) \
+    && !defined(GARGANTUA_LENS) && !defined(COSMIC_HORSESHOE_LENS)
 
 void main() {
     fragColor = texture(SceneSampler, vUv);

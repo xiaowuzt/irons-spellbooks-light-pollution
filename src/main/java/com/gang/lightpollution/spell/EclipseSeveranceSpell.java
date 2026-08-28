@@ -37,7 +37,7 @@ public final class EclipseSeveranceSpell extends AbstractSpell {
     public EclipseSeveranceSpell() {
         this.baseManaCost = 1000;
         this.manaCostPerLevel = 0;
-        this.baseSpellPower = 500;
+        this.baseSpellPower = 520;
         this.spellPowerPerLevel = 0;
         this.castTime = 20;
     }

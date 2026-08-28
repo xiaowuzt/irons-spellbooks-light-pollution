@@ -3,6 +3,8 @@ package com.gang.lightpollution.client.renderer;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.SpellLightConfig;
 import com.gang.lightpollution.client.GeminiKillEffectPostShaders;
+import com.gang.lightpollution.entity.GargantuaEntity;
+import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.SingularityEntity;
 import com.gang.lightpollution.entity.StarfallEntity;
 import com.gang.lightpollution.entity.StarlessEntity;
@@ -850,6 +852,194 @@ public final class SpellLightPostProcessor {
         } finally {
             snapshot.restore();
         }
+    }
+
+    /**
+     * Gargantua: the disk, the shadow and the lensed background, in one pass.
+     *
+     * <p>Unlike every other effect in this mod, none of this is geometry. The disk's
+     * far side has to appear bent up over the shadow and down under it, which is
+     * multiple imaging rather than distortion — the same piece of disk seen twice
+     * along two different bent paths. No mesh can express that, because the shape
+     * depends on where the viewer is standing. So the pass integrates a photon
+     * geodesic per pixel and samples the disk wherever the bent ray cuts its plane.
+     * See the shader include for the equation and the published radii.</p>
+     */
+    public static void renderGargantua(List<GargantuaEntity> effects,
+                                       Matrix4f projectionMatrix,
+                                       Matrix4f viewMatrix, Camera camera,
+                                       float partialTick) {
+        if (runtimeDisabled || !SpellLightConfig.enabled || effects == null
+                || effects.isEmpty() || projectionMatrix == null || viewMatrix == null
+                || camera == null || !RenderSystem.isOnRenderThread()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        ShaderInstance shader = GeminiKillEffectPostShaders.shader(Pass.GARGANTUA_LENS);
+        if (minecraft.level == null || mainTarget == null || shader == null
+                || mainTarget.getDepthTextureId() < 0
+                || mainTarget.width <= 0 || mainTarget.height <= 0) {
+            return;
+        }
+
+        RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        try {
+            ensureSceneCopy(mainTarget.width, mainTarget.height);
+            ensureCurrentDepth(mainTarget.width, mainTarget.height);
+            Matrix4f projection = new Matrix4f(projectionMatrix);
+            Matrix4f inverseProjection = new Matrix4f(projection).invert();
+            Matrix4f viewRotation = new Matrix4f(viewMatrix)
+                    .setTranslation(0.0F, 0.0F, 0.0F);
+            Vec3 cameraPosition = camera.getPosition();
+
+            for (GargantuaEntity entity : effects) {
+                float radius = entity.gravitationalRadius(partialTick);
+                float brightness = entity.brightness(partialTick);
+                if (radius <= 0.01F || brightness <= 0.01F) {
+                    continue;
+                }
+                Vec3 centre = entity.centre(partialTick);
+                Vector3f eye = viewRotation.transformPosition(new Vector3f(
+                        (float) (centre.x - cameraPosition.x),
+                        (float) (centre.y - cameraPosition.y),
+                        (float) (centre.z - cameraPosition.z)));
+                // The spin axis is a direction, so only the rotation applies to it.
+                Vec3 axis = entity.spinAxis();
+                Vector3f axisEye = viewRotation.transformDirection(new Vector3f(
+                        (float) axis.x, (float) axis.y, (float) axis.z)).normalize();
+
+                copyColor(mainTarget, sceneCopy);
+                copyDepth(mainTarget, currentDepth);
+                mainTarget.bindWrite(true);
+                configureFullscreenState();
+                shader.setSampler("SceneSampler", sceneCopy.getColorTextureId());
+                shader.setSampler("DepthSampler", currentDepth.getDepthTextureId());
+                set(shader, "Params", mainTarget.width, mainTarget.height, 0.0F, 0.0F);
+                set(shader, "HoleCentre", eye.x(), eye.y(), eye.z(), radius);
+                // The disk's structure comes from this: noise modulates its local
+                // thickness, which gives torn wispy edges instead of a hard ring
+                // with blotches painted on it.
+                shader.setSampler("NoiseSampler", noiseTextureId());
+                set(shader, "SpinAxis", axisEye.x(), axisEye.y(), axisEye.z(),
+                        GargantuaEntity.SPIN);
+                set(shader, "HoleState", entity.opened(partialTick),
+                        entity.criticality(partialTick),
+                        SpellBoltRenderer.boltTime(),
+                        entity.getSwallowedCount());
+                set(shader, "DiskShape", GargantuaEntity.DISK_INNER_RADIUS,
+                        GargantuaEntity.DISK_OUTER_RADIUS, 0.004F, brightness);
+                set(shader, "InverseProjectionMat", inverseProjection);
+                set(shader, "ProjectionMat", projection);
+                RenderSystem.setShader(() -> shader);
+                drawFullscreenQuad();
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            disableAfterFailure(failure);
+        } finally {
+            snapshot.restore();
+        }
+    }
+
+    /**
+     * The Cosmic Horseshoe: an arc of lensed galaxy light, plus the scene bent round it.
+     *
+     * <p>Cheaper than Gargantua by a wide margin, and for a structural reason rather
+     * than by tuning. Gargantua integrates a photon geodesic and marches up to 96 steps
+     * per pixel because its signature is multiple imaging of its own disk. A lens map is
+     * closed form, so this is one evaluation and one extra texture read per pixel.</p>
+     */
+    public static void renderCosmicHorseshoe(List<CosmicHorseshoeEntity> effects,
+                                             Matrix4f projectionMatrix,
+                                             Matrix4f viewMatrix, Camera camera,
+                                             float partialTick) {
+        if (runtimeDisabled || !SpellLightConfig.enabled || effects == null
+                || effects.isEmpty() || projectionMatrix == null || viewMatrix == null
+                || camera == null || !RenderSystem.isOnRenderThread()) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        RenderTarget mainTarget = minecraft.getMainRenderTarget();
+        ShaderInstance shader =
+                GeminiKillEffectPostShaders.shader(Pass.COSMIC_HORSESHOE_LENS);
+        if (minecraft.level == null || mainTarget == null || shader == null
+                || mainTarget.getDepthTextureId() < 0
+                || mainTarget.width <= 0 || mainTarget.height <= 0) {
+            return;
+        }
+
+        RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        try {
+            ensureSceneCopy(mainTarget.width, mainTarget.height);
+            ensureCurrentDepth(mainTarget.width, mainTarget.height);
+            Matrix4f projection = new Matrix4f(projectionMatrix);
+            Matrix4f inverseProjection = new Matrix4f(projection).invert();
+            Matrix4f viewRotation = new Matrix4f(viewMatrix)
+                    .setTranslation(0.0F, 0.0F, 0.0F);
+            Vec3 cameraPosition = camera.getPosition();
+
+            for (CosmicHorseshoeEntity entity : effects) {
+                float brightness = entity.brightness(partialTick);
+                if (brightness <= 0.01F) {
+                    continue;
+                }
+                Vec3 centre = entity.centre(partialTick);
+                Vector3f eye = viewRotation.transformPosition(new Vector3f(
+                        (float) (centre.x - cameraPosition.x),
+                        (float) (centre.y - cameraPosition.y),
+                        (float) (centre.z - cameraPosition.z)));
+                // A direction, so only the rotation applies to it.
+                Vec3 gap = entity.gapDirection();
+                Vector3f gapEye = viewRotation.transformDirection(new Vector3f(
+                        (float) gap.x, (float) gap.y, (float) gap.z)).normalize();
+
+                copyColor(mainTarget, sceneCopy);
+                copyDepth(mainTarget, currentDepth);
+                mainTarget.bindWrite(true);
+                configureFullscreenState();
+                shader.setSampler("SceneSampler", sceneCopy.getColorTextureId());
+                shader.setSampler("DepthSampler", currentDepth.getDepthTextureId());
+                set(shader, "Params", mainTarget.width, mainTarget.height, 0.0F, 0.0F);
+                set(shader, "LensCentre", eye.x(), eye.y(), eye.z(),
+                        CosmicHorseshoeEntity.EINSTEIN_RADIUS);
+                // The axis ratio is what makes this a horseshoe rather than two matching
+                // arcs. 0.72 is typical of the ellipticals that lens like this.
+                set(shader, "GapDir", gapEye.x(), gapEye.y(), gapEye.z(), 0.72F);
+                set(shader, "LensState", entity.aligned(partialTick), brightness,
+                        SpellBoltRenderer.boltTime(),
+                        // A stable per-cast phase for the clump placement, kept small so
+                        // the hash stays where sin has precision left.
+                        (entity.getSeed() & 0xFFFF) * 0.0011F);
+                set(shader, "SourceShape", CosmicHorseshoeEntity.SOURCE_RADIUS,
+                        CosmicHorseshoeEntity.SOURCE_OFFSET, 0.55F, 3.4F);
+                set(shader, "InverseProjectionMat", inverseProjection);
+                set(shader, "ProjectionMat", projection);
+                RenderSystem.setShader(() -> shader);
+                drawFullscreenQuad();
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            disableAfterFailure(failure);
+        } finally {
+            snapshot.restore();
+        }
+    }
+
+    /**
+     * GL id of the shared noise tile.
+     *
+     * <p>The single-argument lookup matters. Its two-argument sibling returns the
+     * fallback when the texture has never been used, and the noise tile is otherwise
+     * only touched by the lightning renderer — so in any scene without lightning this
+     * handed back id 0, the sampler read black, and the disk's noise cutoff then
+     * discarded every single sample. The disk rendered as nothing at all. This
+     * overload registers and loads on demand instead.</p>
+     *
+     * <p>Resolved every frame rather than cached, because a resource reload replaces
+     * the texture object and a stale id fails the same silent way.</p>
+     */
+    private static int noiseTextureId() {
+        return Minecraft.getInstance().getTextureManager()
+                .getTexture(SpellBoltRenderer.NOISE).getId();
     }
 
     /**

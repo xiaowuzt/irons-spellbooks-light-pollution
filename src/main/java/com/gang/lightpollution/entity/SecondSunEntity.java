@@ -56,11 +56,11 @@ public final class SecondSunEntity extends Entity {
     /** Radius of the scorched area on the ground, in blocks. */
     public static final double EFFECT_RADIUS = 26.0D;
     /** Max-health fraction per scorch tick while it is overhead. */
-    private static final float SCORCH_DAMAGE_FRACTION = 0.02F;
+    private static final float SCORCH_DAMAGE_FRACTION = 0.018F;
     /** Ticks between scorch applications. */
     private static final int SCORCH_INTERVAL_TICKS = 15;
     /** Max-health fraction of the supernova itself. */
-    private static final float NOVA_DAMAGE_FRACTION = 0.55F;
+    private static final float NOVA_DAMAGE_FRACTION = 0.61F;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             SecondSunEntity.class, EntityDataSerializers.INT);

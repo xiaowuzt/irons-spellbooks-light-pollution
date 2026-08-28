@@ -45,9 +45,9 @@ public final class FuneralNovaEntity extends Entity {
     public static final int HYPERNOVA_DAMAGE_TICK = 164;
 
     public static final double EFFECT_RADIUS = 12.0D;
-    private static final float ACCRETION_DAMAGE_FRACTION = 0.15F;
-    private static final float COLLAPSE_DAMAGE_FRACTION = 0.20F;
-    private static final float HYPERNOVA_DAMAGE_FRACTION = 0.25F;
+    private static final float ACCRETION_DAMAGE_FRACTION = 0.13F;
+    private static final float COLLAPSE_DAMAGE_FRACTION = 0.19F;
+    private static final float HYPERNOVA_DAMAGE_FRACTION = 0.27F;
 
     private static final EntityDataAccessor<Integer> DATA_SEED = SynchedEntityData.defineId(
             FuneralNovaEntity.class, EntityDataSerializers.INT);

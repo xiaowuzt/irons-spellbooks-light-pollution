@@ -1,6 +1,15 @@
 package com.gang.lightpollution.registry;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.entity.GargantuaEntity;
+import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
+import com.gang.lightpollution.entity.MicroquasarEntity;
+import com.gang.lightpollution.entity.HelixNebulaEntity;
+import com.gang.lightpollution.entity.MagnetarEntity;
+import com.gang.lightpollution.entity.TidalDisruptionEntity;
+import com.gang.lightpollution.entity.QuasarJetEntity;
+import com.gang.lightpollution.entity.PinwheelEntity;
+import com.gang.lightpollution.entity.CrabNebulaEntity;
 import com.gang.lightpollution.entity.CelestialJudgmentEntity;
 import com.gang.lightpollution.entity.ChromaticAccretionEntity;
 import com.gang.lightpollution.entity.ConstellationEntity;
@@ -115,6 +124,60 @@ public final class ModEntities {
                     .of(WorldTreeEntity::new, MobCategory.MISC)
                     .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
                     .build(ExampleMod.MODID + ":world_tree"));
+
+    public static final RegistryObject<EntityType<GargantuaEntity>> GARGANTUA =
+            ENTITY_TYPES.register("gargantua", () -> EntityType.Builder
+                    .of(GargantuaEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":gargantua"));
+
+    public static final RegistryObject<EntityType<CosmicHorseshoeEntity>> COSMIC_HORSESHOE =
+            ENTITY_TYPES.register("cosmic_horseshoe", () -> EntityType.Builder
+                    .of(CosmicHorseshoeEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":cosmic_horseshoe"));
+
+    public static final RegistryObject<EntityType<MicroquasarEntity>> MICROQUASAR =
+            ENTITY_TYPES.register("microquasar", () -> EntityType.Builder
+                    .of(MicroquasarEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":microquasar"));
+
+    public static final RegistryObject<EntityType<HelixNebulaEntity>> HELIX_NEBULA =
+            ENTITY_TYPES.register("helix_nebula", () -> EntityType.Builder
+                    .of(HelixNebulaEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":helix_nebula"));
+
+    public static final RegistryObject<EntityType<MagnetarEntity>> MAGNETAR =
+            ENTITY_TYPES.register("magnetar", () -> EntityType.Builder
+                    .of(MagnetarEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":magnetar"));
+
+    public static final RegistryObject<EntityType<TidalDisruptionEntity>> TIDAL_DISRUPTION =
+            ENTITY_TYPES.register("tidal_disruption", () -> EntityType.Builder
+                    .of(TidalDisruptionEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":tidal_disruption"));
+
+    public static final RegistryObject<EntityType<QuasarJetEntity>> QUASAR_JET =
+            ENTITY_TYPES.register("quasar_jet", () -> EntityType.Builder
+                    .of(QuasarJetEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":quasar_jet"));
+
+    public static final RegistryObject<EntityType<PinwheelEntity>> PINWHEEL =
+            ENTITY_TYPES.register("pinwheel", () -> EntityType.Builder
+                    .of(PinwheelEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":pinwheel"));
+
+    public static final RegistryObject<EntityType<CrabNebulaEntity>> CRAB_NEBULA =
+            ENTITY_TYPES.register("crab_nebula", () -> EntityType.Builder
+                    .of(CrabNebulaEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":crab_nebula"));
 
     private ModEntities() {
     }

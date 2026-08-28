@@ -27,7 +27,7 @@ float hash13(vec3 p) {
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-float noise3(vec3 x) {
+float slNoise3(vec3 x) {
     vec3 i = floor(x);
     vec3 f = fract(x);
     f = f * f * (3.0 - 2.0 * f);
@@ -41,9 +41,9 @@ float noise3(vec3 x) {
 
 /** Convective granulation, sampled on the sphere's own surface. */
 float granulation(vec3 normal, float t) {
-    float n = noise3(normal * 4.5 + vec3(0.0, t * 0.25, 0.0)) * 0.6;
-    n += noise3(normal * 12.0 - vec3(t * 0.2, 0.0, t * 0.15)) * 0.28;
-    n += noise3(normal * 27.0 + vec3(t * 0.35)) * 0.12;
+    float n = slNoise3(normal * 4.5 + vec3(0.0, t * 0.25, 0.0)) * 0.6;
+    n += slNoise3(normal * 12.0 - vec3(t * 0.2, 0.0, t * 0.15)) * 0.28;
+    n += slNoise3(normal * 27.0 + vec3(t * 0.35)) * 0.12;
     return n;
 }
 
@@ -117,7 +117,7 @@ void main() {
 
         // Darker patches, also on the surface so they foreshorten with it.
         float spots = smoothstep(0.6, 0.78,
-                noise3(spun * 2.2 + vec3(seed * 0.05)));
+                slNoise3(spun * 2.2 + vec3(seed * 0.05)));
         float face = limb * mottle * (1.0 - spots * 0.5);
 
         // Gain below the clipping point, so the structure above survives the
@@ -127,7 +127,7 @@ void main() {
         // A bright rim at the limb with prominences standing off it.
         float rim = pow(1.0 - cosAngle, 3.0);
         float archAngle = atan(centred.y, centred.x);
-        float arches = 0.55 + 0.45 * noise3(vec3(archAngle * 3.4, seed * 0.2, 2.0));
+        float arches = 0.55 + 0.45 * slNoise3(vec3(archAngle * 3.4, seed * 0.2, 2.0));
         rgb += core * rim * arches * brightness * 0.5 * disc;
 
         alpha = max(alpha, disc * fade);
@@ -143,8 +143,8 @@ void main() {
                 * (1.0 - smoothstep(0.0, reach, beyond));
         float angle = atan(centred.y, centred.x);
         // Streamers, so the halo is structured rather than a smooth gradient.
-        float streamers = 0.6 + 0.4 * noise3(vec3(angle * 2.6, seed * 0.3, 1.0));
-        streamers *= 0.75 + 0.45 * noise3(vec3(angle * 8.0, seed * 0.5, 4.0));
+        float streamers = 0.6 + 0.4 * slNoise3(vec3(angle * 2.6, seed * 0.3, 1.0));
+        streamers *= 0.75 + 0.45 * slNoise3(vec3(angle * 8.0, seed * 0.5, 4.0));
         float halo = falloff * streamers * (1.0 - disc);
         rgb += core * brightness * 0.4 * halo;
         alpha = max(alpha, clamp(halo, 0.0, 1.0) * fade * 0.85);
@@ -157,7 +157,7 @@ void main() {
         // A second, wider front behind it.
         front += exp(-pow((radial - shell * 0.72) / 0.17, 2.0)) * 0.45;
         float angle = atan(centred.y, centred.x);
-        float ragged = 0.72 + 0.28 * noise3(vec3(angle * 4.0, nova * 3.0, 7.0));
+        float ragged = 0.72 + 0.28 * slNoise3(vec3(angle * 4.0, nova * 3.0, 7.0));
         float blast = front * ragged * (1.0 - nova * 0.4);
 
         rgb += vec3(1.0, 0.97, 0.92) * blast * brightness * 0.8;

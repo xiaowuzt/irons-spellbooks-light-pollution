@@ -60,8 +60,8 @@ public final class StarlessEntity extends Entity {
     /** Ticks over which the release flash decays. */
     private static final float FLASH_DECAY_TICKS = 26.0F;
 
-    private static final float STARVATION_DAMAGE_FRACTION = 0.18F;
-    private static final float RELEASE_DAMAGE_FRACTION = 0.30F;
+    private static final float STARVATION_DAMAGE_FRACTION = 0.16F;
+    private static final float RELEASE_DAMAGE_FRACTION = 0.26F;
     /** Extra maximum-health fraction per swallowed light, and its cap. */
     private static final float SWALLOWED_DAMAGE_STEP = 0.05F;
     private static final int SWALLOWED_DAMAGE_CAP = 4;

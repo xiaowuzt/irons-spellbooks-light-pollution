@@ -29,7 +29,7 @@ float hash13(vec3 p) {
     return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
-float noise3(vec3 x) {
+float slNoise3(vec3 x) {
     vec3 i = floor(x);
     vec3 f = fract(x);
     f = f * f * (3.0 - 2.0 * f);
@@ -65,7 +65,7 @@ void main() {
         float miss = sqrt(max(c - b * b, 0.0));
         float halo = radius / max(miss, 0.0001);
         float glow = pow(clamp(halo, 0.0, 1.0), 2.4);
-        float swirl = 0.62 + 0.38 * noise3(dir * 11.0 + vec3(progress * 6.0));
+        float swirl = 0.62 + 0.38 * slNoise3(dir * 11.0 + vec3(progress * 6.0));
         vec3 haloRgb = mix(vec3(0.46, 0.22, 0.92), vec3(1.0, 0.88, 1.0),
                 clamp(glow * 1.5, 0.0, 1.0)) * glow * swirl * intensity * 0.7;
         float haloAlpha = clamp(glow * swirl, 0.0, 1.0) * fade * 0.9;
@@ -88,9 +88,9 @@ void main() {
 
     // Bands of infalling material, sheared so they wrap the body instead of
     // sitting on it like paint.
-    float shear = noise3(normal * 4.0 + vec3(0.0, progress * 7.0, 0.0));
+    float shear = slNoise3(normal * 4.0 + vec3(0.0, progress * 7.0, 0.0));
     float bands = 0.5 + 0.5 * sin(normal.y * 9.0 + shear * 5.0 + progress * 14.0);
-    float grain = 0.6 + 0.4 * noise3(normal * 15.0 + vec3(progress * 9.0));
+    float grain = 0.6 + 0.4 * slNoise3(normal * 15.0 + vec3(progress * 9.0));
 
     // A dark pupil dead centre, thinning the glow where the solid body shows
     // through. Only a detail: under additive blending anything dark is absent, so

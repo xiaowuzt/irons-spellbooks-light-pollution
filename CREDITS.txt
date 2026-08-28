@@ -1,3 +1,24 @@
+Iron's Spells: Light Pollution — Attributions
+=========================================================================
+
+Some of FX (github.com/YangMao-Minister/some_of_fx), MIT, (c) 2026 Pizuka
+  Singularity's screen-space refraction, its lightning, the noise and core
+  textures, and the sound effects derive from that project. Full licence text in
+  SOME_OF_FX_LICENSE.txt.
+
+ArcaneVortex, by ErChien — used with the author's written permission
+  Gargantua's ray-marched black hole draws on ArcaneVortex's rendering work.
+  ArcaneVortex is All Rights Reserved; the author gave permission for direct use
+  of the code on the condition that it be credited, and this notice is that
+  condition being met. Please do not redistribute ArcaneVortex's own code on the
+  strength of this notice — the permission was granted to this project, not
+  onward.
+  The physics and every radius come from James, von Tunzelmann, Franklin &
+  Thorne, "Gravitational lensing by spinning black holes in astrophysics, and in
+  the movie Interstellar", Classical and Quantum Gravity 32, 065001 (2015).
+
+=========================================================================
+
 Minecraft Forge: Credits/Thank You
 
 Forge is a set of tools and modifications to the Minecraft base game code to assist 

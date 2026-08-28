@@ -56,6 +56,33 @@ public final class ModSpells {
     public static final RegistryObject<AbstractSpell> WORLD_TREE = SPELLS.register(
             "world_tree", WorldTreeSpell::new);
 
+    public static final RegistryObject<AbstractSpell> GARGANTUA = SPELLS.register(
+            "gargantua", GargantuaSpell::new);
+
+    public static final RegistryObject<AbstractSpell> COSMIC_HORSESHOE = SPELLS.register(
+            "cosmic_horseshoe", CosmicHorseshoeSpell::new);
+
+    public static final RegistryObject<AbstractSpell> MICROQUASAR = SPELLS.register(
+            "microquasar", MicroquasarSpell::new);
+
+    public static final RegistryObject<AbstractSpell> HELIX_NEBULA = SPELLS.register(
+            "helix_nebula", HelixNebulaSpell::new);
+
+    public static final RegistryObject<AbstractSpell> MAGNETAR = SPELLS.register(
+            "magnetar", MagnetarSpell::new);
+
+    public static final RegistryObject<AbstractSpell> TIDAL_DISRUPTION = SPELLS.register(
+            "tidal_disruption", TidalDisruptionSpell::new);
+
+    public static final RegistryObject<AbstractSpell> QUASAR_JET = SPELLS.register(
+            "quasar_jet", QuasarJetSpell::new);
+
+    public static final RegistryObject<AbstractSpell> PINWHEEL = SPELLS.register(
+            "pinwheel", PinwheelSpell::new);
+
+    public static final RegistryObject<AbstractSpell> CRAB_NEBULA = SPELLS.register(
+            "crab_nebula", CrabNebulaSpell::new);
+
     private ModSpells() {
     }
 }

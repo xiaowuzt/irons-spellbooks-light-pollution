@@ -82,9 +82,9 @@ public final class StarfallEntity extends Entity {
 
     public static final double RAIN_BLAST_RADIUS = 2.5D;
     public static final double FINALE_BLAST_RADIUS = 9.0D;
-    private static final float RAIN_DAMAGE_FRACTION = 0.04F;
+    private static final float RAIN_DAMAGE_FRACTION = 0.037F;
     /** The finale's damage, consolidated from what used to be three bodies. */
-    private static final float FINALE_DAMAGE_FRACTION = 0.30F;
+    private static final float FINALE_DAMAGE_FRACTION = 0.28F;
     /** Fraction of rain meteors that shed a visible shock ring. */
     private static final float SHOCK_RING_CHANCE = 0.3F;
 

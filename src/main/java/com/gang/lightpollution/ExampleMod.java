@@ -56,6 +56,26 @@ public final class ExampleMod {
             event.registerEntityRenderer(ModEntities.SINGULARITY.get(), NoopRenderer::new);
             event.registerEntityRenderer(ModEntities.LEVIATHAN.get(), NoopRenderer::new);
             event.registerEntityRenderer(ModEntities.WORLD_TREE.get(), NoopRenderer::new);
+            // Gargantua is drawn entirely in a screen-space pass, but vanilla still
+            // dereferences the renderer before it asks whether to render, so the
+            // entity needs one registered or the first frame it exists throws.
+            event.registerEntityRenderer(ModEntities.GARGANTUA.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.COSMIC_HORSESHOE.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.MICROQUASAR.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.HELIX_NEBULA.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.MAGNETAR.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.TIDAL_DISRUPTION.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.QUASAR_JET.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.PINWHEEL.get(),
+                    NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.CRAB_NEBULA.get(),
+                    NoopRenderer::new);
         }
     }
 }

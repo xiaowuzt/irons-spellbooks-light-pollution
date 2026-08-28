@@ -1,5 +1,14 @@
 package com.gang.lightpollution.client.renderer;
 
+import com.gang.lightpollution.entity.GargantuaEntity;
+import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
+import com.gang.lightpollution.entity.MicroquasarEntity;
+import com.gang.lightpollution.entity.HelixNebulaEntity;
+import com.gang.lightpollution.entity.MagnetarEntity;
+import com.gang.lightpollution.entity.TidalDisruptionEntity;
+import com.gang.lightpollution.entity.QuasarJetEntity;
+import com.gang.lightpollution.entity.PinwheelEntity;
+import com.gang.lightpollution.entity.CrabNebulaEntity;
 import com.gang.lightpollution.entity.CelestialJudgmentEntity;
 import com.gang.lightpollution.entity.ChromaticAccretionEntity;
 import com.gang.lightpollution.entity.ConstellationEntity;
@@ -55,6 +64,24 @@ public final class SpellLightEmitter {
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<SingularityEntity> SINGULARITY =
             Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<GargantuaEntity> GARGANTUA =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<CosmicHorseshoeEntity> COSMIC_HORSESHOE =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<MicroquasarEntity> MICROQUASAR =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<HelixNebulaEntity> HELIX_NEBULA =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<MagnetarEntity> MAGNETAR =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<TidalDisruptionEntity> TIDAL_DISRUPTION =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<QuasarJetEntity> QUASAR_JET =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<PinwheelEntity> PINWHEEL =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<CrabNebulaEntity> CRAB_NEBULA =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<LeviathanEntity> LEVIATHAN =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<WorldTreeEntity> WORLD_TREE =
@@ -97,6 +124,15 @@ public final class SpellLightEmitter {
         if (entity instanceof StellarConvergenceEntity value) CONVERGENCE.add(value);
         if (entity instanceof SecondSunEntity value) SECOND_SUN.add(value);
         if (entity instanceof SingularityEntity value) SINGULARITY.add(value);
+        if (entity instanceof GargantuaEntity value) GARGANTUA.add(value);
+        if (entity instanceof CosmicHorseshoeEntity value) COSMIC_HORSESHOE.add(value);
+        if (entity instanceof MicroquasarEntity value) MICROQUASAR.add(value);
+        if (entity instanceof HelixNebulaEntity value) HELIX_NEBULA.add(value);
+        if (entity instanceof MagnetarEntity value) MAGNETAR.add(value);
+        if (entity instanceof TidalDisruptionEntity value) TIDAL_DISRUPTION.add(value);
+        if (entity instanceof QuasarJetEntity value) QUASAR_JET.add(value);
+        if (entity instanceof PinwheelEntity value) PINWHEEL.add(value);
+        if (entity instanceof CrabNebulaEntity value) CRAB_NEBULA.add(value);
         if (entity instanceof LeviathanEntity value) LEVIATHAN.add(value);
         if (entity instanceof WorldTreeEntity value) WORLD_TREE.add(value);
     }
@@ -115,6 +151,15 @@ public final class SpellLightEmitter {
         if (entity instanceof StellarConvergenceEntity value) CONVERGENCE.remove(value);
         if (entity instanceof SecondSunEntity value) SECOND_SUN.remove(value);
         if (entity instanceof SingularityEntity value) SINGULARITY.remove(value);
+        if (entity instanceof GargantuaEntity value) GARGANTUA.remove(value);
+        if (entity instanceof CosmicHorseshoeEntity value) COSMIC_HORSESHOE.remove(value);
+        if (entity instanceof MicroquasarEntity value) MICROQUASAR.remove(value);
+        if (entity instanceof HelixNebulaEntity value) HELIX_NEBULA.remove(value);
+        if (entity instanceof MagnetarEntity value) MAGNETAR.remove(value);
+        if (entity instanceof TidalDisruptionEntity value) TIDAL_DISRUPTION.remove(value);
+        if (entity instanceof QuasarJetEntity value) QUASAR_JET.remove(value);
+        if (entity instanceof PinwheelEntity value) PINWHEEL.remove(value);
+        if (entity instanceof CrabNebulaEntity value) CRAB_NEBULA.remove(value);
         if (entity instanceof LeviathanEntity value) LEVIATHAN.remove(value);
         if (entity instanceof WorldTreeEntity value) WORLD_TREE.remove(value);
     }
@@ -133,6 +178,15 @@ public final class SpellLightEmitter {
         CONVERGENCE.clear();
         SECOND_SUN.clear();
         SINGULARITY.clear();
+        GARGANTUA.clear();
+        COSMIC_HORSESHOE.clear();
+        MICROQUASAR.clear();
+        HELIX_NEBULA.clear();
+        MAGNETAR.clear();
+        TIDAL_DISRUPTION.clear();
+        QUASAR_JET.clear();
+        PINWHEEL.clear();
+        CRAB_NEBULA.clear();
         LEVIATHAN.clear();
         WORLD_TREE.clear();
         testLight = null;
@@ -385,6 +439,26 @@ public final class SpellLightEmitter {
                         0.94F, 0.86F, 1.0F));
             }
         }
+        // Gargantua: the accretion disk is the light source, not the hole. Its
+        // colour is the disk's own 4500 K amber rather than anything blue -- the
+        // film's disk is deliberately cool, because a real quasar disk would have
+        // sterilised everything nearby. Brightness rides the same growth curve as
+        // the geometry, so the world lights up as it swells.
+        for (GargantuaEntity entity : GARGANTUA) {
+            Vec3 centre = entity.centre(partialTick);
+            float radius = entity.gravitationalRadius(partialTick);
+            float brightness = entity.brightness(partialTick);
+            if (brightness > 0.03F) {
+                result.add(new Light(centre,
+                        radius * GargantuaEntity.DISK_OUTER_RADIUS * 0.8F,
+                        brightness * 1.1F, 1.0F, 0.78F, 0.42F));
+            }
+            float flash = entity.blastFlash(partialTick);
+            if (flash > 0.01F) {
+                result.add(new Light(centre, 74.0F, flash * 5.0F,
+                        1.0F, 0.94F, 0.86F));
+            }
+        }
         // Leviathan: the body is the light. Sampled at a few points along the
         // spine rather than every segment -- a 48-light body would blow the shadow
         // budget on its own, and the eye cannot tell the difference between five
@@ -438,7 +512,61 @@ public final class SpellLightEmitter {
                         1.0F, Math.min(1.0F, green + 0.1F), Math.min(1.0F, blue + 0.1F)));
             }
         }
-        return drainByVoids(result, partialTick);
+        return drainByGargantuas(drainByVoids(result, partialTick), partialTick);
+    }
+
+    /**
+     * Puts out the spell lights Gargantua has drawn in.
+     *
+     * <p>The geodesic pass already bends the light of the world around the hole, but
+     * a light *source* inside the pull is a different thing: its own glow should be
+     * going down the hole, not carrying on lighting the terrain. Extinguishing it here
+     * makes the light, its falloff and its cast shadows all fade together, the same
+     * way the Starless drain does.</p>
+     *
+     * <p>Gargantua's own disk light is exempt, or it would eat itself.</p>
+     */
+    private static List<Light> drainByGargantuas(List<Light> lights, float partialTick) {
+        if (GARGANTUA.isEmpty() || lights.isEmpty()) {
+            return lights;
+        }
+        List<Light> drained = new ArrayList<>(lights.size());
+        for (Light light : lights) {
+            float keep = 1.0F;
+            for (GargantuaEntity entity : GARGANTUA) {
+                Vec3 centre = entity.centre(partialTick);
+                double distance = light.position().distanceTo(centre);
+                if (distance >= GargantuaEntity.PULL_RADIUS || distance < 0.001D) {
+                    continue;
+                }
+                // Its own disk light sits at the centre; skip it rather than
+                // letting the hole extinguish itself.
+                if (distance < 0.5D) {
+                    continue;
+                }
+                float horizon = entity.gravitationalRadius(partialTick)
+                        * GargantuaEntity.HORIZON_RADIUS;
+                float reach;
+                if (distance <= horizon) {
+                    // Past the horizon a light is simply gone.
+                    reach = 1.0F;
+                } else {
+                    float outer = (float) ((distance - horizon)
+                            / Math.max(GargantuaEntity.PULL_RADIUS - horizon, 0.001D));
+                    reach = 1.0F - outer;
+                    reach = reach * reach * (3.0F - 2.0F * reach);
+                }
+                keep *= 1.0F - entity.opened(partialTick) * reach;
+            }
+            if (keep >= 0.999F) {
+                drained.add(light);
+            } else if (light.intensity() * keep > 0.01F) {
+                drained.add(new Light(light.position(), light.radius(),
+                        light.intensity() * keep,
+                        light.red(), light.green(), light.blue()));
+            }
+        }
+        return drained;
     }
 
     /**
@@ -550,6 +678,30 @@ public final class SpellLightEmitter {
     }
 
     /** Live leviathans, for the body, fins and jaws. */
+    public static List<GargantuaEntity> collectGargantuas() {
+        return GARGANTUA.isEmpty() ? List.of() : new ArrayList<>(GARGANTUA);
+    }
+
+    /** Live horseshoe lenses, for the arc and the scene it bends. */
+    public static List<CosmicHorseshoeEntity> collectCosmicHorseshoes() {
+        return COSMIC_HORSESHOE.isEmpty() ? List.of() : new ArrayList<>(COSMIC_HORSESHOE);
+    }
+
+    /** Live microquasars, for the corkscrew jets. */
+    public static List<MicroquasarEntity> collectMicroquasars() {
+        return MICROQUASAR.isEmpty() ? List.of() : new ArrayList<>(MICROQUASAR);
+    }
+
+    /** Live Helix nebulae, for the shell of cometary knots. */
+    public static List<HelixNebulaEntity> collectHelixNebulae() {
+        return HELIX_NEBULA.isEmpty() ? List.of() : new ArrayList<>(HELIX_NEBULA);
+    }
+
+    /** Live magnetars, for the dipole field loops. */
+    public static List<MagnetarEntity> collectMagnetars() {
+        return MAGNETAR.isEmpty() ? List.of() : new ArrayList<>(MAGNETAR);
+    }
+
     public static List<LeviathanEntity> collectLeviathans() {
         return LEVIATHAN.isEmpty() ? List.of() : new ArrayList<>(LEVIATHAN);
     }
@@ -557,6 +709,26 @@ public final class SpellLightEmitter {
     /** Live world trees, for the roots, trunk, branches and crown. */
     public static List<WorldTreeEntity> collectWorldTrees() {
         return WORLD_TREE.isEmpty() ? List.of() : new ArrayList<>(WORLD_TREE);
+    }
+
+    /** Live tidal disruption effects. */
+    public static List<TidalDisruptionEntity> collectTidalDisruptions() {
+        return TIDAL_DISRUPTION.isEmpty() ? List.of() : new ArrayList<>(TIDAL_DISRUPTION);
+    }
+
+    /** Live quasar jet effects. */
+    public static List<QuasarJetEntity> collectQuasarJets() {
+        return QUASAR_JET.isEmpty() ? List.of() : new ArrayList<>(QUASAR_JET);
+    }
+
+    /** Live pinwheel effects. */
+    public static List<PinwheelEntity> collectPinwheels() {
+        return PINWHEEL.isEmpty() ? List.of() : new ArrayList<>(PINWHEEL);
+    }
+
+    /** Live crab nebula effects. */
+    public static List<CrabNebulaEntity> collectCrabNebulas() {
+        return CRAB_NEBULA.isEmpty() ? List.of() : new ArrayList<>(CRAB_NEBULA);
     }
 
     private static Vec3 interpolated(net.minecraft.world.entity.Entity entity, float partialTick) {

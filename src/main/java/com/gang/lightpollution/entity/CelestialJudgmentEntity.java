@@ -100,13 +100,13 @@ public class CelestialJudgmentEntity extends Entity {
             return;
         }
 
-        float rawDamage = Math.max(1.0F, target.getMaxHealth() * 0.80F);
+        float rawDamage = Math.max(1.0F, target.getMaxHealth() * 0.84F);
         // The spell entity is the direct source and the caster is the owner.
         // Passing the target as the owner makes Iron's Spells treat this as
         // friendly fire against the target itself and cancel the impact.
         SpellDamageSource source = ModSpells.CELESTIAL_JUDGMENT.get().getDamageSource(this, caster);
         if (DamageSources.applyDamage(target, rawDamage, source)) {
-            caster.heal(caster.getMaxHealth() * 0.70F);
+            caster.heal(caster.getMaxHealth() * 0.64F);
         }
     }
 

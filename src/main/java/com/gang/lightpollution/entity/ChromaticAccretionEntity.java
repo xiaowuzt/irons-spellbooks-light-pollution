@@ -50,8 +50,8 @@ public final class ChromaticAccretionEntity extends Entity {
     public static final float MAX_VISUAL_RADIUS = 6.75F;
 
     private static final int[] PULSE_TICKS = {36, 64, 92, 120};
-    private static final float PULSE_DAMAGE_FRACTION = 0.04F;
-    private static final float COLLAPSE_DAMAGE_FRACTION = 0.34F;
+    private static final float PULSE_DAMAGE_FRACTION = 0.044F;
+    private static final float COLLAPSE_DAMAGE_FRACTION = 0.31F;
     private static final float STORED_DAMAGE_SHARE = 0.30F;
     private static final float STORED_DAMAGE_CAP_FRACTION = 0.20F;
     private static final float PROJECTILE_DAMAGE_FRACTION = 0.01F;

@@ -108,11 +108,11 @@ public final class LeviathanEntity extends Entity {
     public static final double EFFECT_RADIUS = BODY_LENGTH * 0.5D + BITE_RADIUS + 4.0D;
 
     /** Max-health fraction for being caught by the passing body. */
-    private static final float SWEEP_DAMAGE_FRACTION = 0.06F;
+    private static final float SWEEP_DAMAGE_FRACTION = 0.056F;
     /** Ticks between sweep applications. */
     private static final int SWEEP_INTERVAL_TICKS = 6;
     /** Max-health fraction of the bite. */
-    private static final float BITE_DAMAGE_FRACTION = 0.52F;
+    private static final float BITE_DAMAGE_FRACTION = 0.58F;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             LeviathanEntity.class, EntityDataSerializers.INT);

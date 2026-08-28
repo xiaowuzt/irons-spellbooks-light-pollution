@@ -79,11 +79,11 @@ public final class SingularityEntity extends Entity {
     /** Ticks between crush applications while the charge builds. */
     private static final int CRUSH_INTERVAL_TICKS = 10;
     /** Max-health fraction per crush at the very edge of the pull. */
-    private static final float CRUSH_MIN_FRACTION = 0.008F;
+    private static final float CRUSH_MIN_FRACTION = 0.006F;
     /** Max-health fraction per crush for anything held at the core. */
-    private static final float CRUSH_MAX_FRACTION = 0.04F;
+    private static final float CRUSH_MAX_FRACTION = 0.035F;
     /** Max-health fraction of the detonation itself. */
-    private static final float BLAST_DAMAGE_FRACTION = 0.62F;
+    private static final float BLAST_DAMAGE_FRACTION = 0.66F;
 
     /** Ticks between arc sounds while the charge builds. */
     private static final int ARC_SOUND_INTERVAL_TICKS = 5;
