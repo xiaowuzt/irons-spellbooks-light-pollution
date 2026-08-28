@@ -224,12 +224,22 @@ public final class CrabNebulaEntity extends Entity {
     /**
      * A point on one filament of the cage.
      *
-     * <p>Each filament is an arc lying on the shell's surface, tilted and rotated by its
-     * index so the set of them wraps the sphere from many directions. Staying on the surface
-     * is the whole point: the interior has to be empty, because a hollow cage over a void is
-     * what separates this from a branching solid.</p>
+     * <p>Each filament is a closed loop on the shell's surface, tilted and rotated by its index so
+     * the set of them wraps the sphere from many directions. Staying on the surface is the whole
+     * point: the interior has to be empty, because a hollow cage over a void is what separates this
+     * from a branching solid.</p>
      *
-     * @param fraction 0 to 1 along the filament
+     * <p>Closed rather than an arc, which is what it was. Open arcs left every filament with two
+     * loose ends hanging in the middle of the shell, and twenty-two of those read as debris rather
+     * than as a cage.</p>
+     *
+     * <p>Closing them cannot mean making them circles, though — twenty-two great circles is a
+     * wireframe globe, which is exactly what the real remnant does not look like. So each loop
+     * weaves out of its own plane on whole harmonics of the turn. Whole ones specifically: a
+     * fractional harmonic would not return to its starting value after a full turn, so the loop
+     * would arrive back at its start pointing somewhere else.</p>
+     *
+     * @param fraction 0 to 1 around the loop; 1 is the same point as 0
      */
     public Vec3 filamentPoint(Vec3 centre, int filament, double fraction, float ageTicks) {
         double radius = shellRadius(ageTicks);
@@ -238,21 +248,30 @@ public final class CrabNebulaEntity extends Entity {
         // Two angles per filament, hashed off the synced seed, giving each its own plane.
         double lean = hash(seed, filament, 1) * Math.PI;
         double spin = hash(seed, filament, 2) * Math.PI * 2.0D;
-        // Arcs cover part of a great circle rather than all of it, so the cage has openings.
-        double span = Math.PI * (0.55D + 0.7D * hash(seed, filament, 3));
-        double start = hash(seed, filament, 4) * Math.PI * 2.0D;
-        double angle = start + span * fraction;
+        double angle = hash(seed, filament, 4) * Math.PI * 2.0D
+                + Math.PI * 2.0D * fraction;
 
-        // A great circle in a plane defined by lean and spin.
+        // An orthonormal frame: u and w span the loop's nominal plane, n is its normal.
         Vec3 u = new Vec3(Math.cos(spin), 0.0D, Math.sin(spin));
         Vec3 w = new Vec3(-Math.sin(spin) * Math.cos(lean), Math.sin(lean),
                 Math.cos(spin) * Math.cos(lean));
-        // Filaments are not perfectly on the surface — they ripple, which is why the real
-        // ones look like a tangle rather than a wireframe globe.
+        Vec3 n = u.cross(w);
+
+        // Out-of-plane weave, which is what keeps the cage a tangle instead of a globe. The
+        // per-filament phases are constant along the loop, so they shift the pattern without
+        // breaking the periodicity the closure depends on.
+        double weave = 0.30D * Math.sin(angle * 2.0D + filament * 1.7D)
+                + 0.17D * Math.sin(angle * 3.0D - filament * 2.3D);
+        // Filaments are not perfectly on the surface — they ripple, which is part of why the
+        // real ones look like a tangle.
         double ripple = 1.0D + 0.09D * Math.sin(angle * 3.0D + filament);
 
-        return centre.add(u.scale(Math.cos(angle) * radius * ripple))
-                .add(w.scale(Math.sin(angle) * radius * ripple));
+        // Normalised, so the weave tilts the loop across the shell instead of lifting it off.
+        Vec3 direction = u.scale(Math.cos(angle))
+                .add(w.scale(Math.sin(angle)))
+                .add(n.scale(weave))
+                .normalize();
+        return centre.add(direction.scale(radius * ripple));
     }
 
     /** Stable hash in [0,1) from the synced seed, an index and a field selector. */
@@ -308,7 +327,11 @@ public final class CrabNebulaEntity extends Entity {
 
         double touchSqr = (FILAMENT_TOUCH_RADIUS + FILAMENT_HALF_WIDTH)
                 * (FILAMENT_TOUCH_RADIUS + FILAMENT_HALF_WIDTH);
-        int samples = 16;
+        // Enough samples that consecutive ones are closer together than the touch radius.
+        // A closed loop at this radius is around 130 blocks long, so 48 puts them under three
+        // blocks apart; the 16 that covered the old half-arcs would leave gaps a player could
+        // stand in while visibly inside a filament.
+        int samples = 48;
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
@@ -325,7 +348,7 @@ public final class CrabNebulaEntity extends Entity {
                 }
             }
             if (touching) {
-                applyTrueDamage(target, source, FILAMENT_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, FILAMENT_DAMAGE_FRACTION);
             }
         }
     }
@@ -344,13 +367,19 @@ public final class CrabNebulaEntity extends Entity {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= reach) {
-                applyTrueDamage(target, source, WIND_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, WIND_DAMAGE_FRACTION);
             }
         }
     }
 
     /** The remnant letting go, out to the whole shell. */
     private void resolveCollapse(ServerLevel level) {
+        // Announced before anything else in here, including the early return when
+        // nothing is in range: the event happened regardless of whether it hit.
+        com.gang.lightpollution.net.ModNetwork.sendCaption(level,
+                this.position().add(0.0D, HOVER_HEIGHT, 0.0D),
+                "caption.irons_spellbooks_light_pollution.crab_nebula.letgo",
+                com.gang.lightpollution.SpellPalette.accentFor(this), 1.6F);
         LivingEntity caster = resolveCaster(level);
         DamageSource source = CrabNebulaDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
@@ -363,7 +392,7 @@ public final class CrabNebulaEntity extends Entity {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= reach) {
-                applyTrueDamage(target, source, COLLAPSE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, COLLAPSE_DAMAGE_FRACTION);
             }
         }
     }
@@ -395,31 +424,6 @@ public final class CrabNebulaEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source,
-                                        float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

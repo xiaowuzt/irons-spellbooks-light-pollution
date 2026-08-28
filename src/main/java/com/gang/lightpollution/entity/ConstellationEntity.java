@@ -294,7 +294,7 @@ public final class ConstellationEntity extends Entity {
                 double closeness = 1.0D - Mth.clamp(distance / PULL_RADIUS, 0.0D, 1.0D);
                 float fraction = (float) Mth.lerp(closeness * closeness,
                         BURN_MIN_FRACTION, BURN_MAX_FRACTION);
-                applyTrueDamage(target, source, fraction);
+                SpellDamage.apply(this, target, source, fraction);
                 target.setSecondsOnFire(closeness > 0.5D ? 6 : 3);
             }
         }
@@ -339,30 +339,6 @@ public final class ConstellationEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source, float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

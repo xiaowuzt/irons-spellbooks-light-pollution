@@ -36,7 +36,9 @@ void main() {
         }
         float hotspot = exp(-radius * radius * 9.0);
         float cocoon = pow(1.0 - radius, 1.7) * 0.30;
-        vec3 colour = vertexColor.rgb * (hotspot + cocoon) * intensity * 2.7;
+        // Zero at the disc's rim, so the lobe has no visible circular cut.
+        float rim = max(0.0, 1.0 - radius * radius);
+        vec3 colour = vertexColor.rgb * (hotspot + cocoon) * rim * intensity * 2.7;
         fragColor = vec4(colour, 1.0) * vec4(ColorModulator.rgb, 1.0);
         return;
     }
@@ -57,6 +59,14 @@ void main() {
     // all clamped under one so the Doppler and line colours would not clip; the verdict was
     // that accuracy had been bought at the cost of impact. The colour ramps are still built
     // from real physics, but the exposure on top of them is chosen to hurt to look at.
+    // Forced to exactly zero at the quad's own edge. Every one of these shaders was leaving a
+    // residue there -- the helix knots 0.055 at their far end, the jet ribbon 0.06 at its
+    // sides -- and raising the exposure to make the effects striking multiplied that residue
+    // into a plainly visible rectangle or a hard line along every strand. The window costs
+    // almost nothing at the centre and removes the seam by construction rather than by hoping
+    // the falloff got small enough.
+    channel *= pow(max(0.0, 1.0 - across * across), 1.5);
+
     vec3 colour = vertexColor.rgb * channel * intensity * 1.9;
     fragColor = vec4(colour, 1.0) * ColorModulator;
 }

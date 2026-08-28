@@ -74,20 +74,29 @@ public final class CurveRibbon {
             across[i] = edge.normalize().scale(width.at(fractions[i]));
         }
 
+        // Colour per point, not per segment. This was the last thing left constant across a
+        // quad, and it is what made the strand read as a row of tiles: each quad was flat-filled
+        // with the colour of its own midpoint, so every joint became a step in brightness. The
+        // positions, widths and along-coordinates were already shared or interpolated; the
+        // colour was not, and one uniform channel is enough to draw the seam.
+        int[] colours = new int[segments + 1];
+        for (int i = 0; i <= segments; ++i) {
+            colours[i] = colour.at(fractions[i]);
+        }
+
         int emitted = 0;
         for (int i = 0; i < segments; ++i) {
             float alongFrom = (float) (i / (double) segments);
             float alongTo = (float) ((i + 1) / (double) segments);
-            int packed = colour.at((fractions[i] + fractions[i + 1]) * 0.5D);
-            emitted += quad(builder, camera, points[i], across[i], alongFrom,
-                    points[i + 1], across[i + 1], alongTo, packed);
+            emitted += quad(builder, camera, points[i], across[i], alongFrom, colours[i],
+                    points[i + 1], across[i + 1], alongTo, colours[i + 1]);
         }
         return emitted;
     }
 
     private static int quad(BufferBuilder builder, Vec3 camera,
-                            Vec3 from, Vec3 fromAcross, float alongFrom,
-                            Vec3 to, Vec3 toAcross, float alongTo, int colour) {
+                            Vec3 from, Vec3 fromAcross, float alongFrom, int fromColour,
+                            Vec3 to, Vec3 toAcross, float alongTo, int toColour) {
         float fx = (float) (from.x - camera.x);
         float fy = (float) (from.y - camera.y);
         float fz = (float) (from.z - camera.z);
@@ -101,14 +110,14 @@ public final class CurveRibbon {
         float tay = (float) toAcross.y;
         float taz = (float) toAcross.z;
 
-        // The two ends carry different along values. One value for all four corners leaves
-        // the shader's along coordinate constant within a quad, so anything it drives —
-        // knots, packets, a colour ramp — comes out uniform per quad and the strip renders
-        // as alternating bright and dark rectangles.
-        vertex(builder, fx - fax, fy - fay, fz - faz, alongFrom, 0.0F, colour);
-        vertex(builder, tx - tax, ty - tay, tz - taz, alongTo, 0.0F, colour);
-        vertex(builder, tx + tax, ty + tay, tz + taz, alongTo, 1.0F, colour);
-        vertex(builder, fx + fax, fy + fay, fz + faz, alongFrom, 1.0F, colour);
+        // Both the along coordinate and the colour differ between the two ends, so the GPU
+        // interpolates them across the quad and consecutive quads agree at the edge they share.
+        // Holding either one constant per quad is enough to draw a visible joint: the along
+        // coordinate drives knots and packets, and the colour drives brightness directly.
+        vertex(builder, fx - fax, fy - fay, fz - faz, alongFrom, 0.0F, fromColour);
+        vertex(builder, tx - tax, ty - tay, tz - taz, alongTo, 0.0F, toColour);
+        vertex(builder, tx + tax, ty + tay, tz + taz, alongTo, 1.0F, toColour);
+        vertex(builder, fx + fax, fy + fay, fz + faz, alongFrom, 1.0F, fromColour);
         return 4;
     }
 

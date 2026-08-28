@@ -57,6 +57,13 @@ public final class MagnetarEntity extends Entity {
     public static final int FIELD_LINES = 14;
     /** How far the outermost loop reaches from the star, in blocks. */
     public static final double FIELD_REACH = 19.0D;
+    /**
+     * Radius of the neutron star itself, in blocks.
+     *
+     * <p>Load-bearing rather than decorative: the field lines terminate on it, so it is what
+     * separates each loop's two ends and lets the loop close visibly.</p>
+     */
+    public static final double STAR_RADIUS = 2.1D;
     /** Half-width of a loop's ribbon, in blocks. */
     public static final double LOOP_HALF_WIDTH = 0.42D;
     /** How close to a loop counts as touching it, in blocks. */
@@ -155,10 +162,12 @@ public final class MagnetarEntity extends Entity {
                 : (float) (this.level().getGameTime() - start) + partialTick;
         age = Math.max(0.0F, age);
         if (isDisplay()) {
-            // Held just short of the flare, fully wound. Looping the wind-up would mean
-            // watching the same ramp restart; the wound magnetosphere is the interesting
-            // state, and the flare is a one-shot that would blank the view every cycle.
-            return Math.min(age, WIND_END_TICK - 1.0F);
+            // Cycles the wind-up instead of holding it at the top. Held fully wound the field
+            // is always at the white-hot end of its ramp, so the violet it starts from is never
+            // visible and the effect looks like it only has one colour. Stopping short of the
+            // flare still avoids blanking the view every cycle.
+            float span = WIND_END_TICK - THREAD_END_TICK;
+            return THREAD_END_TICK + (age % span);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -256,17 +265,36 @@ public final class MagnetarEntity extends Entity {
         // theta from 0 (one pole) to pi (the other).
         double theta = along * Math.PI;
         double sin = Math.sin(theta);
+        double cos = Math.cos(theta);
         // Alternating loop sizes so the shell has structure instead of one nested set.
         double scale = 0.45D + 0.55D * ((line % 3) / 2.0D);
-        double r = FIELD_REACH * scale * sin * sin;
+        double shell = FIELD_REACH * scale;
 
+        // The dipole field line in cylindrical form. From r = L sin^2(theta):
+        //     rho = r sin(theta) = L sin^3(theta)
+        //     z   = r cos(theta) = L sin^2(theta) cos(theta)
+        //
+        // Written out this way rather than as r divided by sin, which is what it was before.
+        // That version needed a clamp to survive the poles, and the clamp flattened the loops
+        // so hard that both ends collapsed onto the star's centre — every line ran out from
+        // the middle and back into it, which is why they read as open arcs with loose ends
+        // instead of as closed loops.
+        double rho = shell * sin * sin * sin;
+        double z = shell * sin * sin * cos;
+
+        // Anchor the ends on the star's surface rather than at a point. A mathematical dipole
+        // is a point and its lines all return to it; a real one has a body, and the lines
+        // terminate at two separated magnetic poles. That separation is what makes each loop
+        // visibly leave somewhere and arrive somewhere else.
+        z += STAR_RADIUS * cos;
+
+        // The twist has to vanish at both ends, or the two ends of one line sit at different
+        // azimuths and the loop cannot close. sin^2 goes to zero at both poles.
         double azimuth = 2.0D * Math.PI * line / FIELD_LINES
-                + woundFraction * TWIST_TURNS * Math.PI * 2.0D * along;
+                + woundFraction * TWIST_TURNS * Math.PI * 2.0D * sin * sin;
 
         Vec3 radial = side.scale(Math.cos(azimuth)).add(other.scale(Math.sin(azimuth)));
-        return centre.add(axis.scale(r * Math.cos(theta) / Math.max(sin, 0.08D)
-                        * 0.55D))
-                .add(radial.scale(r));
+        return centre.add(axis.scale(z)).add(radial.scale(rho));
     }
 
     @Override
@@ -332,13 +360,19 @@ public final class MagnetarEntity extends Entity {
                 }
             }
             if (touching) {
-                applyTrueDamage(target, source, FIELD_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, FIELD_DAMAGE_FRACTION);
             }
         }
     }
 
     /** The rearrangement. Everything within reach, once. */
     private void resolveFlare(ServerLevel level) {
+        // Announced before anything else in here, including the early return when
+        // nothing is in range: the event happened regardless of whether it hit.
+        com.gang.lightpollution.net.ModNetwork.sendCaption(level,
+                this.position().add(0.0D, HOVER_HEIGHT, 0.0D),
+                "caption.irons_spellbooks_light_pollution.magnetar.flare",
+                com.gang.lightpollution.SpellPalette.accentFor(this), 1.7F);
         LivingEntity caster = resolveCaster(level);
         DamageSource source = MagnetarDamage.field(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
@@ -351,7 +385,7 @@ public final class MagnetarEntity extends Entity {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= FLARE_RADIUS) {
-                applyTrueDamage(target, source, FLARE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, FLARE_DAMAGE_FRACTION);
             }
         }
     }
@@ -383,31 +417,6 @@ public final class MagnetarEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source,
-                                        float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

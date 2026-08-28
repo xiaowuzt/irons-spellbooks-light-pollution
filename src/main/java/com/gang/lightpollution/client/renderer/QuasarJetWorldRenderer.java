@@ -17,8 +17,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
 
 import java.util.List;
 
@@ -67,21 +65,22 @@ public final class QuasarJetWorldRenderer {
         }
         Minecraft minecraft = Minecraft.getInstance();
         ShaderInstance shader = ConstellationShaders.quasarBeam();
-        if (minecraft.level == null || shader == null) {
+        ShaderInstance strandShader = ConstellationShaders.strand();
+        if (minecraft.level == null || shader == null || strandShader == null) {
             return;
         }
 
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
 
-        GlState state = GlState.capture();
+        GlStateGuard state = GlStateGuard.capture();
         PoseStack modelView = RenderSystem.getModelViewStack();
         modelView.pushPose();
         try {
             modelView.setIdentity();
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
-            drawChannels(jets, camera, partialTick, shader);
+            drawChannels(jets, camera, partialTick, strandShader);
             drawBodies(jets, camera, partialTick, shader);
             // The central bodies, over everything else. Six of these effects drew
             // only their outer structure and left the middle empty.
@@ -95,7 +94,7 @@ public final class QuasarJetWorldRenderer {
 
     private static void drawChannels(List<QuasarJetEntity> jets, Vec3 camera,
                                      float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = begin();
+        BufferBuilder builder = beginTube();
         int vertices = 0;
         for (QuasarJetEntity entity : jets) {
             float brightness = entity.brightness(partialTick);
@@ -111,13 +110,16 @@ public final class QuasarJetWorldRenderer {
             // The nucleus. The jet has to be coming out of something.
             EffectCore.add(centre, 3.0D, 0.92F, 0.95F, 1.00F, brightness * 2.1F);
             double reach = QuasarJetEntity.JET_LENGTH * launched;
-            int colour = CurveRibbon.pack(BEAM_R, BEAM_G, BEAM_B, brightness * 0.9F);
+            int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 210.0F));
 
-            vertices += CurveRibbon.emit(builder, camera, CHANNEL_SEGMENTS, 0.0D, 1.0D,
+            vertices += CurveTube.emit(builder, camera, CHANNEL_SEGMENTS, 0.0D, 1.0D,
                     fraction -> centre.add(direction.scale(reach * fraction)),
                     // Flares a little with distance, as the confining pressure drops.
                     fraction -> QuasarJetEntity.JET_HALF_WIDTH * (1.0D + fraction * 0.5D),
-                    fraction -> colour);
+                    // aux 1: this jet is the approaching one. A quasar throws two, but beaming
+                    // makes the receding one invisible, so only one is ever drawn.
+                    CurveTube.MODE_JET, 1.0F,
+                    Math.min(1.0F, brightness * 0.15F), alpha);
         }
         draw(builder, shader, vertices, 1.0F);
     }
@@ -125,7 +127,7 @@ public final class QuasarJetWorldRenderer {
     /** The knots and the terminal lobe, both as camera-facing discs. */
     private static void drawBodies(List<QuasarJetEntity> jets, Vec3 camera,
                                    float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = begin();
+        BufferBuilder builder = beginFlat();
         int vertices = 0;
         for (QuasarJetEntity entity : jets) {
             float brightness = entity.brightness(partialTick);
@@ -198,7 +200,23 @@ public final class QuasarJetWorldRenderer {
                 .endVertex();
     }
 
-    private static BufferBuilder begin() {
+    /**
+     * Begin the buffer for tube geometry.
+     *
+     * <p>POSITION_TEX_COLOR_NORMAL, because TubeMeshBuilder writes a normal per vertex and the
+     * strand shader declares one. This renderer needs two formats in one frame — the channel is a
+     * tube and the knots and lobe are flat quads — so the two begins are kept separate rather
+     * than one helper that would silently be wrong for whichever pass it was not written for.</p>
+     */
+    private static BufferBuilder beginTube() {
+        finish(effectBuffer);
+        effectBuffer.begin(VertexFormat.Mode.QUADS,
+                DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+        return effectBuffer;
+    }
+
+    /** Begin the buffer for flat camera-facing quads. */
+    private static BufferBuilder beginFlat() {
         finish(effectBuffer);
         effectBuffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         return effectBuffer;
@@ -242,41 +260,6 @@ public final class QuasarJetWorldRenderer {
             }
         } catch (RuntimeException ignored) {
             effectBuffer = new BufferBuilder(BUFFER_CAPACITY);
-        }
-    }
-
-    private record GlState(boolean blend, boolean depth, boolean cull, boolean depthWrite,
-                           int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        private static GlState capture() {
-            return new GlState(
-                    GL11.glIsEnabled(GL11.GL_BLEND),
-                    GL11.glIsEnabled(GL11.GL_DEPTH_TEST),
-                    GL11.glIsEnabled(GL11.GL_CULL_FACE),
-                    GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA));
-        }
-
-        private void restore() {
-            RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-            if (blend) {
-                RenderSystem.enableBlend();
-            } else {
-                RenderSystem.disableBlend();
-            }
-            if (depth) {
-                RenderSystem.enableDepthTest();
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-            if (cull) {
-                RenderSystem.enableCull();
-            } else {
-                RenderSystem.disableCull();
-            }
-            RenderSystem.depthMask(depthWrite);
         }
     }
 }

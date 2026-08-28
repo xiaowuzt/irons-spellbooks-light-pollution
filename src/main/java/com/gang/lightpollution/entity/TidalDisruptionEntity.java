@@ -318,13 +318,19 @@ public final class TidalDisruptionEntity extends Entity {
                 }
             }
             if (struck) {
-                applyTrueDamage(target, source, STREAM_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, STREAM_DAMAGE_FRACTION);
             }
         }
     }
 
     /** The accretion flare when the bound half of the debris comes back. */
     private void resolveFlare(ServerLevel level) {
+        // Announced before anything else in here, including the early return when
+        // nothing is in range: the event happened regardless of whether it hit.
+        com.gang.lightpollution.net.ModNetwork.sendCaption(level,
+                this.position().add(0.0D, HOVER_HEIGHT, 0.0D),
+                "caption.irons_spellbooks_light_pollution.tidal_disruption.peak",
+                com.gang.lightpollution.SpellPalette.accentFor(this), 1.6F);
         LivingEntity caster = resolveCaster(level);
         DamageSource source = TidalDisruptionDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
@@ -337,7 +343,7 @@ public final class TidalDisruptionEntity extends Entity {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= FLARE_RADIUS) {
-                applyTrueDamage(target, source, FLARE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, FLARE_DAMAGE_FRACTION);
             }
         }
     }
@@ -369,31 +375,6 @@ public final class TidalDisruptionEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source,
-                                        float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

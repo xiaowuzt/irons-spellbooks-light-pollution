@@ -15,6 +15,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.ModLoadingContext;
+import com.gang.lightpollution.text.DynamicTextClientConfig;
 import net.minecraftforge.fml.config.ModConfig;
 import org.slf4j.Logger;
 
@@ -30,7 +31,15 @@ public final class ExampleMod {
         ModSounds.register(modBus);
         ModCreativeTabs.register(modBus);
         ModSpells.SPELLS.register(modBus);
+        // The mod's first network channel. Everything else here is drawn from synced entity
+        // data, but damage is resolved in a server-only tick, so the floating text needs telling.
+        com.gang.lightpollution.net.ModNetwork.register();
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SpellLightConfig.SPEC);
+        // The ported text effects, under an explicit file name. Two CLIENT specs would
+        // otherwise both want <modid>-client.toml and collide. Its own accessors fall back
+        // to defaults when unloaded, so registering it only adds the player-facing toggles.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT,
+                DynamicTextClientConfig.SPEC, "irons_spellbooks_light_pollution-text.toml");
     }
 
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)

@@ -103,7 +103,46 @@ public final class GargantuaEntity extends Entity {
     public static final double EFFECT_RADIUS = PULL_RADIUS + 4.0D;
 
     /** Pull per tick at full strength, scaled by r_g squared at the call site. */
-    private static final double PULL_ACCELERATION = 0.012D;
+    /**
+     * How hard it draws things in.
+     *
+     * <p>Raised from 0.012. At that value the inverse-square falloff left the outer half of the
+     * 24-block radius doing essentially nothing — 0.008 blocks per tick at the rim against a
+     * walking speed of about 0.11, so a player could stroll out of it without noticing there
+     * was a pull at all. The point of a black hole is that being anywhere near it is a
+     * problem.</p>
+     */
+    private static final double PULL_ACCELERATION = 0.055D;
+    /**
+     * Floor under the inverse-square falloff, in blocks.
+     *
+     * <p>Without this the pull at the rim is a hundredth of what it is at the centre, which is
+     * correct for gravity and useless as a mechanic. Clamping the effective distance flattens
+     * the curve enough that the whole radius is dangerous while the centre is still seven times
+     * worse. Chosen just outside the horizon, which sits at 1.8 r_g = 7.2 blocks and kills
+     * outright — so the flattened region is almost entirely inside the lethal radius and the
+     * flattening costs nothing anything could have survived anyway.</p>
+     */
+    private static final double PULL_FALLOFF_FLOOR = 9.0D;
+    /**
+     * Extra pull applied to anything that is not alive.
+     *
+     * <p>An arrow crosses the whole radius in under a second, so the acceleration a walking mob
+     * feels as a strong drag barely deflects it. Projectiles, dropped items and thrown things
+     * need an order more before their path visibly bends into the hole.</p>
+     */
+    private static final double PROJECTILE_PULL_SCALE = 6.5D;
+    /**
+     * Capture radius, as a multiple of the horizon.
+     *
+     * <p>Inside this the pull stops being a force and becomes a direct haul. Acceleration on its
+     * own never finished the job — a player can out-walk it and a mob's pathing and gravity
+     * fight it — so nothing was ever actually drawn in, which is what made the spell look as
+     * though it had no suction at all.</p>
+     */
+    private static final double CAPTURE_MULTIPLE = 1.9D;
+    /** How fast captured things are hauled inward, in blocks per tick. */
+    private static final double CAPTURE_SPEED = 0.85D;
     /** Ticks between tidal applications. */
     private static final int TIDAL_INTERVAL_TICKS = 8;
     /** Max-health fraction of a tidal application at the edge of the pull. */
@@ -318,7 +357,12 @@ public final class GargantuaEntity extends Entity {
         super.tick();
 
         if (isDisplay()) {
-            // Nothing to resolve and nothing to expire: it stands until told to go.
+            // Pulls, but does not damage and never expires. The pull is the part worth looking
+            // at and the display command was the only way anyone had seen this hole, so
+            // returning here made it look as though it had no suction at all.
+            if (this.level() instanceof ServerLevel displayLevel) {
+                applyPull(displayLevel);
+            }
             return;
         }
 
@@ -356,17 +400,48 @@ public final class GargantuaEntity extends Entity {
         // Eased in over the opening tear rather than by the hole growing, so the first
         // second is a warning rather than an immediate yank.
         double strength = PULL_ACCELERATION * radius * radius * opened(1.0F);
+        double horizon = radius * HORIZON_RADIUS;
 
-        for (LivingEntity target : gather(level, caster, centre, PULL_RADIUS)) {
+        for (Entity target : gatherAny(level, caster, centre, PULL_RADIUS)) {
             Vec3 toCentre = centre.subtract(target.getBoundingBox().getCenter());
             double distance = toCentre.length();
             if (distance < 0.001D) {
                 continue;
             }
-            // Inverse square, so it is gentle at the rim and violent up close.
-            double falloff = 1.0D / Math.max(distance * distance, radius * radius);
-            Vec3 pull = toCentre.scale(strength * falloff * PULL_RADIUS / distance);
-            target.setDeltaMovement(target.getDeltaMovement().add(pull));
+            Vec3 direction = toCentre.scale(1.0D / distance);
+
+            // Inverse square, floored so the rim still pulls. Unfloored this spans a factor
+            // of a hundred across the radius and only the last few blocks read as suction.
+            double effective = Math.max(distance, PULL_FALLOFF_FLOOR);
+            double falloff = 1.0D / (effective * effective);
+            double accel = strength * falloff * PULL_RADIUS;
+
+            // Projectiles are light and fast, and adding a small acceleration to something
+            // already travelling at speed barely bends its path. They get a much harder pull
+            // so an arrow crossing the radius visibly curves into the hole instead of sailing
+            // through it.
+            if (!(target instanceof LivingEntity)) {
+                accel *= PROJECTILE_PULL_SCALE;
+            }
+
+            Vec3 velocity = target.getDeltaMovement().add(direction.scale(accel));
+
+            // Inside the capture radius, stop adding force and start hauling. Acceleration
+            // alone never actually gets anything in: a player can out-walk it, and a mob's
+            // own pathing plus gravity fight it the whole way. Past this point the velocity is
+            // overwritten with a direct inward one, which is what "sucked in" means and what
+            // acceleration was failing to deliver.
+            double capture = Math.max(horizon * CAPTURE_MULTIPLE, PULL_FALLOFF_FLOOR);
+            if (distance < capture) {
+                // Overwritten, not added to, so gravity and pathing cannot fight it. Safe to do
+                // every tick without disabling gravity: this runs each tick while the hole is
+                // open, so whatever gravity adds in between is replaced before it accumulates.
+                // Turning gravity off instead would need turning back on again, and anything
+                // that survived the hole would be left floating.
+                velocity = direction.scale(Math.min(distance, CAPTURE_SPEED));
+            }
+
+            target.setDeltaMovement(velocity);
             target.hurtMarked = true;
             if (target instanceof ServerPlayer player) {
                 player.connection.send(new ClientboundSetEntityMotionPacket(player));
@@ -374,13 +449,6 @@ public final class GargantuaEntity extends Entity {
         }
     }
 
-    /**
-     * Tidal shear, and the horizon.
-     *
-     * <p>The shear is weighted by the square of closeness, so drifting through the
-     * outer pull is survivable and being held against the hole is not. Anything that
-     * actually reaches the horizon is gone — no fraction, no resistance.</p>
-     */
     private void resolveTidal(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = centre(1.0F);
@@ -404,12 +472,18 @@ public final class GargantuaEntity extends Entity {
                     1.0D - (distance - horizon) / (PULL_RADIUS - horizon), 0.0D, 1.0D);
             float fraction = Mth.lerp(closeness * closeness,
                     TIDAL_MIN_FRACTION, TIDAL_MAX_FRACTION);
-            applyTrueDamage(target, source, fraction);
+            SpellDamage.apply(this, target, source, fraction);
         }
     }
 
     /** The detonation. Its strength depends on how much light it ate. */
     private void resolveBlast(ServerLevel level) {
+        // Announced before anything else in here, including the early return when
+        // nothing is in range: the event happened regardless of whether it hit.
+        com.gang.lightpollution.net.ModNetwork.sendCaption(level,
+                this.position().add(0.0D, HOVER_HEIGHT, 0.0D),
+                "caption.irons_spellbooks_light_pollution.gargantua.collapse",
+                com.gang.lightpollution.SpellPalette.accentFor(this), 1.9F);
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = centre(1.0F);
         List<LivingEntity> targets = gather(level, caster, centre, BLAST_RADIUS);
@@ -420,7 +494,7 @@ public final class GargantuaEntity extends Entity {
                 getSwallowedCount() * BLAST_BONUS_PER_LIGHT);
         DamageSource source = GargantuaDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            applyTrueDamage(target, source, BLAST_DAMAGE_FRACTION + bonus);
+            SpellDamage.apply(this, target, source, BLAST_DAMAGE_FRACTION + bonus);
             // Thrown outward: the disk is being flung off, and so is everything else.
             Vec3 outward = target.getBoundingBox().getCenter().subtract(centre);
             double distance = outward.length();
@@ -495,6 +569,32 @@ public final class GargantuaEntity extends Entity {
                                 <= radius * radius);
     }
 
+    /**
+     * Everything the hole pulls, not just what is alive.
+     *
+     * <p>Projectiles, dropped items and thrown things all fall in too. Restricting the pull to
+     * living entities meant arrows flew straight through a black hole, which reads as the effect
+     * being decorative.</p>
+     *
+     * <p>The caster's own arrows are not spared. The hole does not know who fired them, and an
+     * exception there would look like a bug rather than a courtesy.</p>
+     */
+    private List<Entity> gatherAny(ServerLevel level, LivingEntity caster,
+                                   Vec3 centre, double radius) {
+        return level.getEntities(this,
+                new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
+                        centre.x + radius, centre.y + radius, centre.z + radius),
+                target -> {
+                    if (target instanceof LivingEntity living) {
+                        return canAffect(caster, living);
+                    }
+                    // Anything else that moves and is not another one of these holes.
+                    return !(target instanceof GargantuaEntity)
+                            && target.getBoundingBox().getCenter().distanceToSqr(centre)
+                                    <= radius * radius;
+                });
+    }
+
     private LivingEntity resolveCaster(ServerLevel level) {
         Entity byId = level.getEntity(this.getCasterId());
         if (byId instanceof LivingEntity living
@@ -522,31 +622,6 @@ public final class GargantuaEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source,
-                                        float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

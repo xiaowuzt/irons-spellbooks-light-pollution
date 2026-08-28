@@ -58,6 +58,10 @@ public final class ConstellationShaders {
     private static ShaderInstance crabFilament;
     @Nullable
     private static ShaderInstance effectCore;
+    @Nullable
+    private static ShaderInstance strand;
+    @Nullable
+    private static ShaderInstance starSurface;
 
     private ConstellationShaders() {
     }
@@ -85,7 +89,15 @@ public final class ConstellationShaders {
         register(event, "quasar_beam", shader -> quasarBeam = shader);
         register(event, "pinwheel_dust", shader -> pinwheelDust = shader);
         register(event, "crab_filament", shader -> crabFilament = shader);
-        register(event, "effect_core", shader -> effectCore = shader);
+        register(event, "effect_core", DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
+                shader -> effectCore = shader);
+        // Carries a real surface normal, like leviathan and world_tree, because it draws
+        // closed tubes rather than camera-facing quads.
+        register(event, "strand", DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
+                shader -> strand = shader);
+        // Real sphere geometry for the central bodies, for the same reason.
+        register(event, "star_surface", DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
+                shader -> starSurface = shader);
     }
 
     private static void register(RegisterShadersEvent event, String path,
@@ -226,5 +238,17 @@ public final class ConstellationShaders {
     @Nullable
     public static ShaderInstance effectCore() {
         return effectCore;
+    }
+
+    /** Real tube geometry for field lines, jets, debris streams, arms and filaments. */
+    @Nullable
+    public static ShaderInstance strand() {
+        return strand;
+    }
+
+    /** Real sphere geometry for the body at the centre of an effect. */
+    @Nullable
+    public static ShaderInstance starSurface() {
+        return starSurface;
     }
 }

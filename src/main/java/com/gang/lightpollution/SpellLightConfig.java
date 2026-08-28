@@ -21,11 +21,43 @@ public final class SpellLightConfig {
             .comment("Depth-buffer shadow samples per light. Higher values improve contact shadows at a GPU cost.")
             .defineInRange("shadowSteps", 32, 8, 256);
 
+    private static final ForgeConfigSpec.EnumValue<TooltipStyle> TOOLTIP_STYLE = BUILDER
+            .comment("How this mod's own tooltips are drawn.",
+                    "  VANILLA - the normal box, with only the border tinted per spell.",
+                    "  PANEL   - a chamfered panel behind the vanilla layout.",
+                    "  ARCANE  - takes rendering over: glow rays, a title separator, own text pass.",
+                    "Also switchable in game with /lightpollution frame <vanilla|panel|arcane>.")
+            .defineEnum("tooltipStyle", TooltipStyle.VANILLA);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static volatile boolean enabled = true;
     public static volatile int maxLights = Integer.MAX_VALUE;
     public static volatile int shadowSteps = 32;
+    /**
+     * Which tooltip treatment to draw.
+     *
+     * <p>Writable at runtime by the command, which is why it is not read straight from the config
+     * value on every frame: the command changes this field, and reloading the config overwrites it
+     * from disk again.</p>
+     */
+    public static volatile TooltipStyle tooltipStyle = TooltipStyle.VANILLA;
+
+    /** The three tooltip treatments. */
+    public enum TooltipStyle {
+        /** The vanilla box, border tinted to the spell's accent. */
+        VANILLA,
+        /** A chamfered panel drawn behind the vanilla layout, which still does the text. */
+        PANEL,
+        /**
+         * Rendering taken over entirely: glow rays, a separator under the title, own text pass.
+         *
+         * <p>Safe to take over because the two hard parts are already done by the time the event
+         * fires — the components arrive wrapped, and the position has already been corrected away
+         * from the screen edges. What is left is drawing.</p>
+         */
+        ARCANE
+    }
 
     private SpellLightConfig() {
     }
@@ -36,6 +68,7 @@ public final class SpellLightConfig {
             return;
         }
         enabled = ENABLED.get();
+        tooltipStyle = TOOLTIP_STYLE.get();
         maxLights = MAX_LIGHTS.get();
         shadowSteps = SHADOW_STEPS.get();
     }

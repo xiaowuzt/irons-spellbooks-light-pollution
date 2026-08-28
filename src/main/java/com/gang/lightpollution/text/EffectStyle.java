@@ -1,0 +1,146 @@
+package com.gang.lightpollution.text;
+
+import com.gang.lightpollution.ExampleMod;
+
+/*
+ * Ported from the author's own Dynamic Text Effects mod (cn.blockforge.dynamictext),
+ * flattened into this mod's packages so the effects work without that mod installed.
+ *
+ * The FTB Quests and ModernUI compatibility layers were deliberately left behind: they need
+ * those mods on the compile classpath, and this mod has no quest text to style.
+ */
+
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
+
+import java.util.Optional;
+
+/**
+ * 将效果位编码进 Style.font，既能穿过换行、视觉重排、物品 tooltip 和 ModernUI 布局缓存，
+ * 又不会占用显示字符。实际查找字体资源前由兼容注入还原原字体 ID。
+ */
+public final class EffectStyle {
+    public static final int RAINBOW = 1;
+    public static final int GLITCH = 1 << 1;
+    public static final int CYBER = 1 << 2;
+    public static final int MAGIC = 1 << 3;
+    public static final int HOLOGRAPHIC = 1 << 4;
+    public static final int ENERGY_BAR = 1 << 5;
+    public static final int LAVA = 1 << 6;
+    public static final int PARCHMENT = 1 << 7;
+    public static final int RED_SPEED_NEON = 1 << 8;
+    public static final int SYNTHWAVE_NEON = 1 << 9;
+
+    public static final int ALL = RAINBOW
+            | GLITCH
+            | CYBER
+            | MAGIC
+            | HOLOGRAPHIC
+            | ENERGY_BAR
+            | LAVA
+            | PARCHMENT
+            | RED_SPEED_NEON
+            | SYNTHWAVE_NEON;
+
+    private static final String PREFIX = "fx/";
+
+    private EffectStyle() {
+    }
+
+    public static Style withMask(Style style, int mask) {
+        Style source = style == null ? Style.EMPTY : style;
+        ResourceLocation base = baseFont(source.getFont());
+        int activeMask = mask & ALL;
+        if (activeMask == 0) {
+            return source.withFont(base);
+        }
+        String path = PREFIX + activeMask + "/" + base.getNamespace() + "/" + base.getPath();
+        return source.withFont(ResourceLocation.fromNamespaceAndPath(ExampleMod.MODID, path));
+    }
+
+    public static int mask(Style style) {
+        return style == null ? 0 : mask(style.getFont());
+    }
+
+    public static int mask(ResourceLocation font) {
+        if (!isEncoded(font)) {
+            return 0;
+        }
+
+        String[] parts = font.getPath().split("/", 4);
+        if (parts.length < 4) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(parts[1]) & ALL;
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    public static boolean isEncoded(Style style) {
+        return style != null && isEncoded(style.getFont());
+    }
+
+    public static boolean isEncoded(ResourceLocation font) {
+        return font != null
+                && ExampleMod.MODID.equals(font.getNamespace())
+                && font.getPath().startsWith(PREFIX);
+    }
+
+    /** 移除本模组效果元数据，同时保留原 insertion、事件与所有原版格式。 */
+    public static Style clean(Style style) {
+        if (style == null) {
+            return Style.EMPTY;
+        }
+        return isEncoded(style.getFont()) ? style.withFont(baseFont(style.getFont())) : style;
+    }
+
+    public static ResourceLocation baseFont(ResourceLocation font) {
+        if (!isEncoded(font)) {
+            return font == null ? Style.DEFAULT_FONT : font;
+        }
+
+        String[] parts = font.getPath().split("/", 4);
+        if (parts.length < 4) {
+            return Style.DEFAULT_FONT;
+        }
+
+        ResourceLocation decoded = ResourceLocation.tryBuild(parts[2], parts[3]);
+        return decoded == null ? Style.DEFAULT_FONT : decoded;
+    }
+
+    public static boolean hasEffects(FormattedText text) {
+        if (text == null) {
+            return false;
+        }
+
+        boolean[] found = {false};
+        text.visit((style, segment) -> {
+            if (mask(style) != 0) {
+                found[0] = true;
+            }
+            return Optional.empty();
+        }, Style.EMPTY);
+        return found[0];
+    }
+
+    public static boolean hasEffects(FormattedCharSequence sequence) {
+        if (sequence == null) {
+            return false;
+        }
+
+        boolean[] found = {false};
+        sequence.accept((index, style, codePoint) -> {
+            if (mask(style) != 0) {
+                found[0] = true;
+                return false;
+            }
+            return true;
+        });
+        return found[0];
+    }
+}

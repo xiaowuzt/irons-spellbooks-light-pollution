@@ -24,6 +24,11 @@ import java.util.List;
  *
  * <p>Three layers — bloom, corona, core — because one falloff cannot be both bright in the
  * middle and soft at the edge. Drawn largest first so the core lands on top.</p>
+ *
+ * <p>All three are billboards, but the core is shaded as a sphere rather than as a disc: the disc
+ * version was reported as looking fake, and it had no limb, no rotation and no surface, so it read
+ * as a white circle painted on the air. The sphere is raytraced in the fragment shader on the same
+ * quad, which is why this still costs four vertices per body per layer.</p>
  */
 public final class EffectCore {
     /** One body queued for drawing. */
@@ -48,32 +53,81 @@ public final class EffectCore {
     }
 
     /**
-     * Draw everything queued, largest layer first.
+     * Draw everything queued: the glow first, then the bodies on top of it.
      *
      * <p>Three passes rather than one, because the shader picks its layer from the colour
-     * modulator's alpha and that is per draw call, not per vertex.</p>
+     * modulator's alpha and that is per draw call, not per vertex. The body is a fourth pass with a
+     * different shader entirely, since it is real geometry and the glow is not.</p>
      */
     public static void flush(BufferBuilder builder, Vec3 camera) {
         if (QUEUE.isEmpty()) {
             return;
         }
-        ShaderInstance shader = ConstellationShaders.effectCore();
-        if (shader == null) {
+        ShaderInstance glow = ConstellationShaders.effectCore();
+        ShaderInstance surface = ConstellationShaders.starSurface();
+        if (glow == null) {
             QUEUE.clear();
             return;
         }
         try {
-            layer(builder, camera, shader, BLOOM_SCALE, 0.0F);
-            layer(builder, camera, shader, CORONA_SCALE, 1.0F);
-            layer(builder, camera, shader, 1.0D, 2.0F);
+            layer(builder, camera, glow, BLOOM_SCALE, 0.0F);
+            layer(builder, camera, glow, CORONA_SCALE, 1.0F);
+            if (surface == null) {
+                // No sphere shader, so fall back to the flat core rather than drawing nothing.
+                layer(builder, camera, glow, 1.0D, 2.0F);
+            } else {
+                bodies(builder, camera, surface);
+            }
         } finally {
             QUEUE.clear();
         }
     }
 
+    /**
+     * The bodies themselves, as real spheres.
+     *
+     * <p>Culling is enabled for this pass alone, which is the point of using real geometry: the far
+     * hemisphere is dropped, so every fragment is drawn exactly once and the additive blend does not
+     * double the brightness through the middle of the ball.</p>
+     */
+    private static void bodies(BufferBuilder builder, Vec3 camera, ShaderInstance shader) {
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+        int vertices = 0;
+        for (Body body : QUEUE) {
+            vertices += SphereMeshBuilder.emit(builder, camera, body.at(), body.radius(),
+                    CurveRibbon.pack(body.r(), body.g(), body.b(), body.intensity()));
+        }
+        if (vertices <= 0) {
+            release(builder);
+            return;
+        }
+        try {
+            RenderSystem.enableBlend();
+            RenderSystem.blendFuncSeparate(
+                    GlStateManager.SourceFactor.SRC_ALPHA,
+                    GlStateManager.DestFactor.ONE,
+                    GlStateManager.SourceFactor.ONE,
+                    GlStateManager.DestFactor.ZERO);
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(false);
+            RenderSystem.enableCull();
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+            RenderSystem.setShader(() -> shader);
+            BufferUploader.drawWithShader(builder.end());
+        } catch (RuntimeException | LinkageError failure) {
+            release(builder);
+            throw failure;
+        } finally {
+            RenderSystem.disableCull();
+        }
+    }
+
     private static void layer(BufferBuilder builder, Vec3 camera, ShaderInstance shader,
                               double scale, float selector) {
-        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        // POSITION_TEX_COLOR_NORMAL, because the core layer shades a sphere and needs a
+        // world-space frame to do it in. The normal carries the billboard's right vector; the
+        // fragment stage gets the other two axes from the view ray.
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
         int vertices = 0;
         for (Body body : QUEUE) {
             vertices += disc(builder, camera, body.at(), body.radius() * scale,
@@ -115,21 +169,22 @@ public final class EffectCore {
         if (right.lengthSqr() < 1.0e-8D) {
             right = forward.cross(new Vec3(1.0D, 0.0D, 0.0D));
         }
-        right = right.normalize().scale(radius);
-        Vec3 up = right.cross(forward).normalize().scale(radius);
+        Vec3 axis = right.normalize();
+        right = axis.scale(radius);
+        Vec3 up = axis.cross(forward).normalize().scale(radius);
 
         float cx = (float) (at.x - camera.x);
         float cy = (float) (at.y - camera.y);
         float cz = (float) (at.z - camera.z);
-        corner(builder, cx, cy, cz, right, up, -1, -1, 0.0F, 0.0F, colour);
-        corner(builder, cx, cy, cz, right, up, 1, -1, 1.0F, 0.0F, colour);
-        corner(builder, cx, cy, cz, right, up, 1, 1, 1.0F, 1.0F, colour);
-        corner(builder, cx, cy, cz, right, up, -1, 1, 0.0F, 1.0F, colour);
+        corner(builder, cx, cy, cz, right, up, axis, -1, -1, 0.0F, 0.0F, colour);
+        corner(builder, cx, cy, cz, right, up, axis, 1, -1, 1.0F, 0.0F, colour);
+        corner(builder, cx, cy, cz, right, up, axis, 1, 1, 1.0F, 1.0F, colour);
+        corner(builder, cx, cy, cz, right, up, axis, -1, 1, 0.0F, 1.0F, colour);
         return 4;
     }
 
     private static void corner(BufferBuilder builder, float cx, float cy, float cz,
-                               Vec3 right, Vec3 up, int sx, int sy,
+                               Vec3 right, Vec3 up, Vec3 axis, int sx, int sy,
                                float u, float v, int colour) {
         builder.vertex(cx + (float) (right.x * sx + up.x * sy),
                         cy + (float) (right.y * sx + up.y * sy),
@@ -137,6 +192,9 @@ public final class EffectCore {
                 .uv(u, v)
                 .color((colour >> 16) & 0xFF, (colour >> 8) & 0xFF,
                         colour & 0xFF, (colour >>> 24) & 0xFF)
+                // The unscaled right vector. The shader rebuilds the up axis from this and the
+                // view ray, so it must be the unit direction rather than the radius-scaled edge.
+                .normal((float) axis.x, (float) axis.y, (float) axis.z)
                 .endVertex();
     }
 

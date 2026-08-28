@@ -17,8 +17,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
 
 import java.util.List;
 
@@ -61,7 +59,7 @@ public final class PinwheelWorldRenderer {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        ShaderInstance shader = ConstellationShaders.pinwheelDust();
+        ShaderInstance shader = ConstellationShaders.strand();
         if (minecraft.level == null || shader == null) {
             return;
         }
@@ -69,7 +67,7 @@ public final class PinwheelWorldRenderer {
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
 
-        GlState state = GlState.capture();
+        GlStateGuard state = GlStateGuard.capture();
         PoseStack modelView = RenderSystem.getModelViewStack();
         modelView.pushPose();
         try {
@@ -121,36 +119,32 @@ public final class PinwheelWorldRenderer {
             EffectCore.add(centre.subtract(swing), 1.2D, 1.00F, 0.82F, 0.58F,
                     brightness * 1.5F);
 
+            int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
             for (int arm = 0; arm < PinwheelEntity.ARMS; ++arm) {
                 final int index = arm;
-                vertices += CurveRibbon.emit(builder, camera, SEGMENTS,
+                vertices += CurveTube.emit(builder, camera, SEGMENTS,
                         0.02D, Math.max(0.05D, grown),
                         fraction -> entity.armPoint(centre, index, fraction, rotation),
                         PinwheelEntity::armWidth,
-                        fraction -> dustColour(fraction, brightness));
+                        CurveTube.MODE_ARM, 0.0F,
+                        Math.min(1.0F, brightness * 0.17F), alpha);
             }
         }
         draw(builder, shader, vertices);
     }
 
     /**
-     * Dust colour along an arm, warm near the binary and cold at the far end.
+     * Begin the buffer in the format the tubes actually write.
      *
-     * <p>That direction is the physics: dust is condensing continuously at the shock and
-     * cooling as it is carried out, so age and radius are the same axis. Nothing here reaches
-     * white — dust at a few hundred kelvin cannot.</p>
+     * <p>POSITION_TEX_COLOR_NORMAL, not POSITION_TEX_COLOR. TubeMeshBuilder emits a normal per
+     * vertex and the strand shader declares one; beginning in the shorter format reinterprets
+     * the vertex data against the wrong stride, which no compiler can catch and which shows up
+     * as garbage geometry rather than as an error.</p>
      */
-    private static int dustColour(double fraction, float brightness) {
-        float t = (float) Math.max(0.0D, Math.min(1.0D, fraction));
-        float r = INNER_R + (OUTER_R - INNER_R) * t;
-        float g = INNER_G + (OUTER_G - INNER_G) * t;
-        float b = INNER_B + (OUTER_B - INNER_B) * t;
-        return CurveRibbon.pack(r, g, b, brightness * 0.9F);
-    }
-
     private static BufferBuilder begin() {
         finish(effectBuffer);
-        effectBuffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+        effectBuffer.begin(VertexFormat.Mode.QUADS,
+                DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
         return effectBuffer;
     }
 
@@ -189,41 +183,6 @@ public final class PinwheelWorldRenderer {
             }
         } catch (RuntimeException ignored) {
             effectBuffer = new BufferBuilder(BUFFER_CAPACITY);
-        }
-    }
-
-    private record GlState(boolean blend, boolean depth, boolean cull, boolean depthWrite,
-                           int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        private static GlState capture() {
-            return new GlState(
-                    GL11.glIsEnabled(GL11.GL_BLEND),
-                    GL11.glIsEnabled(GL11.GL_DEPTH_TEST),
-                    GL11.glIsEnabled(GL11.GL_CULL_FACE),
-                    GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA));
-        }
-
-        private void restore() {
-            RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-            if (blend) {
-                RenderSystem.enableBlend();
-            } else {
-                RenderSystem.disableBlend();
-            }
-            if (depth) {
-                RenderSystem.enableDepthTest();
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-            if (cull) {
-                RenderSystem.enableCull();
-            } else {
-                RenderSystem.disableCull();
-            }
-            RenderSystem.depthMask(depthWrite);
         }
     }
 }

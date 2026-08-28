@@ -71,6 +71,49 @@ commit log.
   rather than a radius — outside is safe, the filaments sting, the interior pulses, and
   leaving means crossing the cage again.
 
+### Rendering
+
+- The new effects' strands are real tube geometry rather than camera-facing ribbons.
+  A ribbon has no cross-section, never hides itself, and collapses to nothing wherever
+  the curve happens to point at you — which is why they read as pictures pasted over
+  the world instead of as objects. A tube is round from every angle, its near side
+  occludes its far side, and the highlight moves when you do.
+- Strands are shaded per fragment from a real geometric normal, and brighten toward
+  the rim rather than falling off like a lit surface, because they are hot emitting
+  material and not plastic pipe. An eight-sided tube no longer creases at every quad
+  edge either.
+- Every effect with something at its middle now draws it. Six of the seven had only
+  their outer structure and nothing inside: jets emerging from empty air, field lines
+  looping around a gap, a nebula with no star in it.
+- Those central bodies are real spheres, not billboards — actual geometry with a true
+  normal at every vertex, limb-darkened by the Eddington grey-atmosphere law so the edge
+  sits at 0.4 of the middle, with a granulated surface that turns with the body. A flat
+  quad has no limb, no rotation and no silhouette of its own, so it read as a white
+  circle painted on the sky however carefully it was shaded.
+- Gargantua's strongest lensing is finally visible. Rays bent far enough to leave the
+  screen had no scene left to read and quietly faded back to whatever colour was already
+  there, which meant the region just outside the photon ring — where light turns through
+  the largest angles — bent nothing you could see. Those rays now look out at a
+  volumetric star field along the direction gravity actually sent them. It is sampled by
+  world direction, so it behaves as a fixed sky rather than sliding about with the
+  camera, which is the only way lensed starlight reads as lensed.
+- Crab Nebula filaments are closed loops, so none of them has loose ends hanging in
+  the middle of the shell. Closing them is not the same as making them circles —
+  twenty-two great circles is a wireframe globe, which is the one thing the real
+  remnant does not look like — so each loop weaves out of its own plane instead. The
+  join is genuinely invisible rather than merely short: carrying a reference frame once
+  around one of these loops turns it by as much as fifty degrees, and that turn is
+  spread across every ring instead of being dumped into the closing segment.
+- The visible rectangles and hard edges in the new effects are gone. They were not
+  tiling artefacts. Raising the exposure left the falloffs ending well above zero at
+  the quads' own boundaries, so what you could see was the edge of the quad itself.
+
+### Gargantua
+
+- It pulls. Creatures are dragged toward it rather than only damaged at range, and
+  projectiles are pulled too; inside the capture radius their motion is taken over
+  outright rather than nudged, so they go in instead of sailing past.
+
 ### Balance
 
 - Every spell's damage is now a distinct figure. Five spells previously shared the
@@ -95,6 +138,12 @@ commit log.
   is skipped, and everything else runs. Driver-specific GLSL differences cannot all
   be known in advance, so the cost of one has to be a missing effect rather than an
   unplayable game.
+- Fixed effects leaking a shader colour into whatever drew next. Fourteen world renderers
+  each carried their own copy of the same GL state snapshot, and the copies had drifted:
+  seven put the shader colour back and seven did not. Since the central bodies set that
+  colour's alpha as high as 2.0 to pick which layer to draw, anything rendering after one
+  of the seven inherited it. There is now one snapshot, and it restores the colour that was
+  actually there beforehand rather than assuming white.
 
 ### Presentation
 
@@ -106,6 +155,27 @@ commit log.
 - The Simplified Chinese text for the Cosmic Horseshoe was written in the classical
   register, with the 分/釐/毫 fractions that belong to the Literary Chinese file.
   It now reads as modern Chinese with percentages, like the rest of `zh_cn`.
+- Animated text effects are built in rather than depended on, ported from the
+  author's own dynamic-text mod, so the spell names move without adding a second
+  download. Its toggles live in their own config file.
+- Tooltips for this mod's items are styled per spell: the name animates, and every
+  line under it takes that spell's accent colour. The lines below the name are not
+  ours — level, rarity, cast time, mana, cooldown and school all come from Iron's
+  Spells in its own orange, blue, grey and red, which no language file here can
+  reach — so half the box used to clash with the other half.
+- Two optional tooltip frames, both off by default. `panel` draws a rounded panel behind
+  the normal layout; `arcane` takes rendering over, with glow rays behind the box and a
+  rule under the title. Both carry a highlight that travels around the outline rather than
+  pulsing in place. Switch with `/lightpollution frame <vanilla|panel|arcane>` for the
+  session, or set `tooltipStyle` in the client config to keep it. Adapted from ArcaneVortex
+  with its author's permission, credited in `CREDITS.txt`.
+- Damage from these spells floats above what it hits, in that spell's own colour. Damage
+  on one target is accumulated for half a second and shown once as a total: these spells
+  tick rather than landing single hits, and the Crab Nebula alone would otherwise put
+  around forty separate numbers on one target in a single cast.
+- Four spells now announce their own turning point, which were all completely silent
+  before: Gargantua's horizon closing, the magnetar's magnetosphere letting go, a tidal
+  disruption's fallback peaking, and the Crab remnant coming apart.
 
 ## 1.1.0
 

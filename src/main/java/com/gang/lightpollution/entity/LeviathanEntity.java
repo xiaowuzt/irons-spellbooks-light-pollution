@@ -540,7 +540,7 @@ public final class LeviathanEntity extends Entity {
                 source = LeviathanDamage.source(level, this, caster);
             }
             for (LivingEntity target : touched) {
-                applyTrueDamage(target, source, SWEEP_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, SWEEP_DAMAGE_FRACTION);
                 // Thrown aside along the body's own heading, so being clipped by
                 // it reads as being hit by something moving.
                 Vec3 aside = target.getBoundingBox().getCenter().subtract(point);
@@ -575,7 +575,7 @@ public final class LeviathanEntity extends Entity {
         }
         DamageSource source = LeviathanDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            applyTrueDamage(target, source, BITE_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, BITE_DAMAGE_FRACTION);
         }
     }
 
@@ -606,30 +606,6 @@ public final class LeviathanEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source, float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

@@ -19,8 +19,6 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
 
 import java.util.List;
 
@@ -104,7 +102,7 @@ public final class StarfallWorldRenderer {
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
 
-        GlState state = GlState.capture();
+        GlStateGuard state = GlStateGuard.capture();
         // Camera rotation goes in ModelViewMat and the vertices stay raw and
         // camera-relative, matching the other world renderers. See
         // ConstellationWorldRenderer for what baking it into the vertices instead
@@ -584,40 +582,5 @@ public final class StarfallWorldRenderer {
      * This draws inside LevelRenderer, so every state it changes has to go back
      * exactly as it was or the leak reaches whatever the level draws next.
      */
-    private record GlState(boolean blend, boolean depth, boolean cull, boolean depthWrite,
-                           int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        private static GlState capture() {
-            return new GlState(
-                    GL11.glIsEnabled(GL11.GL_BLEND),
-                    GL11.glIsEnabled(GL11.GL_DEPTH_TEST),
-                    GL11.glIsEnabled(GL11.GL_CULL_FACE),
-                    GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA));
-        }
-
-        private void restore() {
-            RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-            if (blend) {
-                RenderSystem.enableBlend();
-            } else {
-                RenderSystem.disableBlend();
-            }
-            if (depth) {
-                RenderSystem.enableDepthTest();
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-            if (cull) {
-                RenderSystem.enableCull();
-            } else {
-                RenderSystem.disableCull();
-            }
-            RenderSystem.depthMask(depthWrite);
-            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        }
-    }
 
 }

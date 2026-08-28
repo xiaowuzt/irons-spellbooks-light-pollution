@@ -610,7 +610,7 @@ public final class WorldTreeEntity extends Entity {
                     source = WorldTreeDamage.source(level, this, caster);
                 }
                 for (LivingEntity target : touched) {
-                    applyTrueDamage(target, source, ROOT_DAMAGE_FRACTION);
+                    SpellDamage.apply(this, target, source, ROOT_DAMAGE_FRACTION);
                 }
             }
         }
@@ -626,7 +626,7 @@ public final class WorldTreeEntity extends Entity {
         }
         DamageSource source = WorldTreeDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            applyTrueDamage(target, source, TRUNK_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, TRUNK_DAMAGE_FRACTION);
             // Held in place rather than knocked away: the tree is a wall now, and
             // pinning is what makes the crown's pulse land.
             target.addEffect(new MobEffectInstance(
@@ -644,7 +644,7 @@ public final class WorldTreeEntity extends Entity {
         }
         DamageSource source = WorldTreeDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            applyTrueDamage(target, source, CROWN_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, CROWN_DAMAGE_FRACTION);
         }
     }
 
@@ -697,30 +697,6 @@ public final class WorldTreeEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source, float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

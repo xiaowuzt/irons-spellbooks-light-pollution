@@ -188,6 +188,87 @@ public final class TubeMeshBuilder {
     }
 
     /**
+     * Resolves the frame for a closed loop, returning one more ring than points so the last
+     * duplicates the first and the tube joins with no cap.
+     *
+     * <p>Two things have to be true for a loop to close invisibly, and neither comes free.</p>
+     *
+     * <p>The tangents at the join must be computed from the cyclic neighbours, not one-sidedly,
+     * or the two coincident rings face slightly different ways and the seam shows as a kink. That
+     * is what the padding is for: the path is wrapped with its own tail and head so the shared
+     * frame code sees real neighbours on both sides of every point.</p>
+     *
+     * <p>And parallel transport does not come back to where it started. Carrying a reference axis
+     * once around a closed curve rotates it by the loop's holonomy, which for these curves is a
+     * sizeable fraction of a turn. Snapping the last ring onto the first would dump that entire
+     * rotation into the final segment as a visible pinch, so it is spread evenly across every ring
+     * instead — each one rolled back by its share.</p>
+     *
+     * @param loop  points around the loop, each distinct; the closing point is added here rather
+     *              than being expected in the input
+     * @param radii radius at each point, same length as {@code loop}
+     */
+    public static Ring[] closedFrames(Vec3[] loop, float[] radii) {
+        int count = loop.length;
+        if (count < 3) {
+            return frames(loop, radii, null);
+        }
+
+        // Wrapped by one at the start and two at the end, so indices 1 through count+1 all have a
+        // genuine neighbour either side. Index count+1 is the loop's start point again, and it ends
+        // up with a tangent identical to index 1 — which is what makes the join exact.
+        Vec3[] padded = new Vec3[count + 3];
+        float[] paddedRadii = new float[count + 3];
+        padded[0] = loop[count - 1];
+        paddedRadii[0] = radii[count - 1];
+        for (int index = 0; index < count; index++) {
+            padded[index + 1] = loop[index];
+            paddedRadii[index + 1] = radii[index];
+        }
+        padded[count + 1] = loop[0];
+        paddedRadii[count + 1] = radii[0];
+        padded[count + 2] = loop[1];
+        paddedRadii[count + 2] = radii[1];
+
+        Ring[] all = frames(padded, paddedRadii, null);
+        Ring[] rings = new Ring[count + 1];
+        System.arraycopy(all, 1, rings, 0, count + 1);
+
+        float drift = signedAngle(rings[0].right(), rings[count].right(), rings[0].tangent());
+        for (int index = 0; index <= count; index++) {
+            rings[index] = rolled(rings[index], -drift * index / count);
+        }
+        return rings;
+    }
+
+    /** Rotate a ring's frame about its own tangent, matching the roll convention in frames. */
+    private static Ring rolled(Ring ring, float angle) {
+        if (angle == 0.0F) {
+            return ring;
+        }
+        float cos = Mth.cos(angle);
+        float sin = Mth.sin(angle);
+        Vector3f right = new Vector3f(
+                ring.right().x * cos + ring.up().x * sin,
+                ring.right().y * cos + ring.up().y * sin,
+                ring.right().z * cos + ring.up().z * sin).normalize();
+        Vector3f up = new Vector3f(
+                ring.up().x * cos - ring.right().x * sin,
+                ring.up().y * cos - ring.right().y * sin,
+                ring.up().z * cos - ring.right().z * sin).normalize();
+        return new Ring(ring.centre(), ring.radius(), right, up, ring.tangent());
+    }
+
+    /** The angle that rotates {@code from} onto {@code to} about {@code axis}, signed. */
+    private static float signedAngle(Vector3f from, Vector3f to, Vector3f axis) {
+        Vector3f a = new Vector3f(from).normalize();
+        Vector3f b = new Vector3f(to).normalize();
+        float cos = Mth.clamp(a.dot(b), -1.0F, 1.0F);
+        float sin = new Vector3f(a).cross(b).dot(axis);
+        return (float) Math.atan2(sin, cos);
+    }
+
+    /**
      * Writes the tube's surface. Returns the vertex count added.
      *
      * @param sides     divisions around the circumference

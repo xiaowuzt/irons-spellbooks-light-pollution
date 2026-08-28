@@ -7,7 +7,9 @@ Some of FX (github.com/YangMao-Minister/some_of_fx), MIT, (c) 2026 Pizuka
   SOME_OF_FX_LICENSE.txt.
 
 ArcaneVortex, by ErChien — used with the author's written permission
-  Gargantua's ray-marched black hole draws on ArcaneVortex's rendering work.
+  Gargantua's ray-marched black hole draws on ArcaneVortex's rendering work, and
+  the optional PANEL and ARCANE tooltip frames follow its custom tooltip
+  renderer — the glow rays, the title separator and the per-item accent border.
   ArcaneVortex is All Rights Reserved; the author gave permission for direct use
   of the code on the condition that it be credited, and this notice is that
   condition being met. Please do not redistribute ArcaneVortex's own code on the
@@ -16,6 +18,23 @@ ArcaneVortex, by ErChien — used with the author's written permission
   The physics and every radius come from James, von Tunzelmann, Franklin &
   Thorne, "Gravitational lensing by spinning black holes in astrophysics, and in
   the movie Interstellar", Classical and Quantum Gravity 32, 065001 (2015).
+
+Star Nest, by Kali (Shadertoy) — via ArcaneVortex
+  The volumetric star field that Gargantua's strongly deflected rays look out at is
+  Kali's "Star Nest", reproduced with its constants unchanged. It was found inside
+  ArcaneVortex with no attribution of its own; roughly half of that mod was inherited
+  rather than written by its current author, which is how it got there. It is Kali's
+  work, not theirs and not ours. The mod author has confirmed Shadertoy use is
+  permitted here; this credit is kept regardless, since attribution is the one
+  obligation every licence that plausibly applies has in common.
+  Adapted only in that it is sampled along a world-space direction instead of from
+  screen coordinates, so it can stand in for the sky along a bent light ray.
+
+Dynamic text effects, by the author of this mod
+  The animated text in spell names is ported from that separate mod rather than
+  depended on, so this pack carries no extra requirement. Repackaged under
+  com.gang.lightpollution.text, with its FTB and ModernUI compatibility layers
+  dropped as nothing here needs them.
 
 =========================================================================
 

@@ -53,6 +53,14 @@ void main() {
     // all clamped under one so the Doppler and line colours would not clip; the verdict was
     // that accuracy had been bought at the cost of impact. The colour ramps are still built
     // from real physics, but the exposure on top of them is chosen to hurt to look at.
+    // Forced to exactly zero at the quad's own edge. Every one of these shaders was leaving a
+    // residue there -- the helix knots 0.055 at their far end, the jet ribbon 0.06 at its
+    // sides -- and raising the exposure to make the effects striking multiplied that residue
+    // into a plainly visible rectangle or a hard line along every strand. The window costs
+    // almost nothing at the centre and removes the seam by construction rather than by hoping
+    // the falloff got small enough.
+    lit *= pow(max(0.0, 1.0 - across * across), 1.5);
+
     vec3 colour = vertexColor.rgb * lit * intensity * 2.8;
     fragColor = vec4(colour, 1.0) * ColorModulator;
 }

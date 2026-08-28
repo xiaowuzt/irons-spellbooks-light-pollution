@@ -5,6 +5,13 @@ pluginManagement {
             name = 'MinecraftForge'
             url = 'https://maven.minecraftforge.net/'
         }
+        // Where the mixin gradle plugin lives. Needed by the ported text effects, which are
+        // the only part of this mod that uses a mixin.
+        maven {
+            name = 'Sponge'
+            url = 'https://repo.spongepowered.org/repository/maven-public/'
+        }
+        mavenCentral()
     }
 }
 

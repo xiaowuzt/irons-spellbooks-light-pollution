@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.gang.lightpollution.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "irons_spellbooks_light_pollution.refmap.json",
+  "client": [
+    "FontInvoker",
+    "FontMixin",
+    "FontStringRenderOutputMixin",
+    "ItemStackMixin",
+    "MutableComponentMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

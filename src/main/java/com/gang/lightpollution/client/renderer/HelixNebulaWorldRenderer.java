@@ -17,8 +17,6 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL14;
 
 import java.util.List;
 
@@ -37,6 +35,14 @@ public final class HelixNebulaWorldRenderer {
     private static final double RENDER_DISTANCE_SQR = 256.0D * 256.0D;
     /** Length of a knot including its tail, in blocks. */
     private static final double KNOT_LENGTH = 3.6D;
+    /**
+     * Where along the quad the knot's head sits, as a fraction.
+     *
+     * <p>Must match {@code HS_HEAD_AT} in helix_knot.fsh. One number split across two files:
+     * the shader decides where to draw the head, this decides how far the quad extends behind
+     * it, and if they disagree the head lands off centre or gets clipped again.</p>
+     */
+    private static final double HEAD_MARGIN = 0.26D;
     /** Half-width of a knot's quad, in blocks. */
     private static final double KNOT_HALF_WIDTH = 1.05D;
 
@@ -73,7 +79,7 @@ public final class HelixNebulaWorldRenderer {
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
 
-        GlState state = GlState.capture();
+        GlStateGuard state = GlStateGuard.capture();
         PoseStack modelView = RenderSystem.getModelViewStack();
         modelView.pushPose();
         try {
@@ -171,15 +177,23 @@ public final class HelixNebulaWorldRenderer {
             return 0;
         }
         across = across.normalize().scale(KNOT_HALF_WIDTH);
-        Vec3 tail = outward.normalize().scale(KNOT_LENGTH);
+        Vec3 downwind = outward.normalize();
+
+        // The quad reaches back past the knot, not just forward from it. The shader places the
+        // head at HEAD_MARGIN of the way along; with the quad starting exactly at the knot the
+        // head's gaussian was half outside it and every knot rendered as a clean-cut
+        // hemisphere. HEAD_MARGIN here and HS_HEAD_AT in helix_knot.fsh are the same number.
+        double total = KNOT_LENGTH / (1.0D - HEAD_MARGIN);
+        Vec3 back = downwind.scale(-total * HEAD_MARGIN);
+        Vec3 front = downwind.scale(total * (1.0D - HEAD_MARGIN));
 
         int colour = colour(intensity, outerRing);
-        float hx = (float) (at.x - camera.x);
-        float hy = (float) (at.y - camera.y);
-        float hz = (float) (at.z - camera.z);
-        float tx = (float) (at.x + tail.x - camera.x);
-        float ty = (float) (at.y + tail.y - camera.y);
-        float tz = (float) (at.z + tail.z - camera.z);
+        float hx = (float) (at.x + back.x - camera.x);
+        float hy = (float) (at.y + back.y - camera.y);
+        float hz = (float) (at.z + back.z - camera.z);
+        float tx = (float) (at.x + front.x - camera.x);
+        float ty = (float) (at.y + front.y - camera.y);
+        float tz = (float) (at.z + front.z - camera.z);
         float ax = (float) across.x;
         float ay = (float) across.y;
         float az = (float) across.z;
@@ -261,41 +275,6 @@ public final class HelixNebulaWorldRenderer {
             }
         } catch (RuntimeException ignored) {
             effectBuffer = new BufferBuilder(BUFFER_CAPACITY);
-        }
-    }
-
-    private record GlState(boolean blend, boolean depth, boolean cull, boolean depthWrite,
-                           int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        private static GlState capture() {
-            return new GlState(
-                    GL11.glIsEnabled(GL11.GL_BLEND),
-                    GL11.glIsEnabled(GL11.GL_DEPTH_TEST),
-                    GL11.glIsEnabled(GL11.GL_CULL_FACE),
-                    GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_RGB),
-                    GL11.glGetInteger(GL14.GL_BLEND_SRC_ALPHA),
-                    GL11.glGetInteger(GL14.GL_BLEND_DST_ALPHA));
-        }
-
-        private void restore() {
-            RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-            if (blend) {
-                RenderSystem.enableBlend();
-            } else {
-                RenderSystem.disableBlend();
-            }
-            if (depth) {
-                RenderSystem.enableDepthTest();
-            } else {
-                RenderSystem.disableDepthTest();
-            }
-            if (cull) {
-                RenderSystem.enableCull();
-            } else {
-                RenderSystem.disableCull();
-            }
-            RenderSystem.depthMask(depthWrite);
         }
     }
 }

@@ -337,7 +337,7 @@ public final class QuasarJetEntity extends Entity {
             for (int knot = 0; knot < KNOT_COUNT; ++knot) {
                 Vec3 position = knotPosition(centre, knot, ageTicks);
                 if (position != null && position.distanceToSqr(at) <= touchSqr) {
-                    applyTrueDamage(target, source, KNOT_DAMAGE_FRACTION);
+                    SpellDamage.apply(this, target, source, KNOT_DAMAGE_FRACTION);
                     break;
                 }
             }
@@ -358,7 +358,7 @@ public final class QuasarJetEntity extends Entity {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(lobe) <= LOBE_RADIUS) {
-                applyTrueDamage(target, source, HOTSPOT_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, HOTSPOT_DAMAGE_FRACTION);
             }
         }
     }
@@ -390,31 +390,6 @@ public final class QuasarJetEntity extends Entity {
         }
         return caster == null
                 || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
-    }
-
-    private static void applyTrueDamage(LivingEntity target, DamageSource source,
-                                        float fraction) {
-        float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
-        float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
-
-        target.invulnerableTime = 0;
-        target.hurt(source, damage);
-        target.invulnerableTime = 0;
-
-        if (target.isDeadOrDying() || target.isRemoved()) {
-            return;
-        }
-
-        target.setAbsorptionAmount(0.0F);
-        float finalHealth = Math.min(target.getHealth(), desiredHealth);
-        if (finalHealth <= 0.0F) {
-            target.setHealth(0.0F);
-            if (!target.isRemoved()) {
-                target.die(source);
-            }
-        } else {
-            target.setHealth(finalHealth);
-        }
     }
 
     @Override

@@ -356,19 +356,33 @@ void main() {
         float lensed = clamp(bent * 20.0, 0.0, 1.0);
         background = sceneColour;
         if (lensed > 0.001) {
+            // What this ray ends up looking at once gravity has finished with it.
+            //
+            // A ray deflected off the edge of the screen has no scene data to read, which
+            // is the unavoidable limit of working in screen space. It used to fade back to
+            // the undeflected colour: continuous, but it meant the strongest lensing of
+            // all — the region just outside the photon ring, where rays turn through large
+            // angles — resolved to whatever happened to be there already. The bending was
+            // real and invisible.
+            //
+            // Sampling a star field along the deflected direction gives it something to
+            // bend. The direction is in world space, so the same direction always returns
+            // the same stars: the field behaves as a fixed celestial sphere instead of
+            // sliding with the camera, which is the only way lensed starlight reads as
+            // lensed rather than as noise.
+            vec3 stars = starNest(d, time * 0.01);
+            vec3 escaped = stars;
             vec4 outClip = ProjectionMat * vec4(d * max(holeDistance, 32.0), 1.0);
             if (outClip.w > 0.0001) {
                 vec2 outUv = (outClip.xy / outClip.w) * 0.5 + 0.5;
                 vec2 inside = clamp(outUv, 0.0, 1.0);
-                // A ray deflected off the edge of the screen has no data to read --
-                // the unavoidable limit of doing this in screen space. Clamp to the
-                // edge, then fade back toward the undeflected colour by how far off it
-                // went, so it degrades quietly instead of painting a grey dome.
+                // On screen, read the scene. Off screen, hand over to the stars by how far
+                // off it went, so the two cross over smoothly rather than stepping.
                 float strayed = length(outUv - inside);
-                vec3 sampled = mix(texture(SceneSampler, inside).rgb, sceneColour,
+                escaped = mix(texture(SceneSampler, inside).rgb, stars,
                         clamp(strayed * 7.0, 0.0, 1.0));
-                background = mix(sceneColour, sampled, lensed);
             }
+            background = mix(sceneColour, escaped, lensed);
         }
     }
 
