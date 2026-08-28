@@ -23,10 +23,15 @@ public final class SpellLightConfig {
 
     private static final ForgeConfigSpec.EnumValue<TooltipStyle> TOOLTIP_STYLE = BUILDER
             .comment("How this mod's own tooltips are drawn.",
-                    "  VANILLA - the normal box, with only the border tinted per spell.",
-                    "  PANEL   - a chamfered panel behind the vanilla layout.",
-                    "  ARCANE  - takes rendering over: glow rays, a title separator, own text pass.",
-                    "Also switchable in game with /lightpollution frame <vanilla|panel|arcane>.")
+                    "  VANILLA  - the normal box, with only the border tinted per spell.",
+                    "  PANEL    - a rounded panel behind the vanilla layout.",
+                    "  ARCANE   - takes rendering over: glow rays, a centred title, a rule under it.",
+                    "  ORBIT    - the spell's own icon drifting behind the panel.",
+                    "  ASTRAL   - a drifting particle field, turning corner marks, a title band.",
+                    "  RING     - a tilted ring that passes through the tooltip.",
+                    "  SIGIL    - two counter-rotating triangles behind the panel.",
+                    "  PINWHEEL - no panel at all; the text orbits as spokes of a slow pinwheel.",
+                    "Also switchable in game with /lightpollution frame <style>.")
             .defineEnum("tooltipStyle", TooltipStyle.VANILLA);
 
     public static final ForgeConfigSpec SPEC = BUILDER.build();
@@ -43,20 +48,42 @@ public final class SpellLightConfig {
      */
     public static volatile TooltipStyle tooltipStyle = TooltipStyle.VANILLA;
 
-    /** The three tooltip treatments. */
+    /**
+     * The tooltip treatments.
+     *
+     * <p>Each one after VANILLA is a recipe over the shared elements ported from ArcaneVortex's nine
+     * separate tooltip renderers. Those nine mostly differed in which pieces they used and in
+     * palette; here the palette is always the spell's own accent, so a tooltip looks like the spell
+     * it describes rather than like a weapon from another mod.</p>
+     */
     public enum TooltipStyle {
         /** The vanilla box, border tinted to the spell's accent. */
         VANILLA,
-        /** A chamfered panel drawn behind the vanilla layout, which still does the text. */
+        /** A rounded panel drawn behind the vanilla layout, which still does the text. */
         PANEL,
         /**
-         * Rendering taken over entirely: glow rays, a separator under the title, own text pass.
+         * Rendering taken over: glow rays behind the box, a centred title, a rule under it.
          *
          * <p>Safe to take over because the two hard parts are already done by the time the event
-         * fires — the components arrive wrapped, and the position has already been corrected away
-         * from the screen edges. What is left is drawing.</p>
+         * fires — the components arrive wrapped, and the position has already been resolved. What is
+         * left is drawing.</p>
          */
-        ARCANE
+        ARCANE,
+        /** The spell's own icon drifting behind the panel, with ghost copies trailing it. */
+        ORBIT,
+        /** A drifting particle field, turning corner marks, and a band of light under the title. */
+        ASTRAL,
+        /**
+         * A tilted ring threaded through the tooltip.
+         *
+         * <p>The far half is drawn, then the panel, then the near half, so the ring appears to pass
+         * behind the box and out the other side.</p>
+         */
+        RING,
+        /** Two counter-rotating triangular bands behind the panel. */
+        SIGIL,
+        /** No panel: the lines orbit as spokes of a slowly turning pinwheel. */
+        PINWHEEL
     }
 
     private SpellLightConfig() {

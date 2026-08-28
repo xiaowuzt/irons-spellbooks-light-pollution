@@ -62,6 +62,8 @@ public final class ConstellationShaders {
     private static ShaderInstance strand;
     @Nullable
     private static ShaderInstance starSurface;
+    @Nullable
+    private static ShaderInstance ringSurface;
 
     private ConstellationShaders() {
     }
@@ -98,6 +100,8 @@ public final class ConstellationShaders {
         // Real sphere geometry for the central bodies, for the same reason.
         register(event, "star_surface", DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL,
                 shader -> starSurface = shader);
+        // The tooltip ring's surface: the volumetric star field, sampled across the band.
+        register(event, "ring_surface", shader -> ringSurface = shader);
     }
 
     private static void register(RegisterShadersEvent event, String path,
@@ -250,5 +254,11 @@ public final class ConstellationShaders {
     @Nullable
     public static ShaderInstance starSurface() {
         return starSurface;
+    }
+
+    /** The tooltip ring's surface: a strip of the volumetric star field. */
+    @Nullable
+    public static ShaderInstance ringSurface() {
+        return ringSurface;
     }
 }

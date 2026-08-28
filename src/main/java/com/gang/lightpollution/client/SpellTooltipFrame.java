@@ -12,10 +12,17 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.gui.Font;
+import com.gang.lightpollution.client.tooltip.SpellIcons;
+import com.gang.lightpollution.client.tooltip.TextPinwheel;
+import com.gang.lightpollution.client.tooltip.TooltipElements;
+import com.gang.lightpollution.client.tooltip.TooltipShapes;
+import com.gang.lightpollution.client.tooltip.TooltipText;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderTooltipEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -27,13 +34,13 @@ import org.joml.Vector2ic;
 import java.util.List;
 
 /**
- * Draws this mod's tooltips in one of two custom styles, after ArcaneVortex's own frames.
+ * Draws this mod's tooltips in one of several custom styles, after ArcaneVortex's own frames.
  *
- * <p>Both off by default, chosen by {@link TooltipStyle} in the config or by
+ * <p>All off by default, chosen by {@link TooltipStyle} in the config or by
  * {@code /lightpollution frame}. PANEL puts a rounded panel behind the vanilla layout and cancels
- * nothing, so vanilla still places the text. ARCANE cancels the event and draws the lot: a radial
- * glow behind the box, a rounded background with a lit border, a centred title, a rule under it,
- * then the body lines.</p>
+ * nothing, so vanilla still places the text. Every other style cancels the event and lays the box
+ * out here, differing only in what is drawn behind and over the panel — which is why nine separate
+ * renderers in the source mod collapse to one method and a switch.</p>
  *
  * <p><b>The position is not the event's x and y.</b> Those are the <em>mouse</em> position — Forge
  * says so outright: "the Y position of the tooltip box. By default, this is the mouse Y position."
@@ -146,7 +153,7 @@ public final class SpellTooltipFrame {
             return;
         }
 
-        arcane(graphics, event, components, font, at, accent, seconds);
+        takeover(graphics, event, components, font, at, accent, seconds, style);
         // Everything is drawn, so stop vanilla drawing its own box over the top.
         event.setCanceled(true);
     }
@@ -160,18 +167,6 @@ public final class SpellTooltipFrame {
                         0xE8000000 | shade(accent, 0.10F),
                         0xE8000000 | shade(accent, 0.22F)),
                 ARC_SEGMENTS);
-        border(graphics, left, top, right, bottom, corners, accent);
-    }
-
-    /**
-     * The outline, with the light travelling around it.
-     *
-     * <p>Three stops rather than two: a dim base, a bright one, and the dim base again. Two stops
-     * cycle back from bright straight to dim, which reads as a flicker at the seam — the repeat is
-     * what makes it a highlight sliding round a dim edge.</p>
-     */
-    private static void border(GuiGraphics graphics, int left, int top, int right, int bottom,
-                               RoundedRect.Corners corners, int accent) {
         RoundedRect.border(graphics, left, top, right, bottom, corners, 1.0F,
                 RoundedRect.Ramp.of(RoundedRect.Gradient.BORDER_CIRCULAR, BORDER_SPEED,
                         0xFF000000 | shade(accent, 0.40F),
@@ -180,10 +175,16 @@ public final class SpellTooltipFrame {
                 ARC_SEGMENTS);
     }
 
-    /** ARCANE: the whole tooltip, laid out here rather than by vanilla. */
-    private static void arcane(GuiGraphics graphics, RenderTooltipEvent.Pre event,
-                              List<ClientTooltipComponent> components, Font font,
-                              Vector2ic at, int accent, float seconds) {
+    /**
+     * The styles that take rendering over. Every one of them lays the box out here.
+     *
+     * <p>They share the measuring, the clamping and the text pass, and differ only in what is drawn
+     * behind and over the panel. That split is the whole reason the nine renderers this came from
+     * collapse to one method plus a switch.</p>
+     */
+    private static void takeover(GuiGraphics graphics, RenderTooltipEvent.Pre event,
+                                 List<ClientTooltipComponent> components, Font font,
+                                 Vector2ic at, int accent, float seconds, TooltipStyle style) {
         int lineWidth = 0;
         int content = 0;
         for (ClientTooltipComponent component : components) {
@@ -209,48 +210,132 @@ public final class SpellTooltipFrame {
         int right = left + width;
         int bottom = top + height;
 
-        rays(graphics, left, top, right, bottom, accent, seconds);
+        if (style == TooltipStyle.PINWHEEL) {
+            pinwheel(graphics, event, components, font, left, top, right, bottom, seconds);
+            return;
+        }
+
+        // Behind the panel, before the depth translate: the rays blend additively and the backdrop
+        // blits, and neither belongs in the batch the panel goes into.
+        if (style == TooltipStyle.ARCANE) {
+            rays(graphics, left, top, right, bottom, accent, seconds);
+        } else if (style == TooltipStyle.ORBIT) {
+            ResourceLocation icon = SpellIcons.forStack(event.getItemStack());
+            if (icon != null) {
+                TooltipElements.backdrop(graphics, icon, (left + right) / 2, (top + bottom) / 2,
+                        Math.max(64, Math.min(160, height * 3)), 0.55F, seconds);
+            }
+        }
 
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, 380.0F);
         try {
-            RoundedRect.Corners corners = RoundedRect.Corners.uniform(RADIUS);
-            RoundedRect.fill(graphics, left, top, right, bottom, corners,
-                    RoundedRect.Ramp.of(RoundedRect.Gradient.VERTICAL, 0.0F,
-                            0xF2000000 | shade(accent, 0.09F),
-                            0xF2000000 | shade(accent, 0.24F)),
-                    ARC_SEGMENTS);
-            border(graphics, left, top, right, bottom, corners, accent);
+            // The ring and the sigil go under the panel, inside this pose so they share its depth.
+            // The ring specifically has to be split across the panel draw, which is the whole point
+            // of it: far half, panel, near half.
+            float centreX = (left + right) * 0.5F;
+            float centreY = (top + bottom) * 0.5F;
+            // Sized off the panel's HEIGHT, not its width, and clamped. These tooltips carry one very
+            // long stat line, so a box is routinely fifteen times wider than it is tall — deriving
+            // the radius from the width gave a ring some thirteen hundred pixels across, most of it
+            // off screen. It is the same trap the rays hit, and the fix is the same.
+            //
+            // Height is the right driver anyway. The ring is squashed to a fifth of its width, so
+            // what decides whether it threads through the box is how far it reaches above and below
+            // it, and that is a vertical question. The clamp keeps a one-line tooltip from getting a
+            // ring too small to emerge and a tall one from getting a ring off the top of the screen.
+            float ringOuter = Mth.clamp(height * 3.0F, 110.0F, 240.0F);
+            float ringInner = ringOuter - Mth.clamp(ringOuter * 0.17F, 8.0F, 40.0F);
+            if (style == TooltipStyle.RING) {
+                TooltipShapes.ringHalf(graphics, centreX, centreY, ringOuter, ringInner,
+                        TooltipShapes.Half.BEHIND, accent, 0.85F, seconds);
+            } else if (style == TooltipStyle.SIGIL) {
+                TooltipShapes.sigil(graphics, left, top, right, bottom, accent, 0.5F, seconds);
+            }
+
+            TooltipElements.panel(graphics, left, top, right, bottom, RADIUS, accent, BORDER_SPEED);
+
+            if (style == TooltipStyle.RING) {
+                TooltipShapes.ringHalf(graphics, centreX, centreY, ringOuter, ringInner,
+                        TooltipShapes.Half.IN_FRONT, accent, 0.85F, seconds);
+            }
 
             int row = top + PAD_Y;
             if (ruled) {
                 int titleHeight = components.get(0).getHeight();
-                separator(graphics, left + PAD_X, row + titleHeight, right - PAD_X, accent);
+                if (style == TooltipStyle.ASTRAL) {
+                    // A band of light where the rule would go, rather than a rule.
+                    TooltipElements.flowingBand(graphics, left + PAD_X, row + titleHeight,
+                            right - PAD_X, row + titleHeight + 2, accent, 1.0F, 4.0F, 0.9F,
+                            seconds);
+                } else {
+                    TooltipElements.separator(graphics, left + PAD_X, row + titleHeight,
+                            right - PAD_X, accent);
+                }
             }
 
-            graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, 4.0F);
-            Matrix4f pose = graphics.pose().last().pose();
-            for (int index = 0; index < components.size(); ++index) {
-                ClientTooltipComponent component = components.get(index);
-                // The title is centred and the body is not, which is what stops a one-word name
-                // sitting alone at the far left of a very wide box.
-                int x = index == 0
-                        ? left + (width - component.getWidth(font)) / 2
-                        : left + PAD_X;
-                component.renderText(font, x, row, pose, graphics.bufferSource());
-                row += component.getHeight() + (index == 0 && ruled ? SEPARATOR_H : 0);
+            if (style == TooltipStyle.ASTRAL) {
+                TooltipElements.particles(graphics, left, top, right, bottom, accent, seconds);
+                TooltipElements.cornerMarks(graphics, left, top, right, bottom, accent, seconds);
             }
-            // Text is batched rather than drawn, so it has to be flushed while this pose is current.
-            graphics.flush();
+
+            text(graphics, components, font, left, width, top + PAD_Y, ruled);
+        } finally {
             graphics.pose().popPose();
+        }
+    }
 
-            row = top + PAD_Y;
-            for (int index = 0; index < components.size(); ++index) {
-                ClientTooltipComponent component = components.get(index);
-                component.renderImage(font, left + PAD_X, row, graphics);
-                row += component.getHeight() + (index == 0 && ruled ? SEPARATOR_H : 0);
-            }
+    /**
+     * The text pass, shared by every takeover style.
+     *
+     * <p>The title is centred and the body is not, which stops a one-word name sitting alone at the
+     * far left of a very wide box.</p>
+     */
+    private static void text(GuiGraphics graphics, List<ClientTooltipComponent> components,
+                             Font font, int left, int width, int firstRow, boolean ruled) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 4.0F);
+        Matrix4f pose = graphics.pose().last().pose();
+        int row = firstRow;
+        for (int index = 0; index < components.size(); ++index) {
+            ClientTooltipComponent component = components.get(index);
+            int x = index == 0
+                    ? left + (width - component.getWidth(font)) / 2
+                    : left + PAD_X;
+            component.renderText(font, x, row, pose, graphics.bufferSource());
+            row += component.getHeight() + (index == 0 && ruled ? SEPARATOR_H : 0);
+        }
+        // Text is batched rather than drawn, so it has to be flushed while this pose is current.
+        graphics.flush();
+        graphics.pose().popPose();
+
+        row = firstRow;
+        for (int index = 0; index < components.size(); ++index) {
+            ClientTooltipComponent component = components.get(index);
+            component.renderImage(font, left + PAD_X, row, graphics);
+            row += component.getHeight() + (index == 0 && ruled ? SEPARATOR_H : 0);
+        }
+    }
+
+    /**
+     * PINWHEEL: no panel, no border, no background — the lines orbit as spokes.
+     *
+     * <p>Centred on the screen rather than on the cursor, unlike every other style. The spokes reach
+     * sixty pixels out and swing right round, so anchoring that to the pointer would throw half of it
+     * off the edge whenever the cursor was near one.</p>
+     */
+    private static void pinwheel(GuiGraphics graphics, RenderTooltipEvent.Pre event,
+                                 List<ClientTooltipComponent> components, Font font,
+                                 int left, int top, int right, int bottom, float seconds) {
+        List<Component> lines = TooltipText.forStack(event.getItemStack());
+        if (lines.isEmpty()) {
+            return;
+        }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 380.0F);
+        try {
+            TextPinwheel.render(graphics, font, lines,
+                    event.getScreenWidth() * 0.5F, event.getScreenHeight() * 0.5F, seconds);
         } finally {
             graphics.pose().popPose();
         }
@@ -309,35 +394,6 @@ public final class SpellTooltipFrame {
         BufferUploader.drawWithShader(builder.end());
         RenderSystem.disableBlend();
         RenderSystem.enableDepthTest();
-    }
-
-    /**
-     * The rule under the title: transparent at both ends, solid in the middle.
-     *
-     * <p>Fading at both ends rather than one, which is ArcaneVortex's shape. A rule that is opaque
-     * at one edge and gone at the other reads as an unfinished gradient instead of a divider.</p>
-     *
-     * <p>The vertices are written out by hand because {@code fillGradient} grades <em>vertically</em>
-     * — its two colours go to y1 and y2, so across a two-pixel-tall strip it would produce a flat
-     * line and no fade at all. This needs the colour to vary with x, which is the same reason
-     * ArcaneVortex builds its separator from raw quads.</p>
-     */
-    private static void separator(GuiGraphics graphics, int left, int y, int right, int accent) {
-        int middle = (left + right) / 2;
-        int edge = shade(accent, 0.9F);
-        int core = 0xC8000000 | shade(accent, 1.0F);
-        VertexConsumer consumer = graphics.bufferSource().getBuffer(RenderType.gui());
-        Matrix4f pose = graphics.pose().last().pose();
-
-        vertex(consumer, pose, left, y, edge);
-        vertex(consumer, pose, left, y + 2, edge);
-        vertex(consumer, pose, middle, y + 2, core);
-        vertex(consumer, pose, middle, y, core);
-
-        vertex(consumer, pose, middle, y, core);
-        vertex(consumer, pose, middle, y + 2, core);
-        vertex(consumer, pose, right, y + 2, edge);
-        vertex(consumer, pose, right, y, edge);
     }
 
     private static void vertex(VertexConsumer consumer, Matrix4f pose, float x, float y, int argb) {

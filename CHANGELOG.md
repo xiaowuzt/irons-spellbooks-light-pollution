@@ -96,7 +96,8 @@ commit log.
   the largest angles — bent nothing you could see. Those rays now look out at a
   volumetric star field along the direction gravity actually sent them. It is sampled by
   world direction, so it behaves as a fixed sky rather than sliding about with the
-  camera, which is the only way lensed starlight reads as lensed.
+  camera, which is the only way lensed starlight reads as lensed. The `ring` tooltip style
+  shows the same field, so the two agree by construction.
 - Crab Nebula filaments are closed loops, so none of them has loose ends hanging in
   the middle of the shell. Closing them is not the same as making them circles —
   twenty-two great circles is a wireframe globe, which is the one thing the real
@@ -163,12 +164,26 @@ commit log.
   ours — level, rarity, cast time, mana, cooldown and school all come from Iron's
   Spells in its own orange, blue, grey and red, which no language file here can
   reach — so half the box used to clash with the other half.
-- Two optional tooltip frames, both off by default. `panel` draws a rounded panel behind
-  the normal layout; `arcane` takes rendering over, with glow rays behind the box and a
-  rule under the title. Both carry a highlight that travels around the outline rather than
-  pulsing in place. Switch with `/lightpollution frame <vanilla|panel|arcane>` for the
-  session, or set `tooltipStyle` in the client config to keep it. Adapted from ArcaneVortex
-  with its author's permission, credited in `CREDITS.txt`.
+- Seven optional tooltip styles, all off by default and all switchable in game with
+  `/lightpollution frame <style>`, or set `tooltipStyle` in the client config to keep one.
+  Every style is tinted to the spell's own accent, so a tooltip looks like the spell it
+  describes.
+  - `panel` — a rounded panel behind the normal layout, which vanilla still fills in.
+  - `arcane` — takes rendering over: glow rays radiating from behind the box, a centred
+    title, a rule under it.
+  - `orbit` — the spell's own icon drifting behind the panel with ghost copies trailing it.
+  - `astral` — a drifting field of thirty-two points, turning marks at the corners, and a
+    band of light travelling under the title.
+  - `ring` — a tilted ring that passes *through* the tooltip, with a star field inside the
+    band. The far half is drawn, then the panel, then the near half.
+  - `sigil` — two counter-rotating triangular bands behind the panel, forming a
+    six-pointed figure that never settles.
+  - `pinwheel` — no panel at all: each line becomes a spoke of a slowly turning pinwheel,
+    every glyph placed individually with its own tilt and a wave running along the line.
+  Every style carries a highlight that travels around the outline rather than pulsing in
+  place. Adapted from ArcaneVortex with its author's permission, credited in
+  `CREDITS.txt` — nine separate renderers there, which shared a vocabulary and mostly
+  differed in which pieces they used.
 - Damage from these spells floats above what it hits, in that spell's own colour. Damage
   on one target is accumulated for half a second and shown once as a total: these spells
   tick rather than landing single hits, and the Crab Nebula alone would otherwise put

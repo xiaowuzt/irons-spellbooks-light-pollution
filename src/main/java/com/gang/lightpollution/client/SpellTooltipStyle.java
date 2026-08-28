@@ -62,7 +62,6 @@ public final class SpellTooltipStyle {
         }
         int accent = boxed;
         int dim = shade(accent, 0.62F);
-
         List<Component> lines = event.getToolTip();
         for (int index = 1; index < lines.size(); ++index) {
             Component line = lines.get(index);
@@ -77,6 +76,10 @@ public final class SpellTooltipStyle {
                     || text.contains("光污染");
             lines.set(index, recolour(line, brand ? dim : accent, brand));
         }
+        // Kept for the pinwheel style, which places each glyph itself and so needs the styled text
+        // rather than the flattened components the render event hands over. Captured after the
+        // recolouring above, so it carries the colours that will actually be seen.
+        com.gang.lightpollution.client.tooltip.TooltipText.capture(event.getItemStack(), lines);
     }
 
     /**
