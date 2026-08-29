@@ -50,7 +50,7 @@ public final class LeviathanSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.BLOOD_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(440)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public LeviathanSpell() {

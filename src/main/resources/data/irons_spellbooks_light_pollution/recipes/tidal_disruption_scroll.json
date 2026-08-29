@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ERE",
+    "IPI",
+    "ETE"
+  ],
+  "key": {
+    "E": {
+      "item": "irons_spellbooks:arcane_essence"
+    },
+    "R": {
+      "item": "irons_spellbooks:blood_rune"
+    },
+    "I": {
+      "item": "irons_spellbooks:legendary_ink"
+    },
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "T": {
+      "item": "minecraft:heart_of_the_sea"
+    }
+  },
+  "result": {
+    "item": "irons_spellbooks_light_pollution:tidal_disruption_scroll",
+    "count": 1
+  }
+}

@@ -46,7 +46,7 @@ public final class SkyCollapseSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.LIGHTNING_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(420)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public SkyCollapseSpell() {

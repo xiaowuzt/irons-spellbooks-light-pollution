@@ -51,7 +51,7 @@ public final class WorldTreeSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.NATURE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(460)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public WorldTreeSpell() {

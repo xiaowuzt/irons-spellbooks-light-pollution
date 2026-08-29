@@ -44,7 +44,7 @@ public final class StarlessSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ELDRITCH_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(300)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public StarlessSpell() {

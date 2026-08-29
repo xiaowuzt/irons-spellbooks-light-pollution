@@ -10,6 +10,8 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -28,9 +30,11 @@ import org.joml.Matrix4f;
  * you see is an opening rather than a drawn circle. That surface is reproduced here from this mod's
  * own volumetric field instead of by porting their cosmic stack.</p>
  *
- * <p>The sigil is flat colour. Its original went through {@code volumetric_shader} plus that same
- * cosmic stack — to the point of abandoning the draw outright when the cosmic shader is missing —
- * but there the shader only supplied surface material, and the idea is the counter-rotation.</p>
+ * <p>The sigil's shells are two different materials, and that is the look. Its middle shell is
+ * ArcaneVortex's {@code volumetric_shader}, ported as it stands — it needed no textures and no part
+ * of their cosmic stack, only a time and the camera rotation. The two offset shells show the star
+ * field. Drawn flat the figure is just two triangles, which is what it looked like before either
+ * shader was here.</p>
  */
 public final class TooltipShapes {
     /** Segments around the ring. */
@@ -49,12 +53,31 @@ public final class TooltipShapes {
 
     /** Corners of the sigil, in degrees. Point-up, as a triangle drawn on paper. */
     private static final float[] SIGIL_CORNERS = {-90.0F, 30.0F, 150.0F};
-    /** Sigil span, as a multiple of the panel's shorter side. */
-    private static final float SIGIL_SCALE = 2.6F;
-    /** Sigil band thickness, in pixels. */
-    private static final float SIGIL_THICKNESS = 70.0F;
+    /**
+     * Sigil span, as a multiple of the panel's diagonal.
+     *
+     * <p>Driven by the diagonal rather than the shorter side, which is what the original used. That
+     * worked there because its tooltips were roughly square; these carry one very long stat line and
+     * run fifteen times wider than tall, so the shorter side gave a star smaller than the box it was
+     * supposed to sit behind.</p>
+     */
+    private static final float SIGIL_SPAN_RATIO = 0.9F;
+    /** Span bounds in pixels. Raise the upper one for a bigger star; it is the only knob needed. */
+    private static final float SIGIL_SPAN_MIN = 260.0F;
+    private static final float SIGIL_SPAN_MAX = 900.0F;
+    /**
+     * Band thickness as a fraction of the outer radius.
+     *
+     * <p>Proportional, where the original used a flat 70 pixels. A fixed thickness only looks right
+     * at one box size: against a small box it swallowed the whole triangle — at our proportions the
+     * band came out at seventy percent of the radius and the sigil drew as two solid triangles.</p>
+     */
+    private static final float SIGIL_BAND = 0.13F;
     /** Degrees per second the sigil turns. */
     private static final float SIGIL_SPIN = 20.0F;
+    /** Scale of the two star-field shells either side of the plasma one. */
+    private static final float SIGIL_RIM_OUT = 1.05F;
+    private static final float SIGIL_RIM_IN = 0.95F;
 
     private TooltipShapes() {
     }
@@ -153,10 +176,7 @@ public final class TooltipShapes {
             RenderSystem.setShader(() -> shader);
             // Own uniform rather than GameTime: that one wraps every 24000 ticks, and the whole
             // field would reshuffle in one frame when it did.
-            Uniform drift = shader.getUniform("Drift");
-            if (drift != null) {
-                drift.set(seconds * 0.02F);
-            }
+            setUniform(shader, "Drift", seconds * 0.02F);
             BufferUploader.drawWithShader(builder.end());
             RenderSystem.disableBlend();
             RenderSystem.enableDepthTest();
@@ -174,27 +194,35 @@ public final class TooltipShapes {
     }
 
     /**
-     * Two counter-rotating triangular bands behind the panel.
+     * A six-pointed star behind the panel, turning slowly as one body.
      *
-     * <p>Two triangles half a turn apart make a six-pointed figure, and turning them opposite ways
-     * means the figure never settles — the points slide past each other instead of holding a shape.
-     * Three nested shells per triangle at slightly different scales give the band an edge without
-     * needing an outline pass.</p>
+     * <p>Two triangles half a turn apart. They rotate in the <em>same</em> direction, which is the
+     * thing to get right: an earlier version turned them opposite ways, and a Star of David whose
+     * halves counter-rotate never resolves into a star at all — the points slide through each other
+     * and it reads as two triangles that happen to overlap.</p>
+     *
+     * <p>Each triangle is three shells. The middle one is the plasma march; the two either side of
+     * it are the star field, so the bright band ends up sandwiched between two sparkling rims. That
+     * sandwich is the look, and it is why the outer and inner shells cannot be dropped.</p>
      */
     public static void sigil(GuiGraphics graphics, int left, int top, int right, int bottom,
                              int accent, float alpha, float seconds) {
         float centreX = (left + right) * 0.5F;
         float centreY = (top + bottom) * 0.5F;
-        float span = Math.min(right - left, bottom - top) * SIGIL_SCALE;
-        if (span <= 0.0F || alpha <= 0.0F) {
+        float width = right - left;
+        float height = bottom - top;
+        float span = Mth.clamp(
+                (float) Math.sqrt(width * width + height * height) * SIGIL_SPAN_RATIO,
+                SIGIL_SPAN_MIN, SIGIL_SPAN_MAX);
+        if (alpha <= 0.0F) {
             return;
         }
         float turn = (seconds * SIGIL_SPIN) % 360.0F;
 
-        // Opposite directions. Turning both the same way reads as one rigid figure rotating, which
-        // loses the interference that makes this worth drawing.
+        // Same direction, offset by half a turn. Both halves of a Star of David have to travel
+        // together or it is not a star.
         band(graphics, centreX, centreY, span, turn, accent, alpha, seconds);
-        band(graphics, centreX, centreY, span, 180.0F - turn, accent, alpha * 0.75F, seconds);
+        band(graphics, centreX, centreY, span, turn + 180.0F, accent, alpha, seconds);
     }
 
     private static void band(GuiGraphics graphics, float centreX, float centreY, float span,
@@ -204,33 +232,88 @@ public final class TooltipShapes {
         try {
             pose.translate(centreX, centreY, 0.0F);
             pose.mulPose(Axis.ZP.rotationDegrees(turn));
-            // Outer and inner shells dimmer than the middle one, which is what gives the band an
-            // edge without a separate outline pass.
-            triangle(graphics, span * 1.05F, SIGIL_THICKNESS * 1.05F, accent, alpha * 0.45F);
-            triangle(graphics, span * 0.95F, SIGIL_THICKNESS * 0.95F, accent, alpha * 0.45F);
-            triangle(graphics, span, SIGIL_THICKNESS, accent, alpha);
+            // Rims first, plasma over them, matching the original's order.
+            triangle(graphics, span * SIGIL_RIM_OUT, accent, alpha, Surface.STARS, seconds);
+            triangle(graphics, span * SIGIL_RIM_IN, accent, alpha, Surface.STARS, seconds);
+            triangle(graphics, span, accent, alpha, Surface.PLASMA, seconds);
         } finally {
             pose.popPose();
         }
     }
 
-    /** One triangular annulus: three quads, each spanning one edge between outer and inner. */
-    private static void triangle(GuiGraphics graphics, float span, float thickness,
-                                 int accent, float alpha) {
+    /** Which program shades a shell. */
+    private enum Surface {
+        STARS, PLASMA
+    }
+
+    /**
+     * One triangular annulus: three quads, each spanning one edge between outer and inner.
+     *
+     * <p>UVs run along the perimeter on x and across the band on y, so both surfaces have the same
+     * coordinate to work in as the ring does.</p>
+     */
+    private static void triangle(GuiGraphics graphics, float span, int accent, float alpha,
+                                 Surface surface, float seconds) {
+        ShaderInstance shader = surface == Surface.PLASMA
+                ? ConstellationShaders.volumetric()
+                : ConstellationShaders.ringSurface();
+        if (shader == null || alpha <= 0.0F) {
+            return;
+        }
         float outer = span * 0.5F;
-        float inner = Math.max(outer - thickness, outer * 0.3F);
-        int colour = (Mth.clamp((int) (alpha * 255.0F), 0, 255) << 24)
-                | TooltipElements.shade(accent, 1.0F);
-        VertexConsumer consumer = graphics.bufferSource().getBuffer(RenderType.gui());
+        float inner = outer * (1.0F - SIGIL_BAND);
+        int packedAlpha = Mth.clamp((int) (alpha * 255.0F), 0, 255);
+        int red = (accent >> 16) & 0xFF;
+        int green = (accent >> 8) & 0xFF;
+        int blue = accent & 0xFF;
+
+        graphics.flush();
         Matrix4f matrix = graphics.pose().last().pose();
+        BufferBuilder builder = Tesselator.getInstance().getBuilder();
+        builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
 
         for (int corner = 0; corner < SIGIL_CORNERS.length; corner++) {
             float a0 = SIGIL_CORNERS[corner] * Mth.DEG_TO_RAD;
             float a1 = SIGIL_CORNERS[(corner + 1) % SIGIL_CORNERS.length] * Mth.DEG_TO_RAD;
-            vertex(consumer, matrix, Mth.cos(a0) * outer, Mth.sin(a0) * outer, colour);
-            vertex(consumer, matrix, Mth.cos(a0) * inner, Mth.sin(a0) * inner, colour);
-            vertex(consumer, matrix, Mth.cos(a1) * inner, Mth.sin(a1) * inner, colour);
-            vertex(consumer, matrix, Mth.cos(a1) * outer, Mth.sin(a1) * outer, colour);
+            float u0 = corner / (float) SIGIL_CORNERS.length;
+            float u1 = (corner + 1) / (float) SIGIL_CORNERS.length;
+            emit(builder, matrix, Mth.cos(a0) * outer, Mth.sin(a0) * outer,
+                    u0, 0.0F, red, green, blue, packedAlpha);
+            emit(builder, matrix, Mth.cos(a0) * inner, Mth.sin(a0) * inner,
+                    u0, 1.0F, red, green, blue, packedAlpha);
+            emit(builder, matrix, Mth.cos(a1) * inner, Mth.sin(a1) * inner,
+                    u1, 1.0F, red, green, blue, packedAlpha);
+            emit(builder, matrix, Mth.cos(a1) * outer, Mth.sin(a1) * outer,
+                    u1, 0.0F, red, green, blue, packedAlpha);
+        }
+
+        // Blend OFF, which is the whole reason the reference looks the way it does. Their two sigil
+        // render types both use the "no_transparency" shard, so every shell is written opaque. That
+        // is what makes the layering read: the rims cover 1.00 to 1.05 and 0.826 to 0.87 of the
+        // radius, the plasma is drawn last and covers 0.87 to 1.00 outright, and the result is a
+        // bright band with a thin rim either side. Blending them instead mixes all three into one
+        // muddy translucent shape, which is exactly what this looked like before.
+        RenderSystem.disableBlend();
+        RenderSystem.disableCull();
+        RenderSystem.disableDepthTest();
+        RenderSystem.setShader(() -> shader);
+        setUniform(shader, "Drift", seconds * (surface == Surface.PLASMA ? 0.04F : 0.02F));
+        if (surface == Surface.PLASMA) {
+            // The march direction is rotated by the camera, so the field sits in the world rather
+            // than on the screen and turning your head moves through it.
+            Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+            setUniform(shader, "Yaw", camera.getYRot() * Mth.DEG_TO_RAD);
+            setUniform(shader, "Pitch", -camera.getXRot() * Mth.DEG_TO_RAD);
+        }
+        BufferUploader.drawWithShader(builder.end());
+        RenderSystem.enableCull();
+        RenderSystem.enableDepthTest();
+    }
+
+    private static void setUniform(ShaderInstance shader, String name, float value) {
+        Uniform uniform = shader.getUniform(name);
+        if (uniform != null) {
+            uniform.set(value);
         }
     }
 

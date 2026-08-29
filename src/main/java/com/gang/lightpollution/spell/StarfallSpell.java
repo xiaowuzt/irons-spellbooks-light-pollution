@@ -45,7 +45,7 @@ public final class StarfallSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.FIRE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(360)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public StarfallSpell() {

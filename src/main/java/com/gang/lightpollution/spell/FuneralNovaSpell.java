@@ -38,7 +38,7 @@ public final class FuneralNovaSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ELDRITCH_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(360)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public FuneralNovaSpell() {

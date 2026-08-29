@@ -49,7 +49,7 @@ public final class PinwheelSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.FIRE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(280)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public PinwheelSpell() {

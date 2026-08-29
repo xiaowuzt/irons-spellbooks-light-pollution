@@ -8,8 +8,10 @@ Some of FX (github.com/YangMao-Minister/some_of_fx), MIT, (c) 2026 Pizuka
 
 ArcaneVortex, by ErChien — used with the author's written permission
   Gargantua's ray-marched black hole draws on ArcaneVortex's rendering work, and
-  the optional PANEL and ARCANE tooltip frames follow its custom tooltip
-  renderer — the glow rays, the title separator and the per-item accent border.
+  the optional tooltip frames follow its custom tooltip renderers — the glow rays,
+  the title separator, the per-item accent border, the threaded ring, the
+  counter-rotating sigil, the orbiting backdrop and the pinwheel text layout.
+  The sigil's plasma shell is its volumetric_shader, ported as it stands.
   ArcaneVortex is All Rights Reserved; the author gave permission for direct use
   of the code on the condition that it be credited, and this notice is that
   condition being met. Please do not redistribute ArcaneVortex's own code on the

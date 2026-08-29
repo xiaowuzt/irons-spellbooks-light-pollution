@@ -46,7 +46,7 @@ public final class TidalDisruptionSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.BLOOD_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(520)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public TidalDisruptionSpell() {

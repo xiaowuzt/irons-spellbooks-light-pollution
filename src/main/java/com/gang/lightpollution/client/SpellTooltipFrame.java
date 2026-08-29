@@ -250,7 +250,7 @@ public final class SpellTooltipFrame {
                 TooltipShapes.ringHalf(graphics, centreX, centreY, ringOuter, ringInner,
                         TooltipShapes.Half.BEHIND, accent, 0.85F, seconds);
             } else if (style == TooltipStyle.SIGIL) {
-                TooltipShapes.sigil(graphics, left, top, right, bottom, accent, 0.5F, seconds);
+                TooltipShapes.sigil(graphics, left, top, right, bottom, accent, 0.9F, seconds);
             }
 
             TooltipElements.panel(graphics, left, top, right, bottom, RADIUS, accent, BORDER_SPEED);

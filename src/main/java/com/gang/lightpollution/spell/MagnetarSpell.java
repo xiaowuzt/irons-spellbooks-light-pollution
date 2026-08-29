@@ -46,7 +46,7 @@ public final class MagnetarSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ELDRITCH_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(500)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public MagnetarSpell() {

@@ -40,7 +40,7 @@ public class StargraveSingularitySpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ENDER_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(600)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public StargraveSingularitySpell() {

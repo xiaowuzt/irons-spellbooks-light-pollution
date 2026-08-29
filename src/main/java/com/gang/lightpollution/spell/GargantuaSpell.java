@@ -45,7 +45,7 @@ public final class GargantuaSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ENDER_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(540)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public GargantuaSpell() {

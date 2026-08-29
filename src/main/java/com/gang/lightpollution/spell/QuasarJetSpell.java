@@ -48,7 +48,7 @@ public final class QuasarJetSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.EVOCATION_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(560)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public QuasarJetSpell() {

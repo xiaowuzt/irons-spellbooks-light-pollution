@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ERE",
+    "IPI",
+    "ETE"
+  ],
+  "key": {
+    "E": {
+      "item": "irons_spellbooks:arcane_essence"
+    },
+    "R": {
+      "item": "irons_spellbooks:nature_rune"
+    },
+    "I": {
+      "item": "irons_spellbooks:legendary_ink"
+    },
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "T": {
+      "item": "minecraft:mangrove_propagule"
+    }
+  },
+  "result": {
+    "item": "irons_spellbooks_light_pollution:world_tree_scroll",
+    "count": 1
+  }
+}

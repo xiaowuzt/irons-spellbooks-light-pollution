@@ -31,7 +31,7 @@ public final class EclipseSeveranceSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.EVOCATION_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(250)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public EclipseSeveranceSpell() {

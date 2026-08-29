@@ -46,7 +46,7 @@ public final class SecondSunSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.FIRE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(600)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public SecondSunSpell() {

@@ -47,7 +47,7 @@ public final class ConstellationSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.FIRE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(300)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public ConstellationSpell() {

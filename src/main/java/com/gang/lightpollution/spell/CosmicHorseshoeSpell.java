@@ -46,7 +46,7 @@ public final class CosmicHorseshoeSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.EVOCATION_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(320)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public CosmicHorseshoeSpell() {

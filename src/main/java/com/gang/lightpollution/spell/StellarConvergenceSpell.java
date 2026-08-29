@@ -46,7 +46,7 @@ public final class StellarConvergenceSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.HOLY_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(400)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public StellarConvergenceSpell() {

@@ -34,7 +34,7 @@ public class CelestialJudgmentSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.HOLY_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(600)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public CelestialJudgmentSpell() {

@@ -45,7 +45,7 @@ public final class HelixNebulaSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.HOLY_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(340)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public HelixNebulaSpell() {

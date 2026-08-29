@@ -4,9 +4,48 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
-## 1.2.0
+## 1.2.1
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### The spells are obtainable
+
+Every spell in this pack was creative-only, which was not intentional: all twenty-four carried
+`allowCrafting = false`, and that one flag is what Iron's Spells' Scroll Forge checks before
+offering a spell. So there are now three ways to get them.
+
+- **The Scroll Forge.** All twenty-four now appear under their school's focus, and need legendary
+  ink like any other legendary. Nothing else was needed for this — the forge scans the spell
+  registry rather than reading a recipe list, so the flag was the only thing in the way. Iron's
+  own JEI plugin covers that screen, so they show up there too.
+- **Crafting.** Each scroll has its own recipe: four arcane essence, two legendary ink, a sheet of
+  paper, the rune of its school, and one item that says which spell it is — crying obsidian for
+  Gargantua, a lodestone for the Magnetar, a sculk catalyst for the Crab Nebula. Ordinary shaped
+  recipes, so JEI and EMI both list them with no extra work.
+- **Loot.** End city treasure, ancient cities, stronghold libraries, bastion treasure and woodland
+  mansions can each turn up one, at a low chance.
+
+The four Eldritch spells — Funeral Nova, Magnetar, Silhouette, Starless — needed the crafting
+recipe more than the others. Iron's constructs the Eldritch school with `allowLooting = false`,
+and that flag is on the school rather than in any config, so those four are excluded from every
+loot table and every wandering trade in the game. A recipe is the only route to them that does not
+involve editing another mod's data.
+
+Copying a scroll into a spell book already worked and needed no change; it is mentioned here only
+because it was not obvious.
+
+### Fixes
+
+- The sigil tooltip style is no longer two flat triangles. Both of its problems were mine: the two
+  halves were counter-rotating, where the original turns them the same way half a turn apart, so it
+  never resolved into a six-pointed star at all; and the shells were being blended when the original
+  writes them opaque, which mixed all three into one muddy shape instead of layering into a bright
+  band with a rim either side. The band was also a fixed seventy pixels wide against a much smaller
+  star, which at these proportions came out at seventy percent of the radius — very nearly solid.
+- The ring tooltip style was about thirteen hundred pixels across, most of it off screen. It was
+  sized from the panel's width, and these tooltips run fifteen times wider than they are tall.
+
+## 1.2.0
 
 ### Nine new spells
 

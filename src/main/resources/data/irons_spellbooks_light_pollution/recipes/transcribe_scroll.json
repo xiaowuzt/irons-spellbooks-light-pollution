@@ -1,0 +1,11 @@
+{
+  "type": "irons_spellbooks_light_pollution:transcribe_scroll",
+  "ingredients": [
+    {
+      "tag": "irons_spellbooks_light_pollution:spell_scrolls"
+    }
+  ],
+  "result": {
+    "item": "irons_spellbooks:scroll"
+  }
+}

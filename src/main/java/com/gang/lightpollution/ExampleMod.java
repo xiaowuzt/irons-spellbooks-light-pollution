@@ -31,6 +31,7 @@ public final class ExampleMod {
         ModSounds.register(modBus);
         ModCreativeTabs.register(modBus);
         ModSpells.SPELLS.register(modBus);
+        com.gang.lightpollution.recipe.ModRecipes.register(modBus);
         // The mod's first network channel. Everything else here is drawn from synced entity
         // data, but damage is resolved in a server-only tick, so the floating text needs telling.
         com.gang.lightpollution.net.ModNetwork.register();

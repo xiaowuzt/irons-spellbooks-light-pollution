@@ -40,7 +40,7 @@ public final class SilhouetteSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ELDRITCH_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(240)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public SilhouetteSpell() {

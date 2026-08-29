@@ -44,7 +44,7 @@ public final class MicroquasarSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.LIGHTNING_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(380)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public MicroquasarSpell() {

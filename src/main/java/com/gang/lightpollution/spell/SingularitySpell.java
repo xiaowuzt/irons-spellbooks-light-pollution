@@ -46,7 +46,7 @@ public final class SingularitySpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ENDER_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(480)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public SingularitySpell() {

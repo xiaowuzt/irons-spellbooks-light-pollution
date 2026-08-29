@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ERE",
+    "IPI",
+    "ETE"
+  ],
+  "key": {
+    "E": {
+      "item": "irons_spellbooks:arcane_essence"
+    },
+    "R": {
+      "item": "minecraft:echo_shard"
+    },
+    "I": {
+      "item": "irons_spellbooks:legendary_ink"
+    },
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "T": {
+      "item": "minecraft:sculk_sensor"
+    }
+  },
+  "result": {
+    "item": "irons_spellbooks_light_pollution:silhouette_scroll",
+    "count": 1
+  }
+}

@@ -37,6 +37,18 @@ Real-time coloured point lights and ray-traced shadows, without a shader pack.
 - **Physical derivation.** Relativistic beaming, dipole field geometry, apparent superluminal
   motion and the t^(-5/3) fallback law, used to produce the correct forms.
 
+## Getting them
+
+- **The Scroll Forge.** Every spell appears under its school's focus, and needs legendary ink
+  like any other legendary.
+- **Crafting.** Each scroll has its own recipe: four arcane essence, two legendary ink, a sheet
+  of paper, the rune of its school, and one item that says which spell it is — crying obsidian
+  for Gargantua, a lodestone for the Magnetar, a sculk catalyst for the Crab Nebula. Ordinary
+  shaped recipes, so JEI and EMI both list them.
+- **Loot.** End city treasure, ancient cities, stronghold libraries, bastion treasure and
+  woodland mansions can each turn up one, at a low chance.
+- **Inscription.** Copy a scroll into a spell book at an Inscription Table as usual.
+
 ## Presentation
 
 - **Tooltip styles.** Seven, off by default: a rounded panel, radiating rays, the spell's icon

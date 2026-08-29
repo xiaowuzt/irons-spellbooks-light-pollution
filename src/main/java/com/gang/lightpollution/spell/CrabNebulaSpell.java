@@ -48,7 +48,7 @@ public final class CrabNebulaSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.NATURE_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(260)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public CrabNebulaSpell() {

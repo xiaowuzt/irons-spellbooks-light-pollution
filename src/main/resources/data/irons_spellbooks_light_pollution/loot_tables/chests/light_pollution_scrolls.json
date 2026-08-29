@@ -1,0 +1,137 @@
+{
+  "type": "minecraft:chest",
+  "pools": [
+    {
+      "rolls": 1,
+      "bonus_rolls": 0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:gargantua_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:stargrave_singularity_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:singularity_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:chromatic_accretion_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:cosmic_horseshoe_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:quasar_jet_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:eclipse_severance_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:celestial_judgment_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:helix_nebula_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:stellar_convergence_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:second_sun_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:starfall_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:constellation_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:pinwheel_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:microquasar_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:sky_collapse_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:leviathan_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:tidal_disruption_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:crab_nebula_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:world_tree_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:magnetar_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:starless_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:silhouette_scroll",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "irons_spellbooks_light_pollution:funeral_nova_scroll",
+          "weight": 1
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:random_chance",
+          "chance": 0.18
+        }
+      ]
+    }
+  ]
+}

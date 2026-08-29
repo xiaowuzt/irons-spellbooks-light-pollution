@@ -64,6 +64,8 @@ public final class ConstellationShaders {
     private static ShaderInstance starSurface;
     @Nullable
     private static ShaderInstance ringSurface;
+    @Nullable
+    private static ShaderInstance volumetric;
 
     private ConstellationShaders() {
     }
@@ -102,6 +104,8 @@ public final class ConstellationShaders {
                 shader -> starSurface = shader);
         // The tooltip ring's surface: the volumetric star field, sampled across the band.
         register(event, "ring_surface", shader -> ringSurface = shader);
+        // The sigil's surface: a ray march through a rotating noise field.
+        register(event, "volumetric", shader -> volumetric = shader);
     }
 
     private static void register(RegisterShadersEvent event, String path,
@@ -260,5 +264,11 @@ public final class ConstellationShaders {
     @Nullable
     public static ShaderInstance ringSurface() {
         return ringSurface;
+    }
+
+    /** The sigil's surface: a ray march through a rotating noise field. */
+    @Nullable
+    public static ShaderInstance volumetric() {
+        return volumetric;
     }
 }

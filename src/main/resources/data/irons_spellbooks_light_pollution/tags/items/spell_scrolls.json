@@ -1,0 +1,29 @@
+{
+  "replace": false,
+  "values": [
+    "irons_spellbooks_light_pollution:celestial_judgment_scroll",
+    "irons_spellbooks_light_pollution:chromatic_accretion_scroll",
+    "irons_spellbooks_light_pollution:constellation_scroll",
+    "irons_spellbooks_light_pollution:cosmic_horseshoe_scroll",
+    "irons_spellbooks_light_pollution:crab_nebula_scroll",
+    "irons_spellbooks_light_pollution:eclipse_severance_scroll",
+    "irons_spellbooks_light_pollution:funeral_nova_scroll",
+    "irons_spellbooks_light_pollution:gargantua_scroll",
+    "irons_spellbooks_light_pollution:helix_nebula_scroll",
+    "irons_spellbooks_light_pollution:leviathan_scroll",
+    "irons_spellbooks_light_pollution:magnetar_scroll",
+    "irons_spellbooks_light_pollution:microquasar_scroll",
+    "irons_spellbooks_light_pollution:pinwheel_scroll",
+    "irons_spellbooks_light_pollution:quasar_jet_scroll",
+    "irons_spellbooks_light_pollution:second_sun_scroll",
+    "irons_spellbooks_light_pollution:silhouette_scroll",
+    "irons_spellbooks_light_pollution:singularity_scroll",
+    "irons_spellbooks_light_pollution:sky_collapse_scroll",
+    "irons_spellbooks_light_pollution:starfall_scroll",
+    "irons_spellbooks_light_pollution:stargrave_singularity_scroll",
+    "irons_spellbooks_light_pollution:starless_scroll",
+    "irons_spellbooks_light_pollution:stellar_convergence_scroll",
+    "irons_spellbooks_light_pollution:tidal_disruption_scroll",
+    "irons_spellbooks_light_pollution:world_tree_scroll"
+  ]
+}

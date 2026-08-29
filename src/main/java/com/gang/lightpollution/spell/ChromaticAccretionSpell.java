@@ -38,7 +38,7 @@ public final class ChromaticAccretionSpell extends AbstractSpell {
             .setSchoolResource(SchoolRegistry.ENDER_RESOURCE)
             .setMaxLevel(1)
             .setCooldownSeconds(420)
-            .setAllowCrafting(false)
+            .setAllowCrafting(true)
             .build();
 
     public ChromaticAccretionSpell() {
