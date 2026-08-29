@@ -38,7 +38,26 @@ public final class PresentationCommands {
             frame = frame.then(Commands.literal(style.name().toLowerCase(Locale.ROOT))
                     .executes(context -> setStyle(context.getSource(), style)));
         }
-        dispatcher.register(Commands.literal("lightpollution").then(frame));
+
+        var damage = Commands.literal("damage")
+                .executes(context -> setFloatingDamage(context.getSource(), null))
+                .then(Commands.literal("on")
+                        .executes(context -> setFloatingDamage(context.getSource(), true)))
+                .then(Commands.literal("off")
+                        .executes(context -> setFloatingDamage(context.getSource(), false)));
+
+        dispatcher.register(Commands.literal("lightpollution").then(frame).then(damage));
+    }
+
+    /** Turn the floating damage numbers on, off, or to the other state. */
+    private static int setFloatingDamage(CommandSourceStack source, Boolean explicit) {
+        boolean next = explicit != null ? explicit : !SpellLightConfig.floatingDamage;
+        SpellLightConfig.floatingDamage = next;
+        source.sendSuccess(() -> Component.literal(
+                "Floating damage numbers " + (next ? "on" : "off")
+                        + ". This session only — set floatingDamage in the client config"
+                        + " to keep it."), false);
+        return 1;
     }
 
     /**

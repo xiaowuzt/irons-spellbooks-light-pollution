@@ -6,6 +6,8 @@ commit log.
 
 ## 1.2.0
 
+Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
 ### Nine new spells
 
 - **Gargantua** — a black hole built from the Kerr geometry rather than drawn as a
@@ -184,10 +186,11 @@ commit log.
   place. Adapted from ArcaneVortex with its author's permission, credited in
   `CREDITS.txt` — nine separate renderers there, which shared a vocabulary and mostly
   differed in which pieces they used.
-- Damage from these spells floats above what it hits, in that spell's own colour. Damage
-  on one target is accumulated for half a second and shown once as a total: these spells
-  tick rather than landing single hits, and the Crab Nebula alone would otherwise put
-  around forty separate numbers on one target in a single cast.
+- Damage from these spells can float above what it hits, in that spell's own colour. Off by
+  default — turn it on with `/lightpollution damage on` or set `floatingDamage` in the client
+  config. Damage on one target is accumulated for half a second and shown once as a total:
+  these spells tick rather than landing single hits, and the Crab Nebula alone would otherwise
+  put around forty separate numbers on one target in a single cast.
 - Four spells now announce their own turning point, which were all completely silent
   before: Gargantua's horizon closing, the magnetar's magnetosphere letting go, a tidal
   disruption's fallback peaking, and the Crab remnant coming apart.

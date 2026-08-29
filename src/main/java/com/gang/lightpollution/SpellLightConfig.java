@@ -34,6 +34,13 @@ public final class SpellLightConfig {
                     "Also switchable in game with /lightpollution frame <style>.")
             .defineEnum("tooltipStyle", TooltipStyle.VANILLA);
 
+    private static final ForgeConfigSpec.BooleanValue FLOATING_DAMAGE = BUILDER
+            .comment("Show damage from this mod's spells as floating numbers above the target.",
+                    "Off by default: these spells resolve damage every few ticks rather than in",
+                    "single hits, so the numbers are frequent even after they are merged.",
+                    "Also switchable in game with /lightpollution damage <on|off>.")
+            .define("floatingDamage", false);
+
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static volatile boolean enabled = true;
@@ -47,6 +54,14 @@ public final class SpellLightConfig {
      * from disk again.</p>
      */
     public static volatile TooltipStyle tooltipStyle = TooltipStyle.VANILLA;
+    /**
+     * Whether floating damage numbers are drawn.
+     *
+     * <p>Off by default. These spells tick damage rather than landing single hits, so even after
+     * being merged per target the numbers appear several times a second during a cast, which is a
+     * lot of motion to opt somebody into.</p>
+     */
+    public static volatile boolean floatingDamage;
 
     /**
      * The tooltip treatments.
@@ -96,6 +111,7 @@ public final class SpellLightConfig {
         }
         enabled = ENABLED.get();
         tooltipStyle = TOOLTIP_STYLE.get();
+        floatingDamage = FLOATING_DAMAGE.get();
         maxLights = MAX_LIGHTS.get();
         shadowSteps = SHADOW_STEPS.get();
     }
