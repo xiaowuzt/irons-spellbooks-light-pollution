@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.StarfallEntity;
+import com.gang.lightpollution.api.StarfallParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.StarfallSource;
+import com.gang.lightpollution.fx.StarfallShape;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -88,7 +91,11 @@ public final class StarfallWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<StarfallEntity> showers = SpellLightEmitter.collectStarfalls();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<StarfallSource> showers =
+                new java.util.ArrayList<>(SpellLightEmitter.collectStarfalls());
+        showers.addAll(FxRegistry.starfalls());
         if (showers.isEmpty()) {
             return;
         }
@@ -127,28 +134,28 @@ public final class StarfallWorldRenderer {
      * The shader picks between the two from a vertex-colour channel, so they do
      * not need separate passes.
      */
-    private static void drawTrailsAndShocks(List<StarfallEntity> showers, Vec3 camera,
+    private static void drawTrailsAndShocks(List<StarfallSource> showers, Vec3 camera,
                                             float partialTick,
                                             ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
-        for (StarfallEntity entity : showers) {
+        for (StarfallSource entity : showers) {
             float age = entity.getVisualAgeTicks(partialTick);
-            for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT; meteor++) {
-                int impact = StarfallEntity.impactTick(meteor);
-                boolean finale = StarfallEntity.isFinaleMeteor(meteor);
+            for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT; meteor++) {
+                int impact = StarfallShape.impactTick(meteor);
+                boolean finale = StarfallShape.isFinaleMeteor(meteor);
 
-                if (age < StarfallEntity.spawnTick(meteor)) {
+                if (age < StarfallShape.spawnTick(meteor)) {
                     continue;
                 }
                 if (age < impact) {
-                    Vec3 position = entity.meteorPosition(meteor, partialTick);
+                    Vec3 position = StarfallShape.meteorPosition(entity.shapeParams(), entity.meteorLanding(meteor), meteor, entity.getVisualAgeTicks(partialTick));
                     if (camera.distanceToSqr(position) > RENDER_DISTANCE_SQR) {
                         continue;
                     }
                     vertices += emitTrail(builder, camera, entity, meteor,
                             position, age, finale);
-                    if (entity.hasShockRing(meteor)) {
+                    if (StarfallShape.hasShockRing(entity.shapeParams(), meteor)) {
                         vertices += emitMachRing(builder, camera, entity, meteor,
                                 position, age, finale);
                     }
@@ -161,7 +168,7 @@ public final class StarfallWorldRenderer {
                     if (camera.distanceToSqr(landing) > RENDER_DISTANCE_SQR) {
                         continue;
                     }
-                    vertices += emitShock(builder, camera, landing, meteor,
+                    vertices += emitShock(builder, camera, entity.shapeParams(), landing, meteor,
                             since / SHOCK_TICKS, finale);
                 }
             }
@@ -175,16 +182,16 @@ public final class StarfallWorldRenderer {
      * without the interpolation flattening it.
      */
     private static int emitTrail(BufferBuilder builder, Vec3 camera,
-                                 StarfallEntity entity, int meteor, Vec3 position,
+                                 StarfallSource entity, int meteor, Vec3 position,
                                  float age, boolean finale) {
         // The trail points back up the meteor's own heading, which is a slant
         // rather than straight up.
-        Vec3 heading = entity.meteorHeading(meteor);
+        Vec3 heading = StarfallShape.meteorHeading(entity.shapeParams(), meteor);
         Vector3f back = new Vector3f((float) -heading.x, (float) -heading.y,
                 (float) -heading.z).normalize();
 
-        float fall = Mth.clamp((age - StarfallEntity.spawnTick(meteor))
-                / (float) StarfallEntity.fallTicks(meteor), 0.0F, 1.0F);
+        float fall = Mth.clamp((age - StarfallShape.spawnTick(meteor))
+                / (float) StarfallShape.fallTicks(meteor), 0.0F, 1.0F);
         float scale = finale ? 3.4F : 1.0F;
         float length = (9.0F + fall * 23.0F) * scale;
         // Tied to the body's own size rather than set independently: the two were
@@ -259,13 +266,13 @@ public final class StarfallWorldRenderer {
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
         float shake = 0.0F;
-        for (StarfallEntity entity : SpellLightEmitter.collectStarfalls()) {
+        for (StarfallSource entity : SpellLightEmitter.collectStarfalls()) {
             float age = entity.getVisualAgeTicks(partialTick);
-            for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT; meteor++) {
-                if (!StarfallEntity.isFinaleMeteor(meteor)) {
+            for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT; meteor++) {
+                if (!StarfallShape.isFinaleMeteor(meteor)) {
                     continue;
                 }
-                float since = age - StarfallEntity.impactTick(meteor);
+                float since = age - StarfallShape.impactTick(meteor);
                 if (since < 0.0F || since > SHAKE_TICKS) {
                     continue;
                 }
@@ -298,20 +305,20 @@ public final class StarfallWorldRenderer {
      * path rather than as a single front expanding away from it.</p>
      */
     private static int emitMachRing(BufferBuilder builder, Vec3 camera,
-                                    StarfallEntity entity, int meteor, Vec3 position,
+                                    StarfallSource entity, int meteor, Vec3 position,
                                     float age, boolean finale) {
-        Vec3 heading = entity.meteorHeading(meteor);
+        Vec3 heading = StarfallShape.meteorHeading(entity.shapeParams(), meteor);
         Vector3f forward = new Vector3f((float) heading.x, (float) heading.y,
                 (float) heading.z).normalize();
 
-        float fall = Mth.clamp((age - StarfallEntity.spawnTick(meteor))
-                / (float) StarfallEntity.fallTicks(meteor), 0.0F, 1.0F);
+        float fall = Mth.clamp((age - StarfallShape.spawnTick(meteor))
+                / (float) StarfallShape.fallTicks(meteor), 0.0F, 1.0F);
         float scale = finale ? 3.4F : 1.0F;
         float intensity = (0.9F + fall * 1.7F) * (finale ? 1.6F : 1.0F);
 
         // Anchored to distance travelled rather than to the frame, so the ring
         // stays put in the air while the meteor pulls away from it.
-        float shed = fall * StarfallEntity.fallTicks(meteor);
+        float shed = fall * StarfallShape.fallTicks(meteor);
         float aged = Mth.clamp(shed / MACH_RING_LIFE, 0.0F, 1.0F);
         if (aged >= 1.0F) {
             return 0;
@@ -327,8 +334,8 @@ public final class StarfallWorldRenderer {
         Vector3f up = new Vector3f(forward).cross(right).normalize();
 
         // Behind the body by however far it has moved since the ring was shed.
-        float behind = shed * (float) StarfallEntity.fallHeight(meteor)
-                / StarfallEntity.fallTicks(meteor) * 0.6F;
+        float behind = shed * (float) StarfallShape.fallHeight(entity.shapeParams(), meteor)
+                / StarfallShape.fallTicks(meteor) * 0.6F;
         float radius = (1.2F + aged * 15.0F) * scale;
         float fade = 1.0F - aged * aged;
 
@@ -393,9 +400,9 @@ public final class StarfallWorldRenderer {
     }
 
     /** A flat expanding front on the ground where a meteor landed. */
-    private static int emitShock(BufferBuilder builder, Vec3 camera,
+    private static int emitShock(BufferBuilder builder, Vec3 camera, StarfallParams params,
                                  Vec3 landing, int meteor, float progress, boolean finale) {
-        float radius = (float) StarfallEntity.blastRadius(meteor) * 2.3F;
+        float radius = (float) StarfallShape.blastRadius(params, meteor) * 2.3F;
         float fade = 1.0F - progress;
         int packed = color(progress, 1.0F,
                 Mth.clamp((finale ? 2.2F : 1.3F) / 4.0F, 0.0F, 1.0F), fade * fade);
@@ -417,30 +424,30 @@ public final class StarfallWorldRenderer {
      * a hard silhouette with limb darkening -- the thing a billboard cannot do
      * and the reason a meteor stops looking like a blob of light.
      */
-    private static void drawHeads(List<StarfallEntity> showers, Vec3 camera,
+    private static void drawHeads(List<StarfallSource> showers, Vec3 camera,
                                   float partialTick,
                                   ShaderInstance shader) {
         int drawn = 0;
-        for (StarfallEntity entity : showers) {
+        for (StarfallSource entity : showers) {
             float age = entity.getVisualAgeTicks(partialTick);
-            for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT && drawn < MAX_HEADS;
+            for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT && drawn < MAX_HEADS;
                     meteor++) {
-                if (age < StarfallEntity.spawnTick(meteor)
-                        || age >= StarfallEntity.impactTick(meteor)) {
+                if (age < StarfallShape.spawnTick(meteor)
+                        || age >= StarfallShape.impactTick(meteor)) {
                     continue;
                 }
-                Vec3 position = entity.meteorPosition(meteor, partialTick);
+                Vec3 position = StarfallShape.meteorPosition(entity.shapeParams(), entity.meteorLanding(meteor), meteor, entity.getVisualAgeTicks(partialTick));
                 if (camera.distanceToSqr(position) > RENDER_DISTANCE_SQR) {
                     continue;
                 }
-                boolean finale = StarfallEntity.isFinaleMeteor(meteor);
-                float fall = Mth.clamp((age - StarfallEntity.spawnTick(meteor))
-                        / (float) StarfallEntity.fallTicks(meteor), 0.0F, 1.0F);
+                boolean finale = StarfallShape.isFinaleMeteor(meteor);
+                float fall = Mth.clamp((age - StarfallShape.spawnTick(meteor))
+                        / (float) StarfallShape.fallTicks(meteor), 0.0F, 1.0F);
                 // The body is the thing being watched, so it has to have real
                 // size on screen; at well under a block across it read as a spark
                 // however bright it was.
                 float radius = headRadius(finale, fall);
-                float brightness = entity.meteorBrightness(meteor, partialTick)
+                float brightness = StarfallShape.meteorBrightness(meteor, entity.getVisualAgeTicks(partialTick))
                         * (finale ? 1.45F : 1.0F);
                 // Friction heats it as it comes down, so the body runs from
                 // orange to near-white rather than sitting at one colour.

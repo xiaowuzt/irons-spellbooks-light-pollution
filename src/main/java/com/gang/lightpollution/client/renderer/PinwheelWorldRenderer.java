@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.PinwheelEntity;
+import com.gang.lightpollution.api.PinwheelParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.PinwheelShape;
+import com.gang.lightpollution.fx.PinwheelSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -54,7 +57,11 @@ public final class PinwheelWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<PinwheelEntity> wheels = SpellLightEmitter.collectPinwheels();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<PinwheelSource> wheels =
+                new java.util.ArrayList<>(SpellLightEmitter.collectPinwheels());
+        wheels.addAll(FxRegistry.pinwheels());
         if (wheels.isEmpty()) {
             return;
         }
@@ -85,12 +92,12 @@ public final class PinwheelWorldRenderer {
         }
     }
 
-    private static void drawArms(List<PinwheelEntity> wheels, Vec3 camera,
+    private static void drawArms(List<PinwheelSource> wheels, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
 
-        for (PinwheelEntity entity : wheels) {
+        for (PinwheelSource entity : wheels) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -100,19 +107,22 @@ public final class PinwheelWorldRenderer {
                 continue;
             }
             float age = entity.getVisualAgeTicks(partialTick);
-            double rotation = entity.rotation(age);
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            PinwheelParams params = entity.shapeParams();
+            double rotation = PinwheelShape.rotation(age);
             // Grows outward as it spins up, so the spiral is seen being written rather than
             // appearing whole.
-            double grown = entity.spunUp(partialTick);
+            double grown = PinwheelShape.spunUp(age);
             // The binary. Two hot stars, so two bodies rather than one — and they are what
             // the arms trail from, which is why the centre cannot be empty.
-            Vec3 normal = entity.planeNormal();
+            Vec3 normal = PinwheelShape.planeNormal(params);
             Vec3 offsetAxis = normal.cross(new Vec3(0.0D, 1.0D, 0.0D));
             if (offsetAxis.lengthSqr() < 1.0e-6D) {
                 offsetAxis = normal.cross(new Vec3(1.0D, 0.0D, 0.0D));
             }
             offsetAxis = offsetAxis.normalize().scale(1.5D);
-            double spin = entity.rotation(age);
+            double spin = PinwheelShape.rotation(age);
             Vec3 swing = offsetAxis.scale(Math.cos(spin))
                     .add(normal.cross(offsetAxis).normalize().scale(1.5D * Math.sin(spin)));
             EffectCore.add(centre.add(swing), 1.7D, 0.72F, 0.88F, 1.00F, brightness * 2.0F);
@@ -120,12 +130,12 @@ public final class PinwheelWorldRenderer {
                     brightness * 1.5F);
 
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
-            for (int arm = 0; arm < PinwheelEntity.ARMS; ++arm) {
+            for (int arm = 0; arm < PinwheelShape.ARMS; ++arm) {
                 final int index = arm;
                 vertices += CurveTube.emit(builder, camera, SEGMENTS,
                         0.02D, Math.max(0.05D, grown),
-                        fraction -> entity.armPoint(centre, index, fraction, rotation),
-                        PinwheelEntity::armWidth,
+                        fraction -> PinwheelShape.armPoint(params, centre, index, fraction, rotation),
+                        fraction -> PinwheelShape.armWidth(params, fraction),
                         CurveTube.MODE_ARM, 0.0F,
                         Math.min(1.0F, brightness * 0.17F), alpha);
             }

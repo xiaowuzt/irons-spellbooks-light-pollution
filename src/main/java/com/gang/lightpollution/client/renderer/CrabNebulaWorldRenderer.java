@@ -2,7 +2,11 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.CrabNebulaEntity;
+import com.gang.lightpollution.api.CrabNebulaParams;
+import com.gang.lightpollution.fx.CrabNebulaShape;
+import com.gang.lightpollution.fx.CrabNebulaSource;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.FxRegistry;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -61,7 +65,11 @@ public final class CrabNebulaWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<CrabNebulaEntity> nebulae = SpellLightEmitter.collectCrabNebulas();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<CrabNebulaSource> nebulae =
+                new java.util.ArrayList<>(SpellLightEmitter.collectCrabNebulas());
+        nebulae.addAll(FxRegistry.crabNebulae());
         if (nebulae.isEmpty()) {
             return;
         }
@@ -95,60 +103,64 @@ public final class CrabNebulaWorldRenderer {
     }
 
     /** The interior wind nebula. Drawn first, so the cage reads as being in front of it. */
-    private static void drawWind(List<CrabNebulaEntity> nebulae, Vec3 camera,
+    private static void drawWind(List<CrabNebulaSource> nebulae, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
         BufferBuilder builder = beginFlat();
         int vertices = 0;
-        for (CrabNebulaEntity entity : nebulae) {
-            float brightness = entity.brightness(partialTick);
+        for (CrabNebulaSource nebula : nebulae) {
+            float brightness = nebula.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
             }
-            Vec3 centre = entity.centre(partialTick);
+            Vec3 centre = nebula.centre(partialTick);
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
-            float age = entity.getVisualAgeTicks(partialTick);
-            double radius = entity.shellRadius(age) * CrabNebulaEntity.WIND_FRACTION;
+            float age = nebula.getVisualAgeTicks(partialTick);
+            double radius = CrabNebulaShape.shellRadius(nebula.shapeParams(), age)
+                    * CrabNebulaShape.WIND_FRACTION;
             // Pulses on the pulsar's rhythm, which is the tell that something is driving it.
-            float pulse = 0.7F + 0.5F * entity.windPulse(partialTick);
+            float pulse = 0.7F + 0.5F * CrabNebulaShape.windPulse(age);
             vertices += disc(builder, camera, centre, radius,
                     CurveRibbon.pack(WIND_R, WIND_G, WIND_B, brightness * pulse * 0.6F));
         }
         draw(builder, shader, vertices, -1.0F);
     }
 
-    private static void drawCage(List<CrabNebulaEntity> nebulae, Vec3 camera,
+    private static void drawCage(List<CrabNebulaSource> nebulae, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
         BufferBuilder builder = beginTube();
         int vertices = 0;
-        for (CrabNebulaEntity entity : nebulae) {
-            float brightness = entity.brightness(partialTick);
+        for (CrabNebulaSource nebula : nebulae) {
+            float brightness = nebula.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
             }
-            Vec3 centre = entity.centre(partialTick);
+            Vec3 centre = nebula.centre(partialTick);
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
-            float age = entity.getVisualAgeTicks(partialTick);
-            int seed = entity.getSeed();
+            float age = nebula.getVisualAgeTicks(partialTick);
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            CrabNebulaParams params = nebula.shapeParams();
+            int seed = params.seed();
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
             // The pulsar. It drives the whole interior, and it pulses on its own rhythm.
             EffectCore.add(centre, 1.3D, 0.86F, 0.92F, 1.00F,
-                    brightness * (1.4F + entity.windPulse(partialTick) * 2.2F));
+                    brightness * (1.4F + CrabNebulaShape.windPulse(age) * 2.2F));
 
-            for (int filament = 0; filament < CrabNebulaEntity.FILAMENTS; ++filament) {
+            for (int filament = 0; filament < CrabNebulaShape.FILAMENTS; ++filament) {
                 final int index = filament;
                 // Roughly a third of the filaments run green rather than red, which is what
                 // the real remnant does: different lines from different ionisation states.
-                boolean green = CrabNebulaEntity.hash(seed, filament, 7) < 0.34D;
-                float shade = 0.6F + 0.5F * (float)
-                        CrabNebulaEntity.hash(seed, filament, 8);
+                boolean green = FxHash.at(seed, filament, 7) < 0.34D;
+                float shade = 0.6F + 0.5F * (float) FxHash.at(seed, filament, 8);
 
                 vertices += CurveTube.emitLoop(builder, camera, SEGMENTS,
-                        fraction -> entity.filamentPoint(centre, index, fraction, age),
-                        fraction -> CrabNebulaEntity.FILAMENT_HALF_WIDTH,
+                        fraction -> CrabNebulaShape.filamentPoint(
+                                params, centre, index, fraction, age),
+                        fraction -> CrabNebulaShape.FILAMENT_HALF_WIDTH,
                         CurveTube.MODE_FILAMENT, green ? 1.0F : 0.0F,
                         Math.min(1.0F, brightness * shade * 0.17F), alpha);
             }

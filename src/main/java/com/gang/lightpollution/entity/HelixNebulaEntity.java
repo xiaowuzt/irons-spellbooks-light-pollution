@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.HelixNebulaParams;
+import com.gang.lightpollution.fx.HelixNebulaShape;
+import com.gang.lightpollution.fx.HelixNebulaSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -40,42 +43,16 @@ import java.util.UUID;
  * only temporary, standing inside means it has already passed, and the moment that matters
  * is when the shell arrives.</p>
  */
-public final class HelixNebulaEntity extends Entity {
-    public static final int LIFETIME_TICKS = 340;
-    /** The white dwarf lights and the shell starts out. */
-    public static final int IGNITION_END_TICK = 30;
-    /** The shell reaches its full extent and the star lets go. */
-    public static final int SHELL_END_TICK = 280;
-
-    /** Where the shell starts, in blocks. */
-    public static final double SHELL_START_RADIUS = 3.0D;
-    /** Where the shell ends up, in blocks. */
-    public static final double SHELL_END_RADIUS = 30.0D;
-    /** Half-thickness of the shell, in blocks. The knots live in this layer. */
-    public static final double SHELL_THICKNESS = 3.2D;
-    /**
-     * Ratio of the outer ring to the inner one.
-     *
-     * <p>The two rings are what make it an eye rather than a bubble. They are also
-     * different colours in every image of the object, and for a reason worth keeping: the
-     * inner ring glows in doubly ionised oxygen, which is blue-green, and the outer in
-     * hydrogen and nitrogen, which is red. Not a gradient — two distinct shells.</p>
-     */
-    public static final double OUTER_RING_SCALE = 1.42D;
-    /** Tilt of the rings from face-on, degrees. Near enough to give the eye its oval. */
-    public static final double RING_INCLINATION = 37.0D;
-    /**
-     * Knots drawn.
-     *
-     * <p>Scaled down hard from the roughly 40,000 counted in the real nebula. At this
-     * distance the real count would be sub-pixel and cost a fortune; what carries the
-     * look is that every knot has an oriented tail, not how many there are.</p>
-     */
-    public static final int KNOT_COUNT = 560;
+public final class HelixNebulaEntity extends Entity implements HelixNebulaSource {
+    // The form of the nebula lives in HelixNebulaShape, which is what the renderer and the public API
+    // both read, so there is one definition rather than a spell copy and an API copy that can drift.
+    // What stays here is only what the server needs in order to hurt things.
+    public static final int LIFETIME_TICKS = HelixNebulaParams.SPELL_LIFETIME_TICKS;
 
     public static final double HOVER_HEIGHT = 4.0D;
     public static final double EFFECT_RADIUS =
-            SHELL_END_RADIUS * OUTER_RING_SCALE + SHELL_THICKNESS + 4.0D;
+            HelixNebulaShape.SHELL_END_RADIUS * HelixNebulaShape.OUTER_RING_SCALE
+                    + HelixNebulaShape.SHELL_THICKNESS + 4.0D;
 
     /** Taken by the shell as it sweeps past, as a fraction of max health. */
     private static final float SHELL_DAMAGE_FRACTION = 0.072F;
@@ -163,7 +140,7 @@ public final class HelixNebulaEntity extends Entity {
             // Held just short of the collapse, at full extent. Unlike the microquasar
             // there is nothing cyclic to watch here — the shell only grows — so looping it
             // would restart the expansion over and over instead of letting it be looked at.
-            return Math.min(age, SHELL_END_TICK - 1.0F);
+            return Math.min(age, HelixNebulaShape.SHELL_END_TICK - 1.0F);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -176,42 +153,37 @@ public final class HelixNebulaEntity extends Entity {
                 Mth.lerp(partialTick, this.zOld, this.getZ()));
     }
 
-    /**
-     * Radius of the inner ring at a given age, in blocks.
-     *
-     * <p>Eased so the shell leaves quickly and then coasts, which is how an ejected
-     * envelope behaves once it is no longer being pushed.</p>
-     */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public HelixNebulaParams shapeParams() {
+        return HelixNebulaParams.of(azimuth(), getSeed());
+    }
+
+    /** Radius of the inner ring at a given age, in blocks. */
     public double shellRadius(float ageTicks) {
-        if (ageTicks <= IGNITION_END_TICK) {
-            return SHELL_START_RADIUS;
-        }
-        double span = SHELL_END_TICK - IGNITION_END_TICK;
-        double t = Mth.clamp((ageTicks - IGNITION_END_TICK) / span, 0.0D, 1.0D);
-        double eased = 1.0D - Math.pow(1.0D - t, 2.2D);
-        return SHELL_START_RADIUS + (SHELL_END_RADIUS - SHELL_START_RADIUS) * eased;
+        return HelixNebulaShape.shellRadius(shapeParams(), ageTicks);
     }
 
     /** How far the white dwarf has lit, 0 to 1. */
     public float ignition(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / IGNITION_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / HelixNebulaShape.IGNITION_END_TICK);
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= SHELL_END_TICK) {
+        if (age <= HelixNebulaShape.SHELL_END_TICK) {
             return 0.0F;
         }
-        return Mth.clamp((age - SHELL_END_TICK)
-                / (float) (LIFETIME_TICKS - SHELL_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - HelixNebulaShape.SHELL_END_TICK)
+                / (float) (LIFETIME_TICKS - HelixNebulaShape.SHELL_END_TICK), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= IGNITION_END_TICK) {
+        if (age <= HelixNebulaShape.IGNITION_END_TICK) {
             return ignition(partialTick);
         }
-        if (age <= SHELL_END_TICK) {
+        if (age <= HelixNebulaShape.SHELL_END_TICK) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -232,11 +204,11 @@ public final class HelixNebulaEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > IGNITION_END_TICK && timelineTick < SHELL_END_TICK
+            if (timelineTick > HelixNebulaShape.IGNITION_END_TICK && timelineTick < HelixNebulaShape.SHELL_END_TICK
                     && timelineTick % SHELL_INTERVAL_TICKS == 0) {
                 resolveShell(serverLevel, timelineTick);
             }
-            if (!this.collapseResolved && timelineTick >= SHELL_END_TICK) {
+            if (!this.collapseResolved && timelineTick >= HelixNebulaShape.SHELL_END_TICK) {
                 this.collapseResolved = true;
                 resolveCollapse(serverLevel);
             }
@@ -258,12 +230,12 @@ public final class HelixNebulaEntity extends Entity {
     private void resolveShell(ServerLevel level, float ageTicks) {
         double radius = shellRadius(ageTicks);
         double previous = this.lastSweptRadius < 0.0D
-                ? SHELL_START_RADIUS
+                ? HelixNebulaShape.SHELL_START_RADIUS
                 : this.lastSweptRadius;
         this.lastSweptRadius = radius;
 
-        double inner = Math.min(previous, radius) - SHELL_THICKNESS;
-        double outer = Math.max(previous, radius) + SHELL_THICKNESS;
+        double inner = Math.min(previous, radius) - HelixNebulaShape.SHELL_THICKNESS;
+        double outer = Math.max(previous, radius) + HelixNebulaShape.SHELL_THICKNESS;
 
         LivingEntity caster = resolveCaster(level);
         DamageSource source = HelixNebulaDamage.shell(level, caster, this);
@@ -287,7 +259,7 @@ public final class HelixNebulaEntity extends Entity {
         LivingEntity caster = resolveCaster(level);
         DamageSource source = HelixNebulaDamage.shell(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
-        double reach = SHELL_END_RADIUS * OUTER_RING_SCALE;
+        double reach = HelixNebulaShape.SHELL_END_RADIUS * HelixNebulaShape.OUTER_RING_SCALE;
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,

@@ -1,5 +1,9 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.StellarConvergenceParams;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.StellarConvergenceShape;
+import com.gang.lightpollution.fx.StellarConvergenceSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -36,31 +40,14 @@ import java.util.UUID;
  * <p>Star positions are pure functions of the timeline and the synchronized seed,
  * so the renderer, the light emitter and the server damage all agree.</p>
  */
-public final class StellarConvergenceEntity extends Entity {
-    public static final int STAR_COUNT = 9;
-    public static final int LIFETIME_TICKS = 260;
-    /** Ticks between successive stars lighting. */
-    public static final int STAR_STAGGER_TICKS = 8;
-    /** All nine are lit by here. */
-    public static final int LIT_END_TICK = STAR_COUNT * STAR_STAGGER_TICKS;
-    /** Filaments start linking the constellation. */
-    public static final int WEAVE_START_TICK = 90;
-    /** The net finishes contracting and the beams fire. */
-    public static final int BEAM_START_TICK = 150;
-    /** Beams hold, then the column detonates. */
-    public static final int BURST_TICK = 190;
-    public static final int FADE_START_TICK = 220;
+public final class StellarConvergenceEntity extends Entity
+        implements StellarConvergenceSource {
+    // The form lives in StellarConvergenceShape, which the renderer and the public API both read,
+    // so there is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = StellarConvergenceParams.SPELL_LIFETIME_TICKS;
 
-    /** Radius of the constellation, in blocks. */
-    public static final float SHELL_RADIUS = 22.0F;
-    /** Height of the constellation's centre above the anchor, in blocks. */
-    public static final float SHELL_HEIGHT = 26.0F;
-    /** Visual radius of one star, in blocks. */
-    public static final float STAR_RADIUS = 1.9F;
-    /** Radius of the damaging column, in blocks. */
-    public static final double COLUMN_RADIUS = 6.0D;
     /** Bound used to gather candidates. */
-    public static final double EFFECT_RADIUS = SHELL_RADIUS + COLUMN_RADIUS + 2.0D;
+    public static final double EFFECT_RADIUS = StellarConvergenceShape.SHELL_RADIUS + StellarConvergenceShape.COLUMN_RADIUS + 2.0D;
 
     /** Max-health fraction per beam tick while the column holds. */
     private static final float BEAM_DAMAGE_FRACTION = 0.033F;
@@ -131,7 +118,7 @@ public final class StellarConvergenceEntity extends Entity {
     public Vec3 shellCentre(float partialTick) {
         return new Vec3(
                 Mth.lerp(partialTick, this.xOld, this.getX()),
-                Mth.lerp(partialTick, this.yOld, this.getY()) + SHELL_HEIGHT,
+                Mth.lerp(partialTick, this.yOld, this.getY()) + StellarConvergenceShape.SHELL_HEIGHT,
                 Mth.lerp(partialTick, this.zOld, this.getZ()));
     }
 
@@ -143,8 +130,14 @@ public final class StellarConvergenceEntity extends Entity {
                 Mth.lerp(partialTick, this.zOld, this.getZ()));
     }
 
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public StellarConvergenceParams shapeParams() {
+        return StellarConvergenceParams.of(getSeed());
+    }
+
     public static int litTick(int star) {
-        return star * STAR_STAGGER_TICKS;
+        return StellarConvergenceShape.litTick(star);
     }
 
     /**
@@ -153,118 +146,33 @@ public final class StellarConvergenceEntity extends Entity {
      * than randomly scattered, and drift slowly so their shadows sweep.
      */
     public Vec3 starPosition(int star, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        Vec3 centre = shellCentre(partialTick);
-
-        // Golden-angle lattice: even coverage of the sphere for any count.
-        float latitude = 1.0F - 2.0F * (star + 0.5F) / STAR_COUNT;
-        float ringRadius = Mth.sqrt(Math.max(0.0F, 1.0F - latitude * latitude));
-        float angle = star * 2.39996323F
-                + hashUnit(star, 0x9E3779B9L) * Mth.TWO_PI * 0.15F
-                // The slow drift. This is what makes the coloured shadows move.
-                + age * 0.004F;
-
-        float shell = SHELL_RADIUS;
-        // Only the upper half: stars below the centre would be underground.
-        float y = Math.abs(latitude) * 0.75F;
-        Vec3 seat = centre.add(
-                Mth.cos(angle) * ringRadius * shell,
-                y * shell,
-                Mth.sin(angle) * ringRadius * shell);
-
-        int lit = litTick(star);
-        if (age < lit) {
-            return seat;
-        }
-        if (age < BEAM_START_TICK) {
-            // Arriving: eases in from further out along its own bearing.
-            float settle = smoothstep(Math.min((age - lit) / 26.0F, 1.0F));
-            Vec3 far = centre.add(seat.subtract(centre).scale(2.1D));
-            Vec3 arrival = far.lerp(seat, settle);
-            if (age < WEAVE_START_TICK) {
-                return arrival;
-            }
-            // The net contracts, drawing them inward before they fire.
-            float pull = smoothstep((age - WEAVE_START_TICK)
-                    / (float) (BEAM_START_TICK - WEAVE_START_TICK));
-            return arrival.lerp(centre.add(seat.subtract(centre).scale(0.62D)), pull);
-        }
-        return centre.add(seat.subtract(centre).scale(0.62D));
+        return StellarConvergenceShape.starPosition(shapeParams(), shellCentre(partialTick), star,
+                getVisualAgeTicks(partialTick));
     }
 
     /** Colour of a star, spread around the spectrum by index. */
     public float[] starColour(int star) {
-        // Evenly spaced hues, so nine distinct coloured shadows overlap rather
-        // than nine of the same tint.
-        float hue = star / (float) STAR_COUNT;
-        return hueToRgb(hue);
+        return StellarConvergenceShape.starColour(star);
     }
 
     /** Brightness of a star, 0 before it lights. */
     public float starBrightness(int star, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        int lit = litTick(star);
-        if (age < lit) {
-            return 0.0F;
-        }
-        if (age < BEAM_START_TICK) {
-            return Math.min(1.0F, (age - lit) / 14.0F);
-        }
-        if (age < BURST_TICK) {
-            // Pouring themselves into the column.
-            return 1.0F + (age - BEAM_START_TICK) * 0.02F;
-        }
-        float since = age - BURST_TICK;
-        return Math.max(0.0F, 1.6F - since * 0.06F);
+        return StellarConvergenceShape.starBrightness(star, getVisualAgeTicks(partialTick));
     }
 
     /** How far the linking filaments have grown, 0 to 1. */
     public float weaveProgress(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age < WEAVE_START_TICK) {
-            return 0.0F;
-        }
-        if (age >= BURST_TICK) {
-            return Math.max(0.0F, 1.0F - (age - BURST_TICK) / 20.0F);
-        }
-        return Mth.clamp((age - WEAVE_START_TICK)
-                / (float) (BEAM_START_TICK - WEAVE_START_TICK), 0.0F, 1.0F);
+        return StellarConvergenceShape.weaveProgress(getVisualAgeTicks(partialTick));
     }
 
     /** Strength of the converged column, 0 before it fires. */
     public float columnStrength(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age < BEAM_START_TICK) {
-            return 0.0F;
-        }
-        if (age < BURST_TICK) {
-            return smoothstep((age - BEAM_START_TICK) / 12.0F);
-        }
-        float since = age - BURST_TICK;
-        // Flares on the burst, then dies with the spell.
-        return Math.max(0.0F, 2.4F - since * 0.09F);
+        return StellarConvergenceShape.columnStrength(getVisualAgeTicks(partialTick));
     }
 
     /** Burst flash, 0 outside the moment the column detonates. */
     public float burstFlash(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - BURST_TICK;
-        if (since < 0.0F || since > 16.0F) {
-            return 0.0F;
-        }
-        return 1.0F - since / 16.0F;
-    }
-
-    private static float[] hueToRgb(float hue) {
-        float h = (hue % 1.0F) * 6.0F;
-        float x = 1.0F - Math.abs(h % 2.0F - 1.0F);
-        return switch ((int) h) {
-            case 0 -> new float[] {1.0F, x, 0.0F};
-            case 1 -> new float[] {x, 1.0F, 0.0F};
-            case 2 -> new float[] {0.0F, 1.0F, x};
-            case 3 -> new float[] {0.0F, x, 1.0F};
-            case 4 -> new float[] {x, 0.0F, 1.0F};
-            default -> new float[] {1.0F, 0.0F, x};
-        };
+        return StellarConvergenceShape.burstFlash(getVisualAgeTicks(partialTick));
     }
 
     private static float smoothstep(float t) {
@@ -273,14 +181,7 @@ public final class StellarConvergenceEntity extends Entity {
     }
 
     private float hashUnit(int star, long salt) {
-        long hash = (getSeed() & 0xFFFFFFFFL) * 0x2545F4914F6CDD1DL
-                ^ (star + 1L) * salt;
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >>> 33;
-        return (float) ((hash >>> 1) / (double) Long.MAX_VALUE);
+        return FxHash.unit(getSeed(), star, salt);
     }
 
     @Override
@@ -289,11 +190,11 @@ public final class StellarConvergenceEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick >= BEAM_START_TICK && timelineTick < BURST_TICK
+            if (timelineTick >= StellarConvergenceShape.BEAM_START_TICK && timelineTick < StellarConvergenceShape.BURST_TICK
                     && timelineTick % BEAM_INTERVAL_TICKS == 0) {
                 resolveColumn(serverLevel);
             }
-            if (!this.burstResolved && timelineTick >= BURST_TICK) {
+            if (!this.burstResolved && timelineTick >= StellarConvergenceShape.BURST_TICK) {
                 this.burstResolved = true;
                 resolveBurst(serverLevel);
             }
@@ -311,8 +212,8 @@ public final class StellarConvergenceEntity extends Entity {
         // A column, not a sphere: it runs from the ground up to the constellation,
         // so height should not exempt anyone inside it.
         AABB bounds = new AABB(
-                ground.x - COLUMN_RADIUS, ground.y - 2.0D, ground.z - COLUMN_RADIUS,
-                ground.x + COLUMN_RADIUS, ground.y + SHELL_HEIGHT, ground.z + COLUMN_RADIUS);
+                ground.x - StellarConvergenceShape.COLUMN_RADIUS, ground.y - 2.0D, ground.z - StellarConvergenceShape.COLUMN_RADIUS,
+                ground.x + StellarConvergenceShape.COLUMN_RADIUS, ground.y + StellarConvergenceShape.SHELL_HEIGHT, ground.z + StellarConvergenceShape.COLUMN_RADIUS);
         List<LivingEntity> targets = level.getEntitiesOfClass(
                 LivingEntity.class, bounds,
                 target -> canAffect(caster, target) && withinColumn(target, ground));
@@ -329,7 +230,7 @@ public final class StellarConvergenceEntity extends Entity {
         Vec3 centre = target.getBoundingBox().getCenter();
         double dx = centre.x - ground.x;
         double dz = centre.z - ground.z;
-        return dx * dx + dz * dz <= COLUMN_RADIUS * COLUMN_RADIUS;
+        return dx * dx + dz * dz <= StellarConvergenceShape.COLUMN_RADIUS * StellarConvergenceShape.COLUMN_RADIUS;
     }
 
     private void resolveBurst(ServerLevel level) {

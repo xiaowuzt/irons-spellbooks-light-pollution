@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.StellarConvergenceEntity;
+import com.gang.lightpollution.api.StellarConvergenceParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.StellarConvergenceShape;
+import com.gang.lightpollution.fx.StellarConvergenceSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -64,7 +67,11 @@ public final class StellarConvergenceWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<StellarConvergenceEntity> effects = SpellLightEmitter.collectConvergences();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<StellarConvergenceSource> effects =
+                new java.util.ArrayList<>(SpellLightEmitter.collectConvergences());
+        effects.addAll(FxRegistry.stellarConvergences());
         if (effects.isEmpty()) {
             return;
         }
@@ -88,7 +95,7 @@ public final class StellarConvergenceWorldRenderer {
 
             BufferBuilder builder = begin();
             int vertices = 0;
-            for (StellarConvergenceEntity entity : effects) {
+            for (StellarConvergenceSource entity : effects) {
                 if (camera.distanceToSqr(entity.shellCentre(partialTick))
                         > RENDER_DISTANCE_SQR) {
                     continue;
@@ -103,7 +110,7 @@ public final class StellarConvergenceWorldRenderer {
             if (boltShader != null) {
                 BufferBuilder bolts = begin();
                 int boltVertices = 0;
-                for (StellarConvergenceEntity entity : effects) {
+                for (StellarConvergenceSource entity : effects) {
                     if (camera.distanceToSqr(entity.shellCentre(partialTick))
                             > RENDER_DISTANCE_SQR) {
                         continue;
@@ -113,7 +120,7 @@ public final class StellarConvergenceWorldRenderer {
                 drawBolts(bolts, boltShader, boltVertices);
             }
 
-            for (StellarConvergenceEntity entity : effects) {
+            for (StellarConvergenceSource entity : effects) {
                 if (camera.distanceToSqr(entity.shellCentre(partialTick))
                         > RENDER_DISTANCE_SQR) {
                     continue;
@@ -133,23 +140,23 @@ public final class StellarConvergenceWorldRenderer {
      * as a ball of wire, not a constellation.
      */
     private static int emitBolts(BufferBuilder builder, Vec3 camera,
-                                 StellarConvergenceEntity entity, float partialTick) {
-        float weave = entity.weaveProgress(partialTick);
+                                 StellarConvergenceSource entity, float partialTick) {
+        float weave = StellarConvergenceShape.weaveProgress(entity.getVisualAgeTicks(partialTick));
         if (weave <= 0.01F) {
             return 0;
         }
         int vertices = 0;
-        for (int star = 0; star < StellarConvergenceEntity.STAR_COUNT; star++) {
+        for (int star = 0; star < StellarConvergenceShape.STAR_COUNT; star++) {
             for (int step = 1; step <= 2; step++) {
-                int other = (star + step) % StellarConvergenceEntity.STAR_COUNT;
-                float brightness = Math.min(entity.starBrightness(star, partialTick),
-                        entity.starBrightness(other, partialTick));
+                int other = (star + step) % StellarConvergenceShape.STAR_COUNT;
+                float brightness = Math.min(StellarConvergenceShape.starBrightness(star, entity.getVisualAgeTicks(partialTick)),
+                        StellarConvergenceShape.starBrightness(other, entity.getVisualAgeTicks(partialTick)));
                 if (brightness <= 0.05F) {
                     continue;
                 }
                 vertices += SpellBoltRenderer.emit(builder, camera,
-                        entity.starPosition(star, partialTick),
-                        entity.starPosition(other, partialTick),
+                        StellarConvergenceShape.starPosition(entity.shapeParams(), entity.shellCentre(partialTick), star, entity.getVisualAgeTicks(partialTick)),
+                        StellarConvergenceShape.starPosition(entity.shapeParams(), entity.shellCentre(partialTick), other, entity.getVisualAgeTicks(partialTick)),
                         brightness * (step == 1 ? 1.6F : 1.0F),
                         Math.min(brightness, 1.0F),
                         star * 17 + other, weave);
@@ -196,8 +203,8 @@ public final class StellarConvergenceWorldRenderer {
 
     /** The converged column, a prism from the constellation down to the ground. */
     private static int emitColumn(BufferBuilder builder, Vec3 camera,
-                                  StellarConvergenceEntity entity, float partialTick) {
-        float strength = entity.columnStrength(partialTick);
+                                  StellarConvergenceSource entity, float partialTick) {
+        float strength = StellarConvergenceShape.columnStrength(entity.getVisualAgeTicks(partialTick));
         if (strength <= 0.02F) {
             return 0;
         }
@@ -235,8 +242,8 @@ public final class StellarConvergenceWorldRenderer {
 
     /** The ground shock leaving the column's foot. */
     private static int emitBurst(BufferBuilder builder, Vec3 camera,
-                                 StellarConvergenceEntity entity, float partialTick) {
-        float flash = entity.burstFlash(partialTick);
+                                 StellarConvergenceSource entity, float partialTick) {
+        float flash = StellarConvergenceShape.burstFlash(entity.getVisualAgeTicks(partialTick));
         if (flash <= 0.01F) {
             return 0;
         }
@@ -256,22 +263,22 @@ public final class StellarConvergenceWorldRenderer {
     }
 
     /** The nine bodies, each its own draw so it can carry its own centre. */
-    private static void drawStars(Vec3 camera, StellarConvergenceEntity entity,
+    private static void drawStars(Vec3 camera, StellarConvergenceSource entity,
                                   float partialTick, ShaderInstance shader) {
         float age = entity.getVisualAgeTicks(partialTick);
-        for (int star = 0; star < StellarConvergenceEntity.STAR_COUNT; star++) {
-            float brightness = entity.starBrightness(star, partialTick);
+        for (int star = 0; star < StellarConvergenceShape.STAR_COUNT; star++) {
+            float brightness = StellarConvergenceShape.starBrightness(star, entity.getVisualAgeTicks(partialTick));
             if (brightness <= 0.02F) {
                 continue;
             }
-            Vec3 position = entity.starPosition(star, partialTick);
-            float radius = StellarConvergenceEntity.STAR_RADIUS
+            Vec3 position = StellarConvergenceShape.starPosition(entity.shapeParams(), entity.shellCentre(partialTick), star, entity.getVisualAgeTicks(partialTick));
+            float radius = StellarConvergenceShape.STAR_RADIUS
                     * (0.85F + Math.min(brightness, 1.5F) * 0.2F);
             // The body carries its own colour through TintColor. Leaving it to the
             // shader's temperature ramp made all nine bodies near-white, so only
             // the shadows on the ground were coloured and the stars themselves
             // were indistinguishable.
-            float[] tint = entity.starColour(star);
+            float[] tint = StellarConvergenceShape.starColour(star);
             int packed = color(Mth.frac(age * 0.02F + star * 0.11F), 0.92F,
                     Mth.clamp(brightness * 0.4F, 0.0F, 1.0F),
                     Mth.clamp(brightness, 0.0F, 1.0F));

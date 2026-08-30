@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.WorldTreeEntity;
+import com.gang.lightpollution.api.WorldTreeParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.WorldTreeShape;
+import com.gang.lightpollution.fx.WorldTreeSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -86,9 +89,9 @@ public final class WorldTreeWorldRenderer {
 
     /** Roots: half-buried tubes following the terrain out from the trunk's flare. */
     private static int emitRoots(BufferBuilder builder, Vec3 camera,
-                                 WorldTreeEntity entity, float partialTick) {
-        float progress = entity.rootProgress(partialTick);
-        float fade = entity.fade(partialTick);
+                                 WorldTreeSource entity, float partialTick) {
+        float progress = WorldTreeShape.rootProgress(entity.getVisualAgeTicks(partialTick));
+        float fade = WorldTreeShape.fade(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (progress <= 0.01F || fade <= 0.01F) {
             return 0;
         }
@@ -96,15 +99,15 @@ public final class WorldTreeWorldRenderer {
         float intensity = 0.30F;
         int vertices = 0;
 
-        for (int root = 0; root < WorldTreeEntity.ROOT_COUNT; root++) {
+        for (int root = 0; root < WorldTreeShape.ROOT_COUNT; root++) {
             int rings = Math.max(2,
-                    Math.round(WorldTreeEntity.ROOT_SEGMENTS * progress) + 1);
+                    Math.round(WorldTreeShape.ROOT_SEGMENTS * progress) + 1);
             Vec3[] path = new Vec3[rings];
             float[] radii = new float[rings];
             for (int ring = 0; ring < rings; ring++) {
                 float t = ring / (float) (rings - 1) * progress;
                 path[ring] = entity.rootPoint(root, t, partialTick).subtract(camera);
-                radii[ring] = entity.rootRadius(root, t);
+                radii[ring] = WorldTreeShape.rootRadius(entity.shapeParams(), root, t);
             }
             TubeMeshBuilder.Ring[] frames = TubeMeshBuilder.frames(path, radii);
             vertices += TubeMeshBuilder.emit(builder, frames, ROOT_SIDES,
@@ -137,16 +140,16 @@ public final class WorldTreeWorldRenderer {
      * polygon count to suggest facets — which read as a crude post, not as bark.</p>
      */
     private static int emitTrunk(BufferBuilder builder, Vec3 camera,
-                                 WorldTreeEntity entity, float partialTick) {
-        float progress = entity.trunkProgress(partialTick);
-        float fade = entity.fade(partialTick);
+                                 WorldTreeSource entity, float partialTick) {
+        float progress = WorldTreeShape.trunkProgress(entity.getVisualAgeTicks(partialTick));
+        float fade = WorldTreeShape.fade(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (progress <= 0.01F || fade <= 0.01F) {
             return 0;
         }
         int alpha = Math.round(Mth.clamp(fade, 0.0F, 1.0F) * 255.0F);
         float intensity = 0.30F;
         Vec3 seed = entity.seedPoint(partialTick).subtract(camera);
-        float height = WorldTreeEntity.TRUNK_HEIGHT * progress;
+        float height = WorldTreeShape.TRUNK_HEIGHT * progress;
 
         // Three extra rings above the top, tapering to a point: the trunk continues
         // as a leader into the crown, and without them the tube is left open and you
@@ -157,7 +160,7 @@ public final class WorldTreeWorldRenderer {
         for (int ring = 0; ring < TRUNK_RINGS; ring++) {
             float y = trunkWarp(ring / (float) (TRUNK_RINGS - 1)) * height;
             path[ring] = seed.add(0.0D, y, 0.0D);
-            radii[ring] = WorldTreeEntity.trunkRadius(y);
+            radii[ring] = WorldTreeShape.trunkRadius(entity.shapeParams(), y);
         }
         float topRadius = radii[TRUNK_RINGS - 1];
         for (int extra = 0; extra < 3; extra++) {
@@ -176,21 +179,21 @@ public final class WorldTreeWorldRenderer {
             int index = Mth.clamp(Math.round(alongUnit * (rows.length - 1)),
                     0, rows.length - 1);
             float y = (float) (rows[index].y - baseY);
-            float depth = WorldTreeEntity.buttressDepth(y);
+            float depth = WorldTreeShape.buttressDepth(entity.shapeParams(), y);
             float lobed = 1.0F + depth
-                    * Mth.cos(angle * WorldTreeEntity.BUTTRESS_LOBES);
+                    * Mth.cos(angle * WorldTreeShape.BUTTRESS_LOBES);
             out.set(Mth.cos(angle) * lobed, Mth.sin(angle) * lobed);
         };
         return TubeMeshBuilder.emit(builder, TubeMeshBuilder.frames(path, radii),
-                WorldTreeEntity.TRUNK_SIDES, section, MODE_TRUNK, 0.0F,
+                WorldTreeShape.TRUNK_SIDES, section, MODE_TRUNK, 0.0F,
                 intensity, alpha, 0.0F, height);
     }
 
     /** Every branch, all four orders, as tapered tubes. */
     private static int emitBranches(BufferBuilder builder, Vec3 camera,
-                                    WorldTreeEntity entity, float partialTick) {
-        float progress = entity.branchProgress(partialTick);
-        float fade = entity.fade(partialTick);
+                                    WorldTreeSource entity, float partialTick) {
+        float progress = WorldTreeShape.branchProgress(entity.getVisualAgeTicks(partialTick));
+        float fade = WorldTreeShape.fade(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (progress <= 0.01F || fade <= 0.01F) {
             return 0;
         }
@@ -199,7 +202,7 @@ public final class WorldTreeWorldRenderer {
         Vec3 seed = entity.seedPoint(partialTick).subtract(camera);
         int vertices = 0;
 
-        for (WorldTreeEntity.Limb limb : entity.skeleton()) {
+        for (WorldTreeShape.Limb limb : entity.tree().limbs()) {
             float grown = limb.grown(progress);
             if (grown <= 0.02F) {
                 continue;
@@ -226,7 +229,7 @@ public final class WorldTreeWorldRenderer {
             }
             // aux carries how far out this limb is, so the shader can lighten the
             // bark toward the twigs the way real bark thins.
-            float depth = limb.level() / (float) (WorldTreeEntity.BRANCH_LEVELS - 1);
+            float depth = limb.level() / (float) (WorldTreeShape.BRANCH_LEVELS - 1);
             vertices += TubeMeshBuilder.emit(builder,
                     TubeMeshBuilder.frames(path, radii), BRANCH_SIDES[level],
                     TubeMeshBuilder.CIRCLE, MODE_BRANCH, depth, intensity, alpha,
@@ -243,7 +246,11 @@ public final class WorldTreeWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<WorldTreeEntity> effects = SpellLightEmitter.collectWorldTrees();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<WorldTreeSource> effects =
+                new java.util.ArrayList<>(SpellLightEmitter.collectWorldTrees());
+        effects.addAll(FxRegistry.worldTrees());
         if (effects.isEmpty()) {
             return;
         }
@@ -264,12 +271,12 @@ public final class WorldTreeWorldRenderer {
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
 
-            for (WorldTreeEntity entity : effects) {
+            for (WorldTreeSource entity : effects) {
                 if (camera.distanceToSqr(entity.seedPoint(partialTick))
                         > RENDER_DISTANCE_SQR) {
                     continue;
                 }
-                float hardened = entity.hardened(partialTick);
+                float hardened = WorldTreeShape.hardened(entity.getVisualAgeTicks(partialTick));
 
                 BufferBuilder wood = begin();
                 int vertices = 0;
@@ -309,21 +316,21 @@ public final class WorldTreeWorldRenderer {
      * rather than as attached.</p>
      */
     private static int emitLeaves(BufferBuilder builder, Vec3 camera,
-                                  WorldTreeEntity entity, float partialTick) {
-        float crown = entity.crownProgress(partialTick);
-        float branches = entity.branchProgress(partialTick);
-        float fade = entity.fade(partialTick);
+                                  WorldTreeSource entity, float partialTick) {
+        float crown = WorldTreeShape.crownProgress(entity.getVisualAgeTicks(partialTick));
+        float branches = WorldTreeShape.branchProgress(entity.getVisualAgeTicks(partialTick));
+        float fade = WorldTreeShape.fade(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (crown <= 0.01F || fade <= 0.01F) {
             return 0;
         }
         int alpha = Math.round(Mth.clamp(fade, 0.0F, 1.0F) * 255.0F);
         float intensity = 0.30F;
         Vec3 seed = entity.seedPoint(partialTick).subtract(camera);
-        WorldTreeEntity.Limb[] twigs = entity.twigs();
+        WorldTreeShape.Limb[] twigs = entity.tree().twigs();
         int vertices = 0;
 
-        for (WorldTreeEntity.Leaf leaf : entity.leaves()) {
-            WorldTreeEntity.Limb twig = twigs[leaf.twig()];
+        for (WorldTreeShape.Leaf leaf : entity.tree().leaves()) {
+            WorldTreeShape.Limb twig = twigs[leaf.twig()];
             float grown = twig.grown(branches);
             if (grown <= leaf.along()) {
                 // The twig has not reached this leaf's node yet.
@@ -395,9 +402,12 @@ public final class WorldTreeWorldRenderer {
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
         float shake = 0.0F;
-        for (WorldTreeEntity entity : SpellLightEmitter.collectWorldTrees()) {
+        java.util.List<WorldTreeSource> shaking =
+                new java.util.ArrayList<>(SpellLightEmitter.collectWorldTrees());
+        shaking.addAll(FxRegistry.worldTrees());
+        for (WorldTreeSource entity : shaking) {
             float since = entity.getVisualAgeTicks(partialTick)
-                    - WorldTreeEntity.TRUNK_END_TICK;
+                    - WorldTreeShape.TRUNK_END_TICK;
             if (since < 0.0F || since > SHAKE_TICKS) {
                 continue;
             }

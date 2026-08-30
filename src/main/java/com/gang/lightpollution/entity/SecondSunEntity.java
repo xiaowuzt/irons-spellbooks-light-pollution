@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.SecondSunParams;
+import com.gang.lightpollution.fx.SecondSunShape;
+import com.gang.lightpollution.fx.SecondSunSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -37,21 +40,11 @@ import java.util.UUID;
  * ground. Damage, though, is anchored to the aimed point: this is still a spell
  * cast at something.</p>
  */
-public final class SecondSunEntity extends Entity {
-    public static final int LIFETIME_TICKS = 320;
-    /** The disc climbs from the horizon over this window. */
-    public static final int RISE_END_TICK = 110;
-    /** It holds at the zenith and swells. */
-    public static final int SWELL_END_TICK = 210;
-    /** Supernova. */
-    public static final int NOVA_TICK = 220;
-    /** The nova's flash and collapse run to here. */
-    public static final int NOVA_END_TICK = 270;
+public final class SecondSunEntity extends Entity implements SecondSunSource {
+    // The form lives in SecondSunShape, which the renderer and the public API both read, so there
+    // is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = SecondSunParams.SPELL_LIFETIME_TICKS;
 
-    /** Angular radius of the disc at the horizon, in degrees. */
-    public static final float DISC_ANGLE_DEGREES = 13.0F;
-    /** How much larger it is by the time it goes off. */
-    public static final float SWELL_FACTOR = 1.9F;
 
     /** Radius of the scorched area on the ground, in blocks. */
     public static final double EFFECT_RADIUS = 26.0D;
@@ -132,30 +125,19 @@ public final class SecondSunEntity extends Entity {
      * <p>Eased at both ends: it lifts clear of the horizon slowly, which is what
      * makes it read as something enormous rather than something rising fast.</p>
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public SecondSunParams shapeParams() {
+        return SecondSunParams.of(getBearing());
+    }
+
     public float altitude(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age >= RISE_END_TICK) {
-            return 1.0F;
-        }
-        return smoothstep(age / RISE_END_TICK);
+        return SecondSunShape.altitude(getVisualAgeTicks(partialTick));
     }
 
     /** Angular radius of the disc right now, in degrees. */
     public float discAngleDegrees(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float swell = age <= RISE_END_TICK
-                ? 0.0F
-                : Mth.clamp((age - RISE_END_TICK)
-                        / (float) (SWELL_END_TICK - RISE_END_TICK), 0.0F, 1.0F);
-        float base = DISC_ANGLE_DEGREES * (1.0F + swell * (SWELL_FACTOR - 1.0F));
-        if (age <= NOVA_TICK) {
-            return base;
-        }
-        // The nova throws the shell outward, then the remnant collapses.
-        float since = age - NOVA_TICK;
-        float expand = Mth.clamp(since / 18.0F, 0.0F, 1.0F);
-        float collapse = Mth.clamp((since - 18.0F) / 32.0F, 0.0F, 1.0F);
-        return base * (1.0F + expand * 1.8F) * (1.0F - collapse * 0.95F);
+        return SecondSunShape.discAngleDegrees(shapeParams(), getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -163,47 +145,18 @@ public final class SecondSunEntity extends Entity {
      * which is what makes the nova read as the end of a life cycle.
      */
     public float temperature(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= RISE_END_TICK) {
-            return 1.0F;
-        }
-        if (age <= NOVA_TICK) {
-            float swell = (age - RISE_END_TICK)
-                    / (float) (NOVA_TICK - RISE_END_TICK);
-            return 1.0F - swell * 0.75F;
-        }
-        // White-hot again the instant it detonates.
-        return Math.min(1.0F, 0.25F + (age - NOVA_TICK) * 0.2F);
+        return SecondSunShape.temperature(getVisualAgeTicks(partialTick));
     }
 
     /** Overall brightness, driving both the visual and the emitted light. */
+    @Override
     public float brightness(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= RISE_END_TICK) {
-            return altitude(partialTick);
-        }
-        if (age <= NOVA_TICK) {
-            return 1.0F;
-        }
-        if (age <= NOVA_END_TICK) {
-            float since = age - NOVA_TICK;
-            // A hard flare, then a long decline.
-            return Math.max(0.0F, 4.5F - since * 0.09F);
-        }
-        return Math.max(0.0F, 1.0F - (age - NOVA_END_TICK)
-                / (float) (LIFETIME_TICKS - NOVA_END_TICK));
+        return SecondSunShape.brightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     /** Full-screen flash of the nova, 0 outside its window. */
     public float novaFlash(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - NOVA_TICK;
-        if (since < 0.0F || since > 26.0F) {
-            return 0.0F;
-        }
-        // Peaks a moment after detonation rather than instantly, so the eye
-        // registers it as building.
-        float t = since / 26.0F;
-        return Mth.sin(t * Mth.PI) * (1.0F - t * 0.35F);
+        return SecondSunShape.novaFlash(getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -211,21 +164,13 @@ public final class SecondSunEntity extends Entity {
      * light source in the sky rather than a decal.
      */
     public Vec3 discDirection(float partialTick) {
-        float bearing = getBearing();
-        float altitude = altitude(partialTick);
-        // Sweeps from the horizon to near the zenith, stopping short of straight
-        // overhead so the shadows it throws stay long enough to be legible.
-        float elevation = Mth.lerp(altitude, 0.04F, 0.78F) * Mth.HALF_PI;
-        float horizontal = Mth.cos(elevation);
-        return new Vec3(
-                Mth.cos(bearing) * horizontal,
-                Mth.sin(elevation),
-                Mth.sin(bearing) * horizontal);
+        return SecondSunShape.discDirection(shapeParams(), getVisualAgeTicks(partialTick));
     }
 
     /** Where the disc sits, far enough out to read as sky. */
     public Vec3 discPosition(Vec3 viewer, float partialTick, double distance) {
-        return viewer.add(discDirection(partialTick).scale(distance));
+        return SecondSunShape.discPosition(
+                shapeParams(), viewer, getVisualAgeTicks(partialTick), distance);
     }
 
     private static float smoothstep(float t) {
@@ -241,11 +186,11 @@ public final class SecondSunEntity extends Entity {
         if (this.level() instanceof ServerLevel serverLevel) {
             // Only once it is properly up: a disc still on the horizon is not
             // burning anything.
-            if (timelineTick >= RISE_END_TICK && timelineTick < NOVA_TICK
+            if (timelineTick >= SecondSunShape.RISE_END_TICK && timelineTick < SecondSunShape.NOVA_TICK
                     && timelineTick % SCORCH_INTERVAL_TICKS == 0) {
                 resolveScorch(serverLevel);
             }
-            if (!this.novaResolved && timelineTick >= NOVA_TICK) {
+            if (!this.novaResolved && timelineTick >= SecondSunShape.NOVA_TICK) {
                 this.novaResolved = true;
                 resolveNova(serverLevel);
             }

@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.QuasarJetParams;
+import com.gang.lightpollution.fx.QuasarJetShape;
+import com.gang.lightpollution.fx.QuasarJetSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -53,17 +56,11 @@ import java.util.UUID;
  * <p>Figures here are established results, not values verified in the session that wrote
  * this file.</p>
  */
-public final class QuasarJetEntity extends Entity {
-    public static final int LIFETIME_TICKS = 340;
-    /** The nucleus lights and the jet punches out. */
-    public static final int LAUNCH_END_TICK = 34;
-    /** Knots stream along it. This is the body of the spell. */
-    public static final int STREAM_END_TICK = 280;
+public final class QuasarJetEntity extends Entity implements QuasarJetSource {
+    // The form lives in QuasarJetShape, which the renderer and the public API both read, so there is
+    // one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = QuasarJetParams.SPELL_LIFETIME_TICKS;
 
-    /** Bulk Lorentz factor. Around ten is typical for a powerful quasar jet. */
-    public static final double GAMMA = 10.0D;
-    /** Speed as a fraction of c, from the Lorentz factor. */
-    public static final double BETA = Math.sqrt(1.0D - 1.0D / (GAMMA * GAMMA));
     /**
      * Angle between the jet and the line of sight, degrees.
      *
@@ -74,20 +71,11 @@ public final class QuasarJetEntity extends Entity {
      * the figure actually tracked for M87's knots, and it puts the jet at a angle a player
      * can see along rather than nearly end-on.</p>
      */
-    public static final double VIEW_ANGLE = 17.0D;
-    /** How far the jet reaches, in blocks. */
-    public static final double JET_LENGTH = 72.0D;
-    /** Half-width of the jet at the nucleus, in blocks. Collimated, so narrow. */
-    public static final double JET_HALF_WIDTH = 0.7D;
     /** How close to the jet counts as being inside it, in blocks. */
     public static final double JET_TOUCH_RADIUS = 2.6D;
-    /** Knots in flight along the jet at once. */
-    public static final int KNOT_COUNT = 5;
-    /** Radius of the terminal lobe, in blocks. */
-    public static final double LOBE_RADIUS = 10.0D;
 
     public static final double HOVER_HEIGHT = 13.0D;
-    public static final double EFFECT_RADIUS = JET_LENGTH + LOBE_RADIUS + 4.0D;
+    public static final double EFFECT_RADIUS = QuasarJetShape.JET_LENGTH + QuasarJetShape.LOBE_RADIUS + 4.0D;
 
     /** A knot passing through, as a fraction of max health. */
     private static final float KNOT_DAMAGE_FRACTION = 0.068F;
@@ -172,8 +160,8 @@ public final class QuasarJetEntity extends Entity {
         if (isDisplay()) {
             // Kept running: the knots streaming outward are the thing to look at, and the
             // jet's shape does not change, so there is nothing that a wrap would disturb.
-            float span = STREAM_END_TICK - LAUNCH_END_TICK;
-            return LAUNCH_END_TICK + (age % span);
+            float span = QuasarJetShape.STREAM_END_TICK - QuasarJetShape.LAUNCH_END_TICK;
+            return QuasarJetShape.LAUNCH_END_TICK + (age % span);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -187,17 +175,14 @@ public final class QuasarJetEntity extends Entity {
     }
 
     /** Direction the jet points, as a unit vector. Fixed — this one does not precess. */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public QuasarJetParams shapeParams() {
+        return QuasarJetParams.of(azimuth());
+    }
+
     public Vec3 direction() {
-        double azimuth = Math.toRadians(azimuth());
-        // Tipped up so the jet clears the ground along its length. Deliberately not tied to
-        // VIEW_ANGLE despite the similar value: that one is the angle between the jet and
-        // the line of sight, which depends on where the player is standing, while this is
-        // the jet's tilt from horizontal. Forcing them equal would look tidy and conflate
-        // two different quantities.
-        double elevation = Math.toRadians(16.0D);
-        return new Vec3(Math.cos(elevation) * Math.cos(azimuth),
-                Math.sin(elevation),
-                Math.cos(elevation) * Math.sin(azimuth)).normalize();
+        return QuasarJetShape.direction(shapeParams());
     }
 
     /**
@@ -209,8 +194,7 @@ public final class QuasarJetEntity extends Entity {
      * merely be described as doing so.</p>
      */
     public static double apparentSpeed() {
-        double theta = Math.toRadians(VIEW_ANGLE);
-        return BETA * Math.sin(theta) / (1.0D - BETA * Math.cos(theta));
+        return QuasarJetShape.apparentSpeed();
     }
 
     /**
@@ -220,13 +204,7 @@ public final class QuasarJetEntity extends Entity {
      * speed implies, so the spacing a viewer sees is the spacing the formula gives.</p>
      */
     public double knotProgress(int knot, float ageTicks) {
-        double crossingTicks = JET_LENGTH / Math.max(blocksPerTick(), 0.001D);
-        double launched = ageTicks - knot * (crossingTicks / KNOT_COUNT);
-        if (launched <= 0.0D) {
-            return -1.0D;
-        }
-        double progress = (launched % crossingTicks) / crossingTicks;
-        return progress;
+        return QuasarJetShape.knotProgress(knot, ageTicks);
     }
 
     /**
@@ -237,43 +215,39 @@ public final class QuasarJetEntity extends Entity {
      * everything else in the mod and slow enough to track with the eye.</p>
      */
     public static double blocksPerTick() {
-        return JET_LENGTH / 44.0D * (apparentSpeed() / 6.0D);
+        return QuasarJetShape.blocksPerTick();
     }
 
     /** Where a knot sits, or null if it has not launched yet. */
     public Vec3 knotPosition(Vec3 centre, int knot, float ageTicks) {
-        double progress = knotProgress(knot, ageTicks);
-        if (progress < 0.0D) {
-            return null;
-        }
-        return centre.add(direction().scale(JET_LENGTH * progress));
+        return QuasarJetShape.knotPosition(shapeParams(), centre, knot, ageTicks);
     }
 
     /** Centre of the terminal lobe, where the jet rams the surrounding medium. */
     public Vec3 lobeCentre(Vec3 centre) {
-        return centre.add(direction().scale(JET_LENGTH));
+        return QuasarJetShape.lobeCentre(shapeParams(), centre);
     }
 
     /** How far the jet has punched out, 0 to 1. */
     public float launched(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / LAUNCH_END_TICK);
+        return QuasarJetShape.launched(getVisualAgeTicks(partialTick));
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= STREAM_END_TICK) {
+        if (age <= QuasarJetShape.STREAM_END_TICK) {
             return 0.0F;
         }
-        return Mth.clamp((age - STREAM_END_TICK)
-                / (float) (LIFETIME_TICKS - STREAM_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - QuasarJetShape.STREAM_END_TICK)
+                / (float) (LIFETIME_TICKS - QuasarJetShape.STREAM_END_TICK), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= LAUNCH_END_TICK) {
+        if (age <= QuasarJetShape.LAUNCH_END_TICK) {
             return launched(partialTick);
         }
-        if (age <= STREAM_END_TICK) {
+        if (age <= QuasarJetShape.STREAM_END_TICK) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -294,11 +268,11 @@ public final class QuasarJetEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > LAUNCH_END_TICK && timelineTick < STREAM_END_TICK
+            if (timelineTick > QuasarJetShape.LAUNCH_END_TICK && timelineTick < QuasarJetShape.STREAM_END_TICK
                     && timelineTick % JET_INTERVAL_TICKS == 0) {
                 resolveKnots(serverLevel, timelineTick);
             }
-            if (!this.hotspotResolved && timelineTick >= STREAM_END_TICK) {
+            if (!this.hotspotResolved && timelineTick >= QuasarJetShape.STREAM_END_TICK) {
                 this.hotspotResolved = true;
                 resolveHotspot(serverLevel);
             }
@@ -334,7 +308,7 @@ public final class QuasarJetEntity extends Entity {
                 continue;
             }
             Vec3 at = target.getBoundingBox().getCenter();
-            for (int knot = 0; knot < KNOT_COUNT; ++knot) {
+            for (int knot = 0; knot < QuasarJetShape.KNOT_COUNT; ++knot) {
                 Vec3 position = knotPosition(centre, knot, ageTicks);
                 if (position != null && position.distanceToSqr(at) <= touchSqr) {
                     SpellDamage.apply(this, target, source, KNOT_DAMAGE_FRACTION);
@@ -352,12 +326,12 @@ public final class QuasarJetEntity extends Entity {
         Vec3 lobe = lobeCentre(centre);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(lobe.x - LOBE_RADIUS, lobe.y - LOBE_RADIUS, lobe.z - LOBE_RADIUS,
-                        lobe.x + LOBE_RADIUS, lobe.y + LOBE_RADIUS, lobe.z + LOBE_RADIUS))) {
+                new AABB(lobe.x - QuasarJetShape.LOBE_RADIUS, lobe.y - QuasarJetShape.LOBE_RADIUS, lobe.z - QuasarJetShape.LOBE_RADIUS,
+                        lobe.x + QuasarJetShape.LOBE_RADIUS, lobe.y + QuasarJetShape.LOBE_RADIUS, lobe.z + QuasarJetShape.LOBE_RADIUS))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
-            if (target.getBoundingBox().getCenter().distanceTo(lobe) <= LOBE_RADIUS) {
+            if (target.getBoundingBox().getCenter().distanceTo(lobe) <= QuasarJetShape.LOBE_RADIUS) {
                 SpellDamage.apply(this, target, source, HOTSPOT_DAMAGE_FRACTION);
             }
         }

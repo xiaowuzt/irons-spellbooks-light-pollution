@@ -1,5 +1,9 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.SkyCollapseParams;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.SkyCollapseShape;
+import com.gang.lightpollution.fx.SkyCollapseSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -35,28 +39,13 @@ import java.util.UUID;
  * synchronized seed, so the renderer and the server-side impacts agree without
  * any extra syncing.</p>
  */
-public final class SkyCollapseEntity extends Entity {
-    public static final int LIFETIME_TICKS = 220;
-    /** The fracture spreads across the sky over this window. */
-    public static final int FRACTURE_END_TICK = 40;
-    /** First shard tears loose here. */
-    public static final int SHED_START_TICK = 44;
-    /** Ticks between successive shards tearing loose. */
-    public static final int SHED_INTERVAL_TICKS = 16;
-    /** How long a shard takes to come down. Slow: it is enormous. */
-    public static final int SHARD_FALL_TICKS = 42;
-    /** Ordinary shards, then the keystone. */
-    public static final int PLAIN_SHARDS = 6;
-    public static final int SHARD_COUNT = PLAIN_SHARDS + 1;
+public final class SkyCollapseEntity extends Entity implements SkyCollapseSource {
+    // The form lives in SkyCollapseShape, which the renderer and the public API both read, so there
+    // is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = SkyCollapseParams.SPELL_LIFETIME_TICKS;
 
     /** Radius over which shards come down, in blocks. */
     public static final double EFFECT_RADIUS = 20.0D;
-    /** Height a shard starts at, above its landing point. */
-    public static final double SHARD_FALL_HEIGHT = 120.0D;
-    /** Half-width of an ordinary shard, in blocks. */
-    public static final float SHARD_HALF_SPAN = 7.0F;
-    /** Half-width of the keystone. */
-    public static final float KEYSTONE_HALF_SPAN = 18.0F;
 
     public static final double SHARD_BLAST_RADIUS = 6.0D;
     public static final double KEYSTONE_BLAST_RADIUS = 14.0D;
@@ -120,8 +109,15 @@ public final class SkyCollapseEntity extends Entity {
     }
 
     /** How far the fracture has spread across the sky, 0 to 1. */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public SkyCollapseParams shapeParams() {
+        // groundY is unused on this side: the landing points come from the terrain instead.
+        return SkyCollapseParams.of(getSeed(), this.getY());
+    }
+
     public float fractureProgress(float partialTick) {
-        return Mth.clamp(getVisualAgeTicks(partialTick) / FRACTURE_END_TICK, 0.0F, 1.0F);
+        return SkyCollapseShape.fractureProgress(getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -129,36 +125,21 @@ public final class SkyCollapseEntity extends Entity {
      * takes its light back rather than the cracks simply switching off.
      */
     public float fractureGlow(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        int seal = impactTick(SHARD_COUNT - 1);
-        if (age <= FRACTURE_END_TICK) {
-            return fractureProgress(partialTick);
-        }
-        if (age >= seal) {
-            return 0.0F;
-        }
-        return 1.0F - Mth.clamp((age - FRACTURE_END_TICK)
-                / (float) (seal - FRACTURE_END_TICK), 0.0F, 1.0F) * 0.55F;
+        return SkyCollapseShape.fractureGlow(getVisualAgeTicks(partialTick));
     }
 
-    /** Fewest corners on a shard's outline. */
-    public static final int MIN_SHARD_CORNERS = 5;
-    /** Most corners on a shard's outline. */
-    public static final int MAX_SHARD_CORNERS = 9;
 
     /**
      * Bearing the rift runs along, in radians. Derived from the seed so the sky
      * does not split the same way twice.
      */
     public float riftBearing() {
-        return hashUnit(0, 0x1B873593L) * Mth.TWO_PI;
+        return SkyCollapseShape.riftBearing(shapeParams());
     }
 
     /** How many corners this shard's outline has. */
     public int shardCorners(int shard) {
-        int span = MAX_SHARD_CORNERS - MIN_SHARD_CORNERS + 1;
-        return MIN_SHARD_CORNERS
-                + (int) (hashUnit(shard, 0x7FEB352DL) * span) % span;
+        return SkyCollapseShape.shardCorners(shapeParams(), shard);
     }
 
     /**
@@ -167,7 +148,7 @@ public final class SkyCollapseEntity extends Entity {
      * was the single clearest tell that these were quads rather than debris.
      */
     public float shardCornerScale(int shard, int corner) {
-        return 0.42F + hashUnit(shard * 31 + corner, 0xCC9E2D51L) * 0.58F;
+        return SkyCollapseShape.shardCornerScale(shapeParams(), shard, corner);
     }
 
     /**
@@ -176,23 +157,21 @@ public final class SkyCollapseEntity extends Entity {
      * vary, and every shard still reads as the same shape.
      */
     public float shardCornerSkew(int shard, int corner) {
-        int corners = shardCorners(shard);
-        float slice = Mth.TWO_PI / corners;
-        return (hashUnit(shard * 61 + corner, 0x85EBCA77L) - 0.5F) * slice * 0.7F;
+        return SkyCollapseShape.shardCornerSkew(shapeParams(), shard, corner);
     }
 
     public static boolean isKeystone(int shard) {
-        return shard >= PLAIN_SHARDS;
+        return SkyCollapseShape.isKeystone(shard);
     }
 
     /** Tick at which a shard tears loose from the sky. */
     public static int shedTick(int shard) {
-        return SHED_START_TICK + shard * SHED_INTERVAL_TICKS;
+        return SkyCollapseShape.shedTick(shard);
     }
 
     /** Tick at which a shard lands. */
     public static int impactTick(int shard) {
-        return shedTick(shard) + SHARD_FALL_TICKS;
+        return SkyCollapseShape.impactTick(shard);
     }
 
     public static double blastRadius(int shard) {
@@ -200,13 +179,14 @@ public final class SkyCollapseEntity extends Entity {
     }
 
     public static float halfSpan(int shard) {
-        return isKeystone(shard) ? KEYSTONE_HALF_SPAN : SHARD_HALF_SPAN;
+        return isKeystone(shard) ? SkyCollapseShape.KEYSTONE_HALF_SPAN : SkyCollapseShape.SHARD_HALF_SPAN;
     }
 
     /**
      * Where a shard lands, dropped onto the terrain surface. The keystone comes
      * down on the aimed point itself — it is what the whole spell builds to.
      */
+    @Override
     public Vec3 shardLanding(int shard) {
         if (isKeystone(shard)) {
             int centre = this.level().getHeight(Heightmap.Types.MOTION_BLOCKING,
@@ -228,16 +208,8 @@ public final class SkyCollapseEntity extends Entity {
 
     /** Position of a shard's centre, or its landing point once it has hit. */
     public Vec3 shardPosition(int shard, float partialTick) {
-        Vec3 landing = shardLanding(shard);
-        float age = getVisualAgeTicks(partialTick);
-        float fall = Mth.clamp((age - shedTick(shard))
-                / (float) SHARD_FALL_TICKS, 0.0F, 1.0F);
-        // Eased rather than linear, but gently: a slab this size reads wrong if
-        // it accelerates like a pebble.
-        float eased = fall * fall * (1.7F - 0.7F * fall);
-        return new Vec3(landing.x,
-                landing.y + SHARD_FALL_HEIGHT * (1.0F - eased),
-                landing.z);
+        return SkyCollapseShape.shardPosition(shapeParams(), shardLanding(shard), shard,
+                getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -246,50 +218,21 @@ public final class SkyCollapseEntity extends Entity {
      * something that used to be whole.
      */
     public float shardTilt(int shard, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float fall = Mth.clamp((age - shedTick(shard))
-                / (float) SHARD_FALL_TICKS, 0.0F, 1.0F);
-        float lean = 0.35F + hashUnit(shard, 0xB5297A4DL) * 0.5F;
-        return fall * lean * Mth.PI;
+        return SkyCollapseShape.shardTilt(shapeParams(), shard, getVisualAgeTicks(partialTick));
     }
 
     /** Spin of a shard about its own normal, in radians. */
     public float shardSpin(int shard, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float fall = Mth.clamp((age - shedTick(shard))
-                / (float) SHARD_FALL_TICKS, 0.0F, 1.0F);
-        float turns = 0.15F + hashUnit(shard, 0x68E31DA4L) * 0.35F;
-        return hashUnit(shard, 0x2545F491L) * Mth.TWO_PI
-                + fall * turns * Mth.TWO_PI;
+        return SkyCollapseShape.shardSpin(shapeParams(), shard, getVisualAgeTicks(partialTick));
     }
 
     /** Brightness of a shard, 0 before it tears loose. */
     public float shardBrightness(int shard, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        int shed = shedTick(shard);
-        if (age < shed) {
-            return 0.0F;
-        }
-        int impact = impactTick(shard);
-        if (age < impact) {
-            float fall = (age - shed) / (float) SHARD_FALL_TICKS;
-            return 0.5F + fall * 0.5F;
-        }
-        float since = age - impact;
-        return isKeystone(shard)
-                ? Math.max(0.0F, 3.2F - since * 0.15F)
-                : Math.max(0.0F, 1.7F - since * 0.2F);
+        return SkyCollapseShape.shardBrightness(shard, getVisualAgeTicks(partialTick));
     }
 
     private float hashUnit(int shard, long salt) {
-        long hash = (getSeed() & 0xFFFFFFFFL) * 0x2545F4914F6CDD1DL
-                ^ (shard + 1L) * salt;
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >>> 33;
-        return (float) ((hash >>> 1) / (double) Long.MAX_VALUE);
+        return FxHash.unit(getSeed(), shard, salt);
     }
 
     @Override
@@ -298,7 +241,7 @@ public final class SkyCollapseEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            for (int shard = this.resolvedThrough + 1; shard < SHARD_COUNT; shard++) {
+            for (int shard = this.resolvedThrough + 1; shard < SkyCollapseShape.SHARD_COUNT; shard++) {
                 if (timelineTick < impactTick(shard)) {
                     break;
                 }

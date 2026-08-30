@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.MicroquasarParams;
+import com.gang.lightpollution.fx.MicroquasarShape;
+import com.gang.lightpollution.fx.MicroquasarSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -39,12 +42,10 @@ import java.util.UUID;
  * beam will be next. The precession phase is public and the beam is visible, so the
  * information a player needs is on screen.</p>
  */
-public final class MicroquasarEntity extends Entity {
-    public static final int LIFETIME_TICKS = 320;
-    /** The disk assembles and the jets light. */
-    public static final int SPINUP_END_TICK = 40;
-    /** The jets sweep. This is the whole spell. */
-    public static final int HOLD_END_TICK = 260;
+public final class MicroquasarEntity extends Entity implements MicroquasarSource {
+    // The form lives in MicroquasarShape, which the renderer and the public API both read, so there
+    // is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = MicroquasarParams.SPELL_LIFETIME_TICKS;
 
     /**
      * Jet speed as a fraction of c.
@@ -54,9 +55,6 @@ public final class MicroquasarEntity extends Entity {
      * receding one dim and red is computed from this, so changing it changes the
      * asymmetry that makes the pair recognisable.</p>
      */
-    public static final double JET_BETA = 0.26D;
-    /** Half-angle of the precession cone, degrees. From the kinematic model. */
-    public static final double CONE_HALF_ANGLE = 20.0D;
     /**
      * Tilt of the precession axis away from vertical, degrees.
      *
@@ -67,11 +65,6 @@ public final class MicroquasarEntity extends Entity {
      * ring the player can see coming rather than a beam that stays overhead or one that
      * scrapes along the horizon.</p>
      */
-    public static final double AXIS_TILT = 38.0D;
-    /** How far the jets reach, in blocks. */
-    public static final double JET_LENGTH = 54.0D;
-    /** Blobs drawn and tested per jet. */
-    public static final int BULLETS_PER_JET = 30;
     /**
      * Precession cycles completed while the jets are lit.
      *
@@ -79,12 +72,9 @@ public final class MicroquasarEntity extends Entity {
      * eleven seconds the jets burn, which is slow enough to read the sweep coming and fast
      * enough that the corkscrew is visibly turning rather than apparently frozen.</p>
      */
-    public static final double PRECESSION_CYCLES = 1.5D;
 
     public static final double HOVER_HEIGHT = 16.0D;
-    /** How close to the helix is a hit, in blocks. */
-    public static final double BEAM_RADIUS = 3.4D;
-    public static final double EFFECT_RADIUS = JET_LENGTH + BEAM_RADIUS + 4.0D;
+    public static final double EFFECT_RADIUS = MicroquasarShape.JET_LENGTH + MicroquasarShape.BEAM_RADIUS + 4.0D;
 
     /** Swept by the jet, as a fraction of max health. */
     private static final float JET_DAMAGE_FRACTION = 0.048F;
@@ -172,9 +162,9 @@ public final class MicroquasarEntity extends Entity {
             // orientation once per cycle and looked like a twitch. Wrapping the time only
             // works when the wrapped quantity is congruent in the quantity that matters,
             // and here that is the phase.
-            float ticksPerTurn = (HOLD_END_TICK - SPINUP_END_TICK)
-                    / (float) PRECESSION_CYCLES;
-            return SPINUP_END_TICK + (age % ticksPerTurn);
+            float ticksPerTurn = (MicroquasarShape.HOLD_END_TICK - MicroquasarShape.SPINUP_END_TICK)
+                    / (float) MicroquasarShape.PRECESSION_CYCLES;
+            return MicroquasarShape.SPINUP_END_TICK + (age % ticksPerTurn);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -189,24 +179,24 @@ public final class MicroquasarEntity extends Entity {
 
     /** How far the jets have lit, 0 to 1. */
     public float ignition(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / SPINUP_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / MicroquasarShape.SPINUP_END_TICK);
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= HOLD_END_TICK) {
+        if (age <= MicroquasarShape.HOLD_END_TICK) {
             return 0.0F;
         }
-        return Mth.clamp((age - HOLD_END_TICK)
-                / (float) (LIFETIME_TICKS - HOLD_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - MicroquasarShape.HOLD_END_TICK)
+                / (float) (LIFETIME_TICKS - MicroquasarShape.HOLD_END_TICK), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= SPINUP_END_TICK) {
+        if (age <= MicroquasarShape.SPINUP_END_TICK) {
             return ignition(partialTick);
         }
-        if (age <= HOLD_END_TICK) {
+        if (age <= MicroquasarShape.HOLD_END_TICK) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -217,19 +207,19 @@ public final class MicroquasarEntity extends Entity {
      *
      * <p>Measured from the moment the jets light, so the corkscrew starts unwound.</p>
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public MicroquasarParams shapeParams() {
+        return MicroquasarParams.of(this.entityData.get(DATA_AZIMUTH));
+    }
+
     public double precessionPhase(float ageTicks) {
-        double lit = Math.max(1.0D, HOLD_END_TICK - SPINUP_END_TICK);
-        double progress = (ageTicks - SPINUP_END_TICK) / lit;
-        return progress * PRECESSION_CYCLES * Math.PI * 2.0D;
+        return MicroquasarShape.precessionPhase(ageTicks);
     }
 
     /** The precession axis, as a unit vector. Fixed for the life of the effect. */
     public Vec3 axis() {
-        double azimuth = Math.toRadians(this.entityData.get(DATA_AZIMUTH));
-        double tilt = Math.toRadians(AXIS_TILT);
-        return new Vec3(Math.sin(tilt) * Math.cos(azimuth),
-                Math.cos(tilt),
-                Math.sin(tilt) * Math.sin(azimuth)).normalize();
+        return MicroquasarShape.axis(shapeParams());
     }
 
     private static float smoothstep(float t) {
@@ -247,13 +237,13 @@ public final class MicroquasarEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > SPINUP_END_TICK && timelineTick < HOLD_END_TICK
+            if (timelineTick > MicroquasarShape.SPINUP_END_TICK && timelineTick < MicroquasarShape.HOLD_END_TICK
                     && timelineTick % JET_INTERVAL_TICKS == 0) {
                 resolveSweep(serverLevel, timelineTick, JET_DAMAGE_FRACTION);
             }
-            if (!this.terminalResolved && timelineTick >= HOLD_END_TICK) {
+            if (!this.terminalResolved && timelineTick >= MicroquasarShape.HOLD_END_TICK) {
                 this.terminalResolved = true;
-                resolveSweep(serverLevel, HOLD_END_TICK, TERMINAL_DAMAGE_FRACTION);
+                resolveSweep(serverLevel, MicroquasarShape.HOLD_END_TICK, TERMINAL_DAMAGE_FRACTION);
             }
             if (timelineTick >= LIFETIME_TICKS) {
                 this.discard();
@@ -282,7 +272,7 @@ public final class MicroquasarEntity extends Entity {
             return;
         }
 
-        double hitSqr = BEAM_RADIUS * BEAM_RADIUS;
+        double hitSqr = MicroquasarShape.BEAM_RADIUS * MicroquasarShape.BEAM_RADIUS;
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
@@ -290,7 +280,7 @@ public final class MicroquasarEntity extends Entity {
             Vec3 at = target.getBoundingBox().getCenter();
             boolean struck = false;
             for (int side = 0; side < 2 && !struck; ++side) {
-                for (int i = 1; i <= BULLETS_PER_JET; ++i) {
+                for (int i = 1; i <= MicroquasarShape.BULLETS_PER_JET; ++i) {
                     if (bulletPosition(centre, ageTicks, side == 0, i)
                             .distanceToSqr(at) <= hitSqr) {
                         struck = true;
@@ -313,7 +303,7 @@ public final class MicroquasarEntity extends Entity {
      * shape that hits stay identical.</p>
      */
     public Vec3 bulletPosition(Vec3 centre, float ageTicks, boolean forward, int index) {
-        return helixPoint(centre, ageTicks, forward, index / (double) BULLETS_PER_JET);
+        return MicroquasarShape.bulletPosition(shapeParams(), centre, ageTicks, forward, index);
     }
 
     /**
@@ -329,29 +319,7 @@ public final class MicroquasarEntity extends Entity {
      * finely as it needs without changing how far the jet reaches.</p>
      */
     public Vec3 helixPoint(Vec3 centre, float ageTicks, boolean forward, double fraction) {
-        double travel = JET_LENGTH * fraction;
-        // Ticks since this blob left, from how far it has gone. 20 ticks per second, and
-        // JET_BETA is scaled to blocks per tick by the same constant the renderer uses.
-        double ticksAgo = travel / blocksPerTick();
-        double launchPhase = precessionPhase((float) (ageTicks - ticksAgo));
-
-        Vec3 axis = axis();
-        Vec3 side = axis.cross(new Vec3(0.0D, 1.0D, 0.0D));
-        if (side.lengthSqr() < 1.0e-6D) {
-            side = axis.cross(new Vec3(1.0D, 0.0D, 0.0D));
-        }
-        side = side.normalize();
-        Vec3 other = axis.cross(side).normalize();
-
-        double cone = Math.toRadians(CONE_HALF_ANGLE);
-        Vec3 direction = axis.scale(Math.cos(cone))
-                .add(side.scale(Math.sin(cone) * Math.cos(launchPhase)))
-                .add(other.scale(Math.sin(cone) * Math.sin(launchPhase)))
-                .normalize();
-        if (!forward) {
-            direction = direction.reverse();
-        }
-        return centre.add(direction.scale(travel));
+        return MicroquasarShape.helixPoint(shapeParams(), centre, ageTicks, forward, fraction);
     }
 
     /**
@@ -363,9 +331,7 @@ public final class MicroquasarEntity extends Entity {
      * is the only thing about the speed the eye can actually read.</p>
      */
     public static double blocksPerTick() {
-        double litTicks = HOLD_END_TICK - SPINUP_END_TICK;
-        double ticksPerTurn = litTicks / PRECESSION_CYCLES;
-        return JET_LENGTH / (ticksPerTurn * 0.2D);
+        return MicroquasarShape.blocksPerTick();
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {

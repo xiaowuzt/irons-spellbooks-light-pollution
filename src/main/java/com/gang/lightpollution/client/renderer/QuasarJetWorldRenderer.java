@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.QuasarJetEntity;
+import com.gang.lightpollution.api.QuasarJetParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.QuasarJetShape;
+import com.gang.lightpollution.fx.QuasarJetSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -59,7 +62,11 @@ public final class QuasarJetWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<QuasarJetEntity> jets = SpellLightEmitter.collectQuasarJets();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<QuasarJetSource> jets =
+                new java.util.ArrayList<>(SpellLightEmitter.collectQuasarJets());
+        jets.addAll(FxRegistry.quasarJets());
         if (jets.isEmpty()) {
             return;
         }
@@ -92,11 +99,11 @@ public final class QuasarJetWorldRenderer {
         }
     }
 
-    private static void drawChannels(List<QuasarJetEntity> jets, Vec3 camera,
+    private static void drawChannels(List<QuasarJetSource> jets, Vec3 camera,
                                      float partialTick, ShaderInstance shader) {
         BufferBuilder builder = beginTube();
         int vertices = 0;
-        for (QuasarJetEntity entity : jets) {
+        for (QuasarJetSource entity : jets) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -105,17 +112,20 @@ public final class QuasarJetWorldRenderer {
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
-            Vec3 direction = entity.direction();
-            float launched = entity.launched(partialTick);
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            QuasarJetParams params = entity.shapeParams();
+            Vec3 direction = QuasarJetShape.direction(params);
+            float launched = QuasarJetShape.launched(entity.getVisualAgeTicks(partialTick));
             // The nucleus. The jet has to be coming out of something.
             EffectCore.add(centre, 3.0D, 0.92F, 0.95F, 1.00F, brightness * 2.1F);
-            double reach = QuasarJetEntity.JET_LENGTH * launched;
+            double reach = QuasarJetShape.JET_LENGTH * launched;
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 210.0F));
 
             vertices += CurveTube.emit(builder, camera, CHANNEL_SEGMENTS, 0.0D, 1.0D,
                     fraction -> centre.add(direction.scale(reach * fraction)),
                     // Flares a little with distance, as the confining pressure drops.
-                    fraction -> QuasarJetEntity.JET_HALF_WIDTH * (1.0D + fraction * 0.5D),
+                    fraction -> QuasarJetShape.JET_HALF_WIDTH * (1.0D + fraction * 0.5D),
                     // aux 1: this jet is the approaching one. A quasar throws two, but beaming
                     // makes the receding one invisible, so only one is ever drawn.
                     CurveTube.MODE_JET, 1.0F,
@@ -125,11 +135,11 @@ public final class QuasarJetWorldRenderer {
     }
 
     /** The knots and the terminal lobe, both as camera-facing discs. */
-    private static void drawBodies(List<QuasarJetEntity> jets, Vec3 camera,
+    private static void drawBodies(List<QuasarJetSource> jets, Vec3 camera,
                                    float partialTick, ShaderInstance shader) {
         BufferBuilder builder = beginFlat();
         int vertices = 0;
-        for (QuasarJetEntity entity : jets) {
+        for (QuasarJetSource entity : jets) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -139,13 +149,14 @@ public final class QuasarJetWorldRenderer {
                 continue;
             }
             float age = entity.getVisualAgeTicks(partialTick);
+            QuasarJetParams params = entity.shapeParams();
 
-            for (int knot = 0; knot < QuasarJetEntity.KNOT_COUNT; ++knot) {
-                Vec3 at = entity.knotPosition(centre, knot, age);
+            for (int knot = 0; knot < QuasarJetShape.KNOT_COUNT; ++knot) {
+                Vec3 at = QuasarJetShape.knotPosition(params, centre, knot, age);
                 if (at == null) {
                     continue;
                 }
-                double progress = entity.knotProgress(knot, age);
+                double progress = QuasarJetShape.knotProgress(knot, age);
                 // Knots dim as they go, as the emitting material expands and cools.
                 float shade = (float) (1.0D - progress * 0.45D);
                 vertices += disc(builder, camera, at, KNOT_RADIUS,
@@ -153,9 +164,9 @@ public final class QuasarJetWorldRenderer {
                                 brightness * shade * 0.95F));
             }
 
-            if (entity.launched(partialTick) > 0.98F) {
-                vertices += disc(builder, camera, entity.lobeCentre(centre),
-                        QuasarJetEntity.LOBE_RADIUS,
+            if (QuasarJetShape.launched(age) > 0.98F) {
+                vertices += disc(builder, camera, QuasarJetShape.lobeCentre(params, centre),
+                        QuasarJetShape.LOBE_RADIUS,
                         CurveRibbon.pack(LOBE_R, LOBE_G, LOBE_B, brightness * 0.55F));
             }
         }

@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.MagnetarParams;
+import com.gang.lightpollution.fx.MagnetarShape;
+import com.gang.lightpollution.fx.MagnetarSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -38,14 +41,12 @@ import java.util.UUID;
  * That makes the hazard a set of curved loops with gaps between them: unlike every sphere
  * in this set, where you stand inside the radius matters.</p>
  */
-public final class MagnetarEntity extends Entity {
-    public static final int LIFETIME_TICKS = 300;
-    /** The star appears and the field lines thread out. */
-    public static final int THREAD_END_TICK = 36;
-    /** The magnetosphere winds up. Field lines twist and brighten. */
-    public static final int WIND_END_TICK = 230;
+public final class MagnetarEntity extends Entity implements MagnetarSource {
+    // The form of the magnetar lives in MagnetarShape, which the renderer and the public API both
+    // read, so there is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = MagnetarParams.SPELL_LIFETIME_TICKS;
     /** The rearrangement. One pulse, and the loops snap open. */
-    public static final int FLARE_TICK = WIND_END_TICK;
+    public static final int FLARE_TICK = MagnetarShape.FLARE_TICK;
 
     /**
      * Field line count.
@@ -54,22 +55,14 @@ public final class MagnetarEntity extends Entity {
      * with visible gaps between the loops, which is the point — a solid shell of them would
      * just be a sphere again.</p>
      */
-    public static final int FIELD_LINES = 14;
-    /** How far the outermost loop reaches from the star, in blocks. */
-    public static final double FIELD_REACH = 19.0D;
     /**
      * Radius of the neutron star itself, in blocks.
      *
      * <p>Load-bearing rather than decorative: the field lines terminate on it, so it is what
      * separates each loop's two ends and lets the loop close visibly.</p>
      */
-    public static final double STAR_RADIUS = 2.1D;
-    /** Half-width of a loop's ribbon, in blocks. */
-    public static final double LOOP_HALF_WIDTH = 0.42D;
     /** How close to a loop counts as touching it, in blocks. */
     public static final double LOOP_TOUCH_RADIUS = 2.1D;
-    /** Turns the magnetosphere twists through as it winds up. */
-    public static final double TWIST_TURNS = 0.85D;
 
     public static final double HOVER_HEIGHT = 9.0D;
     public static final double FLARE_RADIUS = 22.0D;
@@ -166,8 +159,8 @@ public final class MagnetarEntity extends Entity {
             // is always at the white-hot end of its ramp, so the violet it starts from is never
             // visible and the effect looks like it only has one colour. Stopping short of the
             // flare still avoids blanking the view every cycle.
-            float span = WIND_END_TICK - THREAD_END_TICK;
-            return THREAD_END_TICK + (age % span);
+            float span = MagnetarShape.WIND_END_TICK - MagnetarShape.THREAD_END_TICK;
+            return MagnetarShape.THREAD_END_TICK + (age % span);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -181,37 +174,29 @@ public final class MagnetarEntity extends Entity {
     }
 
     /** The magnetic axis, as a unit vector. */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public MagnetarParams shapeParams() {
+        return MagnetarParams.of(azimuth());
+    }
+
     public Vec3 axis() {
-        double azimuth = Math.toRadians(azimuth());
-        // Leaned over rather than upright, because a dipole standing straight up hides its
-        // loops behind each other from a viewer on the ground.
-        double tilt = Math.toRadians(28.0D);
-        return new Vec3(Math.sin(tilt) * Math.cos(azimuth), Math.cos(tilt),
-                Math.sin(tilt) * Math.sin(azimuth)).normalize();
+        return MagnetarShape.axis(shapeParams());
     }
 
     /** How far the field has threaded out, 0 to 1. */
     public float threaded(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / THREAD_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / MagnetarShape.THREAD_END_TICK);
     }
 
     /** How far the magnetosphere has wound up, 0 to 1. */
     public float wound(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= THREAD_END_TICK) {
-            return 0.0F;
-        }
-        return Mth.clamp((age - THREAD_END_TICK)
-                / (float) (WIND_END_TICK - THREAD_END_TICK), 0.0F, 1.0F);
+        return MagnetarShape.wound(getVisualAgeTicks(partialTick));
     }
 
     /** The flare itself, 1 at the instant it goes and decaying after. */
     public float flare(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - FLARE_TICK;
-        if (since < 0.0F || since > 26.0F) {
-            return 0.0F;
-        }
-        return 1.0F - since / 26.0F;
+        return MagnetarShape.flare(getVisualAgeTicks(partialTick), FLARE_TICK);
     }
 
     public float fade(float partialTick) {
@@ -225,10 +210,10 @@ public final class MagnetarEntity extends Entity {
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= THREAD_END_TICK) {
+        if (age <= MagnetarShape.THREAD_END_TICK) {
             return threaded(partialTick);
         }
-        if (age <= WIND_END_TICK) {
+        if (age <= MagnetarShape.WIND_END_TICK) {
             // Brightens as it winds: the field is being stressed, and that is the tell
             // that the flare is coming.
             return 1.0F + wound(partialTick) * 0.8F;
@@ -250,51 +235,11 @@ public final class MagnetarEntity extends Entity {
      * winds the loop about the axis as the magnetosphere is stressed, which is the
      * rearrangement that eventually lets go.</p>
      *
-     * @param line  which loop, 0 to FIELD_LINES-1
+     * @param line  which loop, 0 to MagnetarShape.FIELD_LINES-1
      * @param along position along the loop, 0 at one pole to 1 at the other
      */
     public Vec3 fieldPoint(Vec3 centre, int line, double along, float woundFraction) {
-        Vec3 axis = axis();
-        Vec3 side = axis.cross(new Vec3(0.0D, 1.0D, 0.0D));
-        if (side.lengthSqr() < 1.0e-6D) {
-            side = axis.cross(new Vec3(1.0D, 0.0D, 0.0D));
-        }
-        side = side.normalize();
-        Vec3 other = axis.cross(side).normalize();
-
-        // theta from 0 (one pole) to pi (the other).
-        double theta = along * Math.PI;
-        double sin = Math.sin(theta);
-        double cos = Math.cos(theta);
-        // Alternating loop sizes so the shell has structure instead of one nested set.
-        double scale = 0.45D + 0.55D * ((line % 3) / 2.0D);
-        double shell = FIELD_REACH * scale;
-
-        // The dipole field line in cylindrical form. From r = L sin^2(theta):
-        //     rho = r sin(theta) = L sin^3(theta)
-        //     z   = r cos(theta) = L sin^2(theta) cos(theta)
-        //
-        // Written out this way rather than as r divided by sin, which is what it was before.
-        // That version needed a clamp to survive the poles, and the clamp flattened the loops
-        // so hard that both ends collapsed onto the star's centre — every line ran out from
-        // the middle and back into it, which is why they read as open arcs with loose ends
-        // instead of as closed loops.
-        double rho = shell * sin * sin * sin;
-        double z = shell * sin * sin * cos;
-
-        // Anchor the ends on the star's surface rather than at a point. A mathematical dipole
-        // is a point and its lines all return to it; a real one has a body, and the lines
-        // terminate at two separated magnetic poles. That separation is what makes each loop
-        // visibly leave somewhere and arrive somewhere else.
-        z += STAR_RADIUS * cos;
-
-        // The twist has to vanish at both ends, or the two ends of one line sit at different
-        // azimuths and the loop cannot close. sin^2 goes to zero at both poles.
-        double azimuth = 2.0D * Math.PI * line / FIELD_LINES
-                + woundFraction * TWIST_TURNS * Math.PI * 2.0D * sin * sin;
-
-        Vec3 radial = side.scale(Math.cos(azimuth)).add(other.scale(Math.sin(azimuth)));
-        return centre.add(axis.scale(z)).add(radial.scale(rho));
+        return MagnetarShape.fieldPoint(shapeParams(), centre, line, along, woundFraction);
     }
 
     @Override
@@ -307,7 +252,7 @@ public final class MagnetarEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > THREAD_END_TICK && timelineTick < FLARE_TICK
+            if (timelineTick > MagnetarShape.THREAD_END_TICK && timelineTick < FLARE_TICK
                     && timelineTick % FIELD_INTERVAL_TICKS == 0) {
                 resolveField(serverLevel, timelineTick);
             }
@@ -350,7 +295,7 @@ public final class MagnetarEntity extends Entity {
             }
             Vec3 at = target.getBoundingBox().getCenter();
             boolean touching = false;
-            for (int line = 0; line < FIELD_LINES && !touching; ++line) {
+            for (int line = 0; line < MagnetarShape.FIELD_LINES && !touching; ++line) {
                 for (int i = 1; i < samples; ++i) {
                     if (fieldPoint(centre, line, i / (double) samples, woundFraction)
                             .distanceToSqr(at) <= touchSqr) {

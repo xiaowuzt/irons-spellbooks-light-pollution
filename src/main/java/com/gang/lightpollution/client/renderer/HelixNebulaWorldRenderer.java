@@ -1,8 +1,11 @@
 package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.api.HelixNebulaParams;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.HelixNebulaEntity;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.HelixNebulaShape;
+import com.gang.lightpollution.fx.HelixNebulaSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -66,7 +69,11 @@ public final class HelixNebulaWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<HelixNebulaEntity> nebulae = SpellLightEmitter.collectHelixNebulae();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<HelixNebulaSource> nebulae =
+                new java.util.ArrayList<>(SpellLightEmitter.collectHelixNebulae());
+        nebulae.addAll(FxRegistry.helixNebulae());
         if (nebulae.isEmpty()) {
             return;
         }
@@ -97,66 +104,38 @@ public final class HelixNebulaWorldRenderer {
         }
     }
 
-    private static void drawKnots(List<HelixNebulaEntity> nebulae, Vec3 camera,
+    private static void drawKnots(List<HelixNebulaSource> nebulae, Vec3 camera,
                                   float partialTick, ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
 
-        for (HelixNebulaEntity entity : nebulae) {
-            float brightness = entity.brightness(partialTick);
+        for (HelixNebulaSource nebula : nebulae) {
+            float brightness = nebula.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
             }
-            Vec3 centre = entity.centre(partialTick);
+            Vec3 centre = nebula.centre(partialTick);
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
-            float age = entity.getVisualAgeTicks(partialTick);
-            double inner = entity.shellRadius(age);
-            double outer = inner * HelixNebulaEntity.OUTER_RING_SCALE;
+            float age = nebula.getVisualAgeTicks(partialTick);
             // The white dwarf. It is what ionises every knot in the shell, and it was not
             // being drawn at all.
             EffectCore.add(centre, 1.5D, 0.80F, 0.92F, 1.00F, brightness * 1.9F);
 
-            // A stable frame for the rings, tilted so the pair reads as an oval eye
-            // rather than a circle seen face-on.
-            double azimuth = Math.toRadians(entity.azimuth());
-            double tilt = Math.toRadians(HelixNebulaEntity.RING_INCLINATION);
-            Vec3 normal = new Vec3(Math.sin(tilt) * Math.cos(azimuth), Math.cos(tilt),
-                    Math.sin(tilt) * Math.sin(azimuth)).normalize();
-            Vec3 axisU = normal.cross(new Vec3(0.0D, 1.0D, 0.0D));
-            if (axisU.lengthSqr() < 1.0e-6D) {
-                axisU = normal.cross(new Vec3(1.0D, 0.0D, 0.0D));
-            }
-            axisU = axisU.normalize();
-            Vec3 axisV = normal.cross(axisU).normalize();
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            HelixNebulaParams params = nebula.shapeParams();
+            HelixNebulaShape.Frame frame = HelixNebulaShape.frame(params);
 
-            int seed = entity.getSeed();
-            for (int i = 0; i < HelixNebulaEntity.KNOT_COUNT; ++i) {
-                boolean outerRing = (i & 1) == 0;
-                double ringRadius = outerRing ? outer : inner;
-
-                // Placement hashed off the synced seed, so both sides agree and every cast
-                // has its knots somewhere different.
-                double angle = hash(seed, i, 1) * Math.PI * 2.0D;
-                // Scattered through the shell's thickness rather than pinned to a circle,
-                // because the knots occupy a layer, not a wire.
-                double radial = ringRadius
-                        + (hash(seed, i, 2) - 0.5D) * HelixNebulaEntity.SHELL_THICKNESS * 2.0D;
-                double outOfPlane = (hash(seed, i, 3) - 0.5D)
-                        * HelixNebulaEntity.SHELL_THICKNESS * 1.4D;
-
-                Vec3 radialDir = axisU.scale(Math.cos(angle))
-                        .add(axisV.scale(Math.sin(angle)));
-                Vec3 at = centre.add(radialDir.scale(radial))
-                        .add(normal.scale(outOfPlane));
-                if (camera.distanceToSqr(at) > RENDER_DISTANCE_SQR) {
+            for (int i = 0; i < HelixNebulaShape.KNOT_COUNT; ++i) {
+                HelixNebulaShape.Knot knot =
+                        HelixNebulaShape.knot(params, centre, frame, age, i);
+                if (camera.distanceToSqr(knot.at()) > RENDER_DISTANCE_SQR) {
                     continue;
                 }
-
-                float shade = 0.55F + 0.45F * (float) hash(seed, i, 4);
-                vertices += knot(builder, camera, at, radialDir, brightness * shade,
-                        outerRing);
+                vertices += knot(builder, camera, knot.at(), knot.outward(),
+                        brightness * knot.shade(), knot.outerRing());
             }
         }
         draw(builder, shader, vertices);
@@ -215,15 +194,6 @@ public final class HelixNebulaWorldRenderer {
 
     private static int channel(float value) {
         return (int) Math.max(0.0F, Math.min(255.0F, value * 255.0F));
-    }
-
-    /** Stable hash in [0,1) from the synced seed, a knot index and a field selector. */
-    private static double hash(int seed, int index, int field) {
-        int h = seed * 73_856_093 ^ index * 19_349_663 ^ field * 83_492_791;
-        h ^= h >>> 13;
-        h *= 1_274_126_177;
-        h ^= h >>> 16;
-        return (h & 0x7FFFFFFF) / (double) 0x7FFFFFFF;
     }
 
     private static BufferBuilder begin() {

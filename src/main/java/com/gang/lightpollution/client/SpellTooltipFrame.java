@@ -104,7 +104,19 @@ public final class SpellTooltipFrame {
     private SpellTooltipFrame() {
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGH)
+    /**
+     * HIGHEST, not HIGH, and that is load-bearing for ModernUI compatibility.
+     *
+     * <p>ModernUI listens for this event at HIGH, draws a complete tooltip — frame, border, title
+     * rule and all the text — and only cancels at LOW. Forge checks cancellation per listener at
+     * invoke time rather than breaking out of the loop, so a cancel suppresses listeners that run
+     * later and nothing that has already run. At equal priority the order is registration order, and
+     * ModernUI registers during mod construction, so it drew first and this drew second: two frames,
+     * each with its own text, and an apparent offset because our box is deliberately wider than
+     * vanilla's. Cancelling from HIGHEST suppresses their draw instead, since neither of their
+     * handlers sets receiveCanceled.</p>
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onTooltipPre(RenderTooltipEvent.Pre event) {
         TooltipStyle style = SpellLightConfig.tooltipStyle;
         if (style == TooltipStyle.VANILLA) {
@@ -140,6 +152,14 @@ public final class SpellTooltipFrame {
         GuiGraphics graphics = event.getGraphics();
 
         if (style == TooltipStyle.PANEL) {
+            // PANEL is the one style that does not cancel: it draws behind whatever lays the
+            // tooltip out. When ModernUI has replaced that layout there is nothing to sit behind —
+            // its box is a different size and in a different place — so this stands down and lets
+            // ModernUI's own frame be the frame. The alternative would be a panel that cannot
+            // align with the text in front of it.
+            if (net.minecraftforge.fml.ModList.get().isLoaded("modernui")) {
+                return;
+            }
             graphics.pose().pushPose();
             // Under vanilla's 400, so vanilla's text lands on top of this.
             graphics.pose().translate(0.0F, 0.0F, 380.0F);

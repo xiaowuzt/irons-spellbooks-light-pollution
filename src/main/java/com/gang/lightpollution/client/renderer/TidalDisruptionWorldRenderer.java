@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.TidalDisruptionEntity;
+import com.gang.lightpollution.api.TidalDisruptionParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.TidalDisruptionShape;
+import com.gang.lightpollution.fx.TidalDisruptionSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -47,7 +50,11 @@ public final class TidalDisruptionWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<TidalDisruptionEntity> events = SpellLightEmitter.collectTidalDisruptions();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<TidalDisruptionSource> events =
+                new java.util.ArrayList<>(SpellLightEmitter.collectTidalDisruptions());
+        events.addAll(FxRegistry.tidalDisruptions());
         if (events.isEmpty()) {
             return;
         }
@@ -78,12 +85,12 @@ public final class TidalDisruptionWorldRenderer {
         }
     }
 
-    private static void drawStreams(List<TidalDisruptionEntity> events, Vec3 camera,
+    private static void drawStreams(List<TidalDisruptionSource> events, Vec3 camera,
                                     float partialTick, ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
 
-        for (TidalDisruptionEntity entity : events) {
+        for (TidalDisruptionSource entity : events) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -101,9 +108,13 @@ public final class TidalDisruptionWorldRenderer {
                     1.00F, 0.86F, 0.70F, brightness * (0.7F + flare * 3.2F));
 
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
+            // Straight to the shared shape maths rather than through a method on the source. The
+            // renderer works the same for a spell anchor and an API instance because both hand over
+            // the same params, and routing through the implementation would undo that.
+            TidalDisruptionParams params = entity.shapeParams();
             vertices += CurveTube.emit(builder, camera, SEGMENTS, 0.0D, 1.0D,
-                    fraction -> entity.streamPoint(centre, age, fraction),
-                    TidalDisruptionEntity::streamWidth,
+                    fraction -> TidalDisruptionShape.streamPoint(params, centre, age, fraction),
+                    fraction -> TidalDisruptionShape.streamWidth(params, fraction),
                     CurveTube.MODE_DEBRIS, 0.0F,
                     Math.min(1.0F, brightness * 0.16F), alpha);
         }

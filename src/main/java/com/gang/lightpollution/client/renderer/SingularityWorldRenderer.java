@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.SingularityEntity;
+import com.gang.lightpollution.api.SingularityParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.SingularityShape;
+import com.gang.lightpollution.fx.SingularitySource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -75,7 +78,11 @@ public final class SingularityWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<SingularityEntity> effects = SpellLightEmitter.collectSingularities();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<SingularitySource> effects =
+                new java.util.ArrayList<>(SpellLightEmitter.collectSingularities());
+        effects.addAll(FxRegistry.singularities());
         if (effects.isEmpty()) {
             return;
         }
@@ -96,7 +103,7 @@ public final class SingularityWorldRenderer {
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
 
-            for (SingularityEntity entity : effects) {
+            for (SingularitySource entity : effects) {
                 Vec3 centre = entity.coreCentre(partialTick);
                 if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                     continue;
@@ -112,7 +119,7 @@ public final class SingularityWorldRenderer {
             if (boltShader != null) {
                 BufferBuilder bolts = begin();
                 int boltVertices = 0;
-                for (SingularityEntity entity : effects) {
+                for (SingularitySource entity : effects) {
                     if (camera.distanceToSqr(entity.coreCentre(partialTick))
                             > RENDER_DISTANCE_SQR) {
                         continue;
@@ -128,16 +135,16 @@ public final class SingularityWorldRenderer {
         }
     }
 
-    private static void drawCore(Vec3 camera, SingularityEntity entity,
+    private static void drawCore(Vec3 camera, SingularitySource entity,
                                  float partialTick, ShaderInstance shader) {
-        float radius = entity.coreRadius(partialTick);
-        float brightness = entity.coreBrightness(partialTick);
+        float radius = SingularityShape.coreRadius(entity.shapeParams(), entity.getVisualAgeTicks(partialTick));
+        float brightness = SingularityShape.coreBrightness(entity.getVisualAgeTicks(partialTick));
         if (radius <= 0.02F || brightness <= 0.02F) {
             return;
         }
         // g in the low band selects the core branch.
         emitSphere(camera, entity.coreCentre(partialTick), radius, CORE_HULL_SCALE,
-                entity.charge(partialTick), 0.15F,
+                SingularityShape.charge(entity.getVisualAgeTicks(partialTick)), 0.15F,
                 Mth.clamp(brightness * 0.3F, 0.0F, 1.0F), 1.0F, shader);
     }
 
@@ -172,16 +179,16 @@ public final class SingularityWorldRenderer {
      * nothing, so without a real occluding body the hole was only ever the ring
      * around it.</p>
      */
-    private static void drawBody(Vec3 camera, SingularityEntity entity,
+    private static void drawBody(Vec3 camera, SingularitySource entity,
                                  float partialTick, ShaderInstance shader) {
-        float radius = entity.coreRadius(partialTick);
+        float radius = SingularityShape.coreRadius(entity.shapeParams(), entity.getVisualAgeTicks(partialTick));
         if (radius <= 0.02F) {
             return;
         }
         // Scale so the outermost cube matches the core's radius.
         float unit = radius / OUTLINE_EXTENT;
         float age = entity.getVisualAgeTicks(partialTick);
-        float charge = entity.charge(partialTick);
+        float charge = SingularityShape.charge(entity.getVisualAgeTicks(partialTick));
         // Spins faster as it charges, which is most of what makes it read as
         // winding up rather than just sitting there.
         float spin = age * (0.02F + charge * 0.10F);
@@ -306,23 +313,23 @@ public final class SingularityWorldRenderer {
      * faster and faster.
      */
     private static int emitBolts(BufferBuilder builder, Vec3 camera,
-                                 SingularityEntity entity, float partialTick) {
+                                 SingularitySource entity, float partialTick) {
         float age = entity.getVisualAgeTicks(partialTick);
-        if (age <= SingularityEntity.OPEN_END_TICK
-                || age >= SingularityEntity.COLLAPSE_TICK) {
+        if (age <= SingularityShape.OPEN_END_TICK
+                || age >= SingularityShape.COLLAPSE_TICK) {
             return 0;
         }
-        float charge = entity.charge(partialTick);
+        float charge = SingularityShape.charge(entity.getVisualAgeTicks(partialTick));
         Vec3 centre = entity.coreCentre(partialTick);
-        int interval = entity.boltInterval(partialTick);
+        int interval = SingularityShape.boltInterval(entity.getVisualAgeTicks(partialTick));
         int bucket = (int) (age / interval);
         // More of them at once as it winds up, not just faster.
-        int count = 2 + Math.round(charge * (SingularityEntity.MAX_BOLTS - 2));
+        int count = 2 + Math.round(charge * (SingularityShape.MAX_BOLTS - 2));
 
         int vertices = 0;
         for (int bolt = 0; bolt < count; bolt++) {
-            Vec3 direction = entity.boltDirection(bolt, bucket);
-            float length = entity.boltLength(bolt, bucket) * (0.4F + charge * 0.6F);
+            Vec3 direction = SingularityShape.boltDirection(entity.shapeParams(), bolt, bucket);
+            float length = SingularityShape.boltLength(entity.shapeParams(), bolt, bucket) * (0.4F + charge * 0.6F);
             vertices += SpellBoltRenderer.emit(builder, camera, centre,
                     centre.add(direction.scale(length)),
                     1.2F + charge * 1.6F, 1.0F,
@@ -339,9 +346,9 @@ public final class SingularityWorldRenderer {
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
         float shake = 0.0F;
-        for (SingularityEntity entity : SpellLightEmitter.collectSingularities()) {
+        for (SingularitySource entity : SpellLightEmitter.collectSingularities()) {
             float since = entity.getVisualAgeTicks(partialTick)
-                    - SingularityEntity.COLLAPSE_TICK;
+                    - SingularityShape.COLLAPSE_TICK;
             if (since < 0.0F || since > SHAKE_TICKS) {
                 continue;
             }

@@ -123,7 +123,8 @@ public final class GeminiKillEffectWorldRenderer {
             if (remove) INSTANCES.remove(entity);
             return remove;
         });
-        if (ACTIVE.isEmpty()) {
+        if (ACTIVE.isEmpty()
+                && com.gang.lightpollution.fx.FxRegistry.funeralNovas().isEmpty()) {
             POST_STATES.clear();
             return;
         }
@@ -153,6 +154,30 @@ public final class GeminiKillEffectWorldRenderer {
                     continue;
                 }
                 renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition, visual, age);
+                rendered++;
+            }
+            // Anything another mod asked for through the API. These are stepped by the registry's
+            // own tick rather than from an entity's age, so nothing is advanced here.
+            for (com.gang.lightpollution.fx.FuneralNovaSource source
+                    : com.gang.lightpollution.fx.FxRegistry.funeralNovas()) {
+                if (rendered >= MAX_EFFECTS) {
+                    break;
+                }
+                GeminiKillEffectVisualInstance visual = source.visual();
+                float age = com.gang.lightpollution.fx.FxRegistry.funeralNovaAge(source);
+                int stage = visual.currentStage(age);
+                if (stage < 0) {
+                    continue;
+                }
+                Vec3 at = visual.position();
+                POST_STATES.add(new PostFrameState(at.add(0.0D, 1.5D, 0.0D), stage,
+                        visual.stageProgress(age), age, 1.0F, visual.chainFade(age)));
+                if (!GeminiKillEffectShaders.ready()
+                        || cameraPosition.distanceToSqr(at) > RENDER_DISTANCE_SQR) {
+                    continue;
+                }
+                renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition,
+                        visual, age);
                 rendered++;
             }
         } finally {

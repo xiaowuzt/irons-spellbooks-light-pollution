@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.MagnetarEntity;
+import com.gang.lightpollution.api.MagnetarParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.MagnetarShape;
+import com.gang.lightpollution.fx.MagnetarSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -60,7 +63,11 @@ public final class MagnetarWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<MagnetarEntity> stars = SpellLightEmitter.collectMagnetars();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<MagnetarSource> stars =
+                new java.util.ArrayList<>(SpellLightEmitter.collectMagnetars());
+        stars.addAll(FxRegistry.magnetars());
         if (stars.isEmpty()) {
             return;
         }
@@ -91,12 +98,12 @@ public final class MagnetarWorldRenderer {
         }
     }
 
-    private static void drawField(List<MagnetarEntity> stars, Vec3 camera,
+    private static void drawField(List<MagnetarSource> stars, Vec3 camera,
                                   float partialTick, ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
 
-        for (MagnetarEntity entity : stars) {
+        for (MagnetarSource entity : stars) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -106,16 +113,19 @@ public final class MagnetarWorldRenderer {
                 continue;
             }
             float woundFraction = entity.wound(partialTick);
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            MagnetarParams params = entity.shapeParams();
             // The neutron star. Without it the loops encircle nothing and the middle of the
             // effect is empty, which is what the field lines are supposed to be anchored to.
-            EffectCore.add(centre, MagnetarEntity.STAR_RADIUS,
+            EffectCore.add(centre, MagnetarShape.STAR_RADIUS,
                     0.86F, 0.80F, 1.00F, brightness * (1.0F + woundFraction * 1.4F));
 
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
-            for (int line = 0; line < MagnetarEntity.FIELD_LINES; ++line) {
+            for (int line = 0; line < MagnetarShape.FIELD_LINES; ++line) {
                 final int index = line;
                 vertices += CurveTube.emit(builder, camera, RIBBON_SEGMENTS, 0.0D, 1.0D,
-                        along -> entity.fieldPoint(centre, index, along, woundFraction),
+                        along -> MagnetarShape.fieldPoint(params, centre, index, along, woundFraction),
                         // Thicker at the poles where the field crowds, thinner at the bulge.
                         along -> FIELD_RADIUS
                                 * (0.55D + 0.45D * Math.abs(Math.cos(along * Math.PI))),

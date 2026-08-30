@@ -3,6 +3,7 @@ package com.gang.lightpollution.client;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.renderer.SpellLightEmitter;
 import com.gang.lightpollution.entity.ConstellationEntity;
+import com.gang.lightpollution.fx.ConstellationShape;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
@@ -44,7 +45,7 @@ public final class ConstellationClientEvents {
 
         for (ConstellationEntity entity : SpellLightEmitter.collectConstellations()) {
             int age = entity.getTimelineAgeTicks();
-            for (int star = 0; star < ConstellationEntity.STAR_COUNT; star++) {
+            for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
                 float brightness = entity.starBrightness(star, 1.0F);
                 if (brightness <= 0.05F) {
                     continue;

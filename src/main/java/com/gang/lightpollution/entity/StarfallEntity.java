@@ -1,6 +1,10 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.api.StarfallParams;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.StarfallShape;
+import com.gang.lightpollution.fx.StarfallSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -41,44 +45,15 @@ import java.util.UUID;
  * on the ground never stop sweeping. The exception is the finale, which is one
  * colossal body falling on the aimed point.</p>
  */
-public final class StarfallEntity extends Entity {
-    public static final int LIFETIME_TICKS = 310;
-    public static final int OMEN_END_TICK = 40;
-    public static final int RAIN_END_TICK = 240;
-    public static final int FINALE_TICK = 240;
-    public static final int FADE_START_TICK = 290;
+public final class StarfallEntity extends Entity implements StarfallSource {
+    // The form lives in StarfallShape, which the renderer and the public API both read, so there is
+    // one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = StarfallParams.SPELL_LIFETIME_TICKS;
 
-    /** Ticks between successive meteors during the rain. */
-    public static final int SPAWN_INTERVAL_TICKS = 5;
-    /**
-     * How long a rain meteor takes to fall. Short on purpose: a meteor that takes
-     * its time reads as a drifting light rather than something arriving at speed.
-     */
-    public static final int FALL_TICKS = 16;
-    /**
-     * How long the finale takes. Longer than a rain meteor despite falling
-     * further: a body that size going past at the same speed is over before it
-     * registers, and the whole point of it is that you watch it come.
-     */
-    public static final int FINALE_FALL_TICKS = 34;
-    /**
-     * How far a meteor's path leans off vertical, in degrees. Straight down gives
-     * the camera almost no parallax, so the body appears to hang instead of move.
-     */
-    public static final double ENTRY_ANGLE_DEGREES = 30.0D;
     /** Meteors in the rain phase, then the single finale. */
-    public static final int RAIN_METEORS =
-            (RAIN_END_TICK - OMEN_END_TICK) / SPAWN_INTERVAL_TICKS;
-    /** One. Three of them split the attention that should be on one arrival. */
-    public static final int FINALE_METEORS = 1;
-    public static final int METEOR_COUNT = RAIN_METEORS + FINALE_METEORS;
 
     /** Radius of the bombarded area, in blocks. */
     public static final double EFFECT_RADIUS = 14.0D;
-    /** Height a rain meteor falls from, above its landing point. */
-    public static final double FALL_HEIGHT = 42.0D;
-    /** Height the finale falls from. Higher, so there is time to see it coming. */
-    public static final double FINALE_FALL_HEIGHT = 96.0D;
 
     public static final double RAIN_BLAST_RADIUS = 2.5D;
     public static final double FINALE_BLAST_RADIUS = 9.0D;
@@ -86,7 +61,6 @@ public final class StarfallEntity extends Entity {
     /** The finale's damage, consolidated from what used to be three bodies. */
     private static final float FINALE_DAMAGE_FRACTION = 0.28F;
     /** Fraction of rain meteors that shed a visible shock ring. */
-    private static final float SHOCK_RING_CHANCE = 0.3F;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             StarfallEntity.class, EntityDataSerializers.INT);
@@ -145,29 +119,29 @@ public final class StarfallEntity extends Entity {
     }
 
     public static boolean isFinaleMeteor(int meteor) {
-        return meteor >= RAIN_METEORS;
+        return StarfallShape.isFinaleMeteor(meteor);
     }
 
     /** Tick at which a meteor begins to fall. */
     public static int spawnTick(int meteor) {
-        return isFinaleMeteor(meteor)
-                ? FINALE_TICK
-                : OMEN_END_TICK + meteor * SPAWN_INTERVAL_TICKS;
+        return StarfallShape.spawnTick(meteor);
     }
 
     /** Tick at which a meteor lands. */
     public static int impactTick(int meteor) {
-        return spawnTick(meteor) + fallTicks(meteor);
+        return StarfallShape.impactTick(meteor);
     }
 
     /** How long this meteor spends falling. */
     public static int fallTicks(int meteor) {
-        return isFinaleMeteor(meteor) ? FINALE_FALL_TICKS : FALL_TICKS;
+        return StarfallShape.fallTicks(meteor);
     }
 
     /** How high above its landing point this meteor starts. */
     public static double fallHeight(int meteor) {
-        return isFinaleMeteor(meteor) ? FINALE_FALL_HEIGHT : FALL_HEIGHT;
+        return StarfallShape.isFinaleMeteor(meteor)
+                ? StarfallShape.FINALE_FALL_HEIGHT
+                : StarfallShape.FALL_HEIGHT;
     }
 
     public static double blastRadius(int meteor) {
@@ -188,6 +162,7 @@ public final class StarfallEntity extends Entity {
      * heightmap for loaded chunks, so a meteor never detonates inside a hillside
      * or hangs in the air above a valley.
      */
+    @Override
     public Vec3 meteorLanding(int meteor) {
         // The finale lands on the aimed point itself. It is the arrival the whole
         // spell has been building to, so it should not be off to one side.
@@ -217,8 +192,7 @@ public final class StarfallEntity extends Entity {
      * ones. The finale always has one.</p>
      */
     public boolean hasShockRing(int meteor) {
-        return isFinaleMeteor(meteor)
-                || hashUnit(meteor, 0x27D4EB2FL) < SHOCK_RING_CHANCE;
+        return StarfallShape.hasShockRing(shapeParams(), meteor);
     }
 
     /**
@@ -230,33 +204,26 @@ public final class StarfallEntity extends Entity {
      * arrives from assorted bearings instead of all sharing one, which would look
      * like a volley rather than a shower.</p>
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public StarfallParams shapeParams() {
+        // groundY is unused on this side: the landing points come from the terrain instead.
+        return StarfallParams.of(getSeed(), this.getY());
+    }
+
     public Vec3 meteorHeading(int meteor) {
-        double azimuth = hashUnit(meteor, 0xC2B2AE3DL) * Mth.TWO_PI;
-        double tilt = Math.toRadians(ENTRY_ANGLE_DEGREES);
-        double horizontal = Math.sin(tilt);
-        return new Vec3(Math.cos(azimuth) * horizontal, -Math.cos(tilt),
-                Math.sin(azimuth) * horizontal);
+        return StarfallShape.meteorHeading(shapeParams(), meteor);
     }
 
     /** Where a meteor enters, back up its heading from the landing point. */
     public Vec3 meteorEntry(int meteor) {
-        Vec3 landing = meteorLanding(meteor);
-        // Scaled so the vertical drop is still the full fall height; the slant
-        // adds horizontal travel on top rather than trading height away for it.
-        double along = fallHeight(meteor)
-                / Math.cos(Math.toRadians(ENTRY_ANGLE_DEGREES));
-        return landing.subtract(meteorHeading(meteor).scale(along));
+        return StarfallShape.meteorEntry(shapeParams(), meteorLanding(meteor), meteor);
     }
 
     /** Position of a meteor in flight, or its landing point once it has hit. */
     public Vec3 meteorPosition(int meteor, float partialTick) {
-        Vec3 landing = meteorLanding(meteor);
-        float age = getVisualAgeTicks(partialTick);
-        int spawn = spawnTick(meteor);
-        float fall = Mth.clamp((age - spawn) / (float) fallTicks(meteor), 0.0F, 1.0F);
-        // Gravity, so the meteor is slow and readable high up and fast at the end.
-        float eased = fall * fall;
-        return meteorEntry(meteor).lerp(landing, eased);
+        return StarfallShape.meteorPosition(shapeParams(), meteorLanding(meteor), meteor,
+                getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -264,34 +231,11 @@ public final class StarfallEntity extends Entity {
      * after impact so the flash does not linger as a permanent light.
      */
     public float meteorBrightness(int meteor, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        int spawn = spawnTick(meteor);
-        if (age < spawn) {
-            return 0.0F;
-        }
-        int impact = impactTick(meteor);
-        if (age < impact) {
-            // Brighten as it approaches, so the threat is legible.
-            float fall = (age - spawn) / (float) fallTicks(meteor);
-            return 0.45F + fall * 0.55F;
-        }
-        float since = age - impact;
-        // The finale's flash is bigger and lasts longer; it is the last thing the
-        // spell does and should not blink out.
-        return isFinaleMeteor(meteor)
-                ? Math.max(0.0F, 3.4F - since * 0.14F)
-                : Math.max(0.0F, 1.8F - since * 0.22F);
+        return StarfallShape.meteorBrightness(meteor, getVisualAgeTicks(partialTick));
     }
 
     private float hashUnit(int meteor, long salt) {
-        long hash = (getSeed() & 0xFFFFFFFFL) * 0x2545F4914F6CDD1DL
-                ^ (meteor + 1L) * salt;
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >>> 33;
-        return (float) ((hash >>> 1) / (double) Long.MAX_VALUE);
+        return FxHash.unit(getSeed(), meteor, salt);
     }
 
     @Override
@@ -300,7 +244,7 @@ public final class StarfallEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            for (int meteor = this.resolvedThrough + 1; meteor < METEOR_COUNT; meteor++) {
+            for (int meteor = this.resolvedThrough + 1; meteor < StarfallShape.METEOR_COUNT; meteor++) {
                 if (timelineTick < impactTick(meteor)) {
                     break;
                 }

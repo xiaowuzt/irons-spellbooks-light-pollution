@@ -17,6 +17,9 @@ import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import com.gang.lightpollution.api.TidalDisruptionParams;
+import com.gang.lightpollution.fx.TidalDisruptionShape;
+import com.gang.lightpollution.fx.TidalDisruptionSource;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.fluids.FluidType;
 import net.minecraftforge.network.NetworkHooks;
@@ -42,35 +45,21 @@ import java.util.UUID;
  * <p>Numbers in this file are established results rather than figures verified in the
  * session that wrote it; the network research for this batch did not go through.</p>
  */
-public final class TidalDisruptionEntity extends Entity {
-    public static final int LIFETIME_TICKS = 360;
-    /** The star arrives and begins to stretch. */
-    public static final int STRETCH_END_TICK = 46;
+public final class TidalDisruptionEntity extends Entity implements TidalDisruptionSource {
+    // Both of these live in TidalDisruptionParams, which is the public contract, so there is one
+    // definition rather than a spell value and an API value that can drift apart.
+    public static final int LIFETIME_TICKS = TidalDisruptionParams.SPELL_LIFETIME_TICKS;
     /** The stream is fully drawn out and whipping round. */
     public static final int STREAM_END_TICK = 250;
     /** Returning debris lights the flare. */
-    public static final int FLARE_TICK = STREAM_END_TICK;
+    public static final int FLARE_TICK = TidalDisruptionParams.SPELL_FLARE_TICK;
 
-    /** How long the debris stream gets, in blocks. */
-    public static final double STREAM_LENGTH = 62.0D;
-    /** Half-width of the stream at its thickest, in blocks. */
-    public static final double STREAM_HALF_WIDTH = 1.3D;
     /** How close to the stream counts as being struck, in blocks. */
     public static final double STREAM_TOUCH_RADIUS = 3.0D;
-    /**
-     * Turns the stream wraps through as it falls back.
-     *
-     * <p>Debris on a bound orbit comes back round, so the stream is not a straight line —
-     * it is a wound-up ribbon. Just over a turn and a half is enough to read as an orbit
-     * rather than as an arc.</p>
-     */
-    public static final double WRAP_TURNS = 1.65D;
-    /** How far the stream reaches from the axis at its widest, in blocks. */
-    public static final double WRAP_RADIUS = 21.0D;
 
     public static final double HOVER_HEIGHT = 11.0D;
     public static final double FLARE_RADIUS = 20.0D;
-    public static final double EFFECT_RADIUS = WRAP_RADIUS + STREAM_TOUCH_RADIUS + 6.0D;
+    public static final double EFFECT_RADIUS = TidalDisruptionShape.WRAP_RADIUS + STREAM_TOUCH_RADIUS + 6.0D;
 
     /** Lashed by the stream, as a fraction of max health. */
     private static final float STREAM_DAMAGE_FRACTION = 0.058F;
@@ -174,7 +163,7 @@ public final class TidalDisruptionEntity extends Entity {
 
     /** How far the star has been drawn out, 0 to 1. */
     public float stretched(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / STRETCH_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / TidalDisruptionShape.STRETCH_END_TICK);
     }
 
     /**
@@ -186,16 +175,7 @@ public final class TidalDisruptionEntity extends Entity {
      * would throw away the one thing about its timing that is diagnostic.</p>
      */
     public float flare(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float since = age - FLARE_TICK;
-        if (since < 0.0F) {
-            return 0.0F;
-        }
-        // Peak is a few ticks wide, then the power law takes over.
-        float rise = Mth.clamp(since / 8.0F, 0.0F, 1.0F);
-        float t = 1.0F + since / 22.0F;
-        float decay = (float) Math.pow(t, -5.0D / 3.0D);
-        return rise * decay;
+        return TidalDisruptionShape.flare(getVisualAgeTicks(partialTick), FLARE_TICK);
     }
 
     public float fade(float partialTick) {
@@ -209,7 +189,7 @@ public final class TidalDisruptionEntity extends Entity {
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= STRETCH_END_TICK) {
+        if (age <= TidalDisruptionShape.STRETCH_END_TICK) {
             return stretched(partialTick);
         }
         if (age <= STREAM_END_TICK) {
@@ -233,34 +213,18 @@ public final class TidalDisruptionEntity extends Entity {
      *
      * @param fraction 0 at the leading tip, 1 at the trailing end
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    public TidalDisruptionParams shapeParams() {
+        return TidalDisruptionParams.of(azimuth());
+    }
+
     public Vec3 streamPoint(Vec3 centre, float ageTicks, double fraction) {
-        double drawn = Mth.clamp(ageTicks / (double) STRETCH_END_TICK, 0.12D, 1.0D);
-        double along = fraction * drawn;
-
-        double azimuth = Math.toRadians(azimuth());
-        Vec3 axis = new Vec3(0.0D, 1.0D, 0.0D);
-        Vec3 side = new Vec3(Math.cos(azimuth), 0.0D, Math.sin(azimuth));
-        Vec3 other = axis.cross(side).normalize();
-
-        // Wrapping: the bound debris goes round, tighter as it falls in. The leading tip is
-        // closest to the hole, so radius grows along the stream.
-        double phase = along * WRAP_TURNS * Math.PI * 2.0D;
-        // Starts at the hole, not 3.8 blocks away from it. The 0.18 floor this used to have
-        // left the stream visibly detached from the flare it is supposed to be falling into,
-        // which is one of the gaps reported as "没有链接在一起".
-        double radius = WRAP_RADIUS * along;
-        // And it climbs out of the orbital plane a little, because the orbit is inclined.
-        double rise = STREAM_LENGTH * 0.10D * Math.sin(along * Math.PI * 1.1D);
-
-        return centre.add(side.scale(Math.cos(phase) * radius))
-                .add(other.scale(Math.sin(phase) * radius))
-                .add(axis.scale(rise));
+        return TidalDisruptionShape.streamPoint(shapeParams(), centre, ageTicks, fraction);
     }
 
     /** Half-width of the stream at a fraction along it, in blocks. */
-    public static double streamWidth(double fraction) {
-        // Thinnest at the leading tip, where the tidal stretching has had longest to work.
-        return STREAM_HALF_WIDTH * (0.35D + 0.65D * fraction);
+    public double streamWidth(double fraction) {
+        return TidalDisruptionShape.streamWidth(shapeParams(), fraction);
     }
 
     @Override
@@ -273,7 +237,7 @@ public final class TidalDisruptionEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > STRETCH_END_TICK && timelineTick < FLARE_TICK
+            if (timelineTick > TidalDisruptionShape.STRETCH_END_TICK && timelineTick < FLARE_TICK
                     && timelineTick % STREAM_INTERVAL_TICKS == 0) {
                 resolveStream(serverLevel, timelineTick);
             }

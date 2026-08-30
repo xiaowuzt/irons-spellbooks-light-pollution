@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.CrabNebulaParams;
+import com.gang.lightpollution.fx.CrabNebulaShape;
+import com.gang.lightpollution.fx.CrabNebulaSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -45,38 +48,15 @@ import java.util.UUID;
  * <p>Figures here are established results, not values verified in the session that wrote
  * this file.</p>
  */
-public final class CrabNebulaEntity extends Entity {
-    public static final int LIFETIME_TICKS = 320;
-    /** The remnant unfolds and the cage closes. */
-    public static final int FORM_END_TICK = 40;
-    /** The pulsar drives its wind. This is the body of the spell. */
-    public static final int WIND_END_TICK = 270;
+public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
+    public static final int LIFETIME_TICKS = CrabNebulaParams.SPELL_LIFETIME_TICKS;
 
-    /** Radius of the shell when it has formed, in blocks. */
-    public static final double SHELL_RADIUS = 21.0D;
-    /**
-     * How much the shell grows over its life, as a fraction.
-     *
-     * <p>Small on purpose. The real remnant expands at around 1500 km/s, which is fast in
-     * absolute terms and slow next to its size — it has taken a thousand years to get where
-     * it is. A shell that visibly raced outward would be a planetary nebula, which this set
-     * already has; the Crab's character is that it hangs there.</p>
-     */
-    public static final double SHELL_GROWTH = 0.16D;
-    /** Filaments in the cage. */
-    public static final int FILAMENTS = 22;
-    /** Half-width of a filament, in blocks. */
-    public static final double FILAMENT_HALF_WIDTH = 0.55D;
     /** How close to a filament counts as touching it, in blocks. */
     public static final double FILAMENT_TOUCH_RADIUS = 1.9D;
-    /** Radius of the interior wind nebula, as a fraction of the shell. */
-    public static final double WIND_FRACTION = 0.72D;
-    /** Ticks between wind pulses. The pulsar's own rhythm, slowed to be readable. */
-    public static final int WIND_INTERVAL_TICKS = 10;
 
     public static final double HOVER_HEIGHT = 13.0D;
     public static final double EFFECT_RADIUS =
-            SHELL_RADIUS * (1.0D + SHELL_GROWTH) + FILAMENT_TOUCH_RADIUS + 4.0D;
+            CrabNebulaShape.SHELL_RADIUS * (1.0D + CrabNebulaShape.SHELL_GROWTH) + FILAMENT_TOUCH_RADIUS + 4.0D;
 
     /** Brushing a filament, as a fraction of max health. */
     private static final float FILAMENT_DAMAGE_FRACTION = 0.016F;
@@ -161,7 +141,7 @@ public final class CrabNebulaEntity extends Entity {
                 : (float) (this.level().getGameTime() - start) + partialTick;
         age = Math.max(0.0F, age);
         if (isDisplay()) {
-            return Math.min(age, WIND_END_TICK - 1.0F);
+            return Math.min(age, CrabNebulaShape.WIND_END_TICK - 1.0F);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -175,34 +155,36 @@ public final class CrabNebulaEntity extends Entity {
     }
 
     /** Radius of the shell at a given age, in blocks. */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public CrabNebulaParams shapeParams() {
+        return CrabNebulaParams.of(getSeed());
+    }
+
     public double shellRadius(float ageTicks) {
-        float formed = Mth.clamp(ageTicks / (float) FORM_END_TICK, 0.0F, 1.0F);
-        double drift = Mth.clamp((ageTicks - FORM_END_TICK)
-                / (double) (WIND_END_TICK - FORM_END_TICK), 0.0D, 1.0D);
-        return SHELL_RADIUS * (0.2D + 0.8D * smoothstep(formed))
-                * (1.0D + SHELL_GROWTH * drift);
+        return CrabNebulaShape.shellRadius(shapeParams(), ageTicks);
     }
 
     /** How far the remnant has unfolded, 0 to 1. */
     public float formed(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / FORM_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / CrabNebulaShape.FORM_END_TICK);
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= WIND_END_TICK) {
+        if (age <= CrabNebulaShape.WIND_END_TICK) {
             return 0.0F;
         }
-        return Mth.clamp((age - WIND_END_TICK)
-                / (float) (LIFETIME_TICKS - WIND_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - CrabNebulaShape.WIND_END_TICK)
+                / (float) (LIFETIME_TICKS - CrabNebulaShape.WIND_END_TICK), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= FORM_END_TICK) {
+        if (age <= CrabNebulaShape.FORM_END_TICK) {
             return formed(partialTick);
         }
-        if (age <= WIND_END_TICK) {
+        if (age <= CrabNebulaShape.WIND_END_TICK) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -210,10 +192,7 @@ public final class CrabNebulaEntity extends Entity {
 
     /** Pulse of the wind nebula, 0 to 1, on the pulsar's rhythm. */
     public float windPulse(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float phase = (age % WIND_INTERVAL_TICKS) / WIND_INTERVAL_TICKS;
-        // Sharp rise, slow decay — a pulse, not a sine.
-        return (float) Math.pow(1.0D - phase, 2.4D);
+        return CrabNebulaShape.windPulse(getVisualAgeTicks(partialTick));
     }
 
     private static float smoothstep(float t) {
@@ -242,46 +221,9 @@ public final class CrabNebulaEntity extends Entity {
      * @param fraction 0 to 1 around the loop; 1 is the same point as 0
      */
     public Vec3 filamentPoint(Vec3 centre, int filament, double fraction, float ageTicks) {
-        double radius = shellRadius(ageTicks);
-        int seed = getSeed();
-
-        // Two angles per filament, hashed off the synced seed, giving each its own plane.
-        double lean = hash(seed, filament, 1) * Math.PI;
-        double spin = hash(seed, filament, 2) * Math.PI * 2.0D;
-        double angle = hash(seed, filament, 4) * Math.PI * 2.0D
-                + Math.PI * 2.0D * fraction;
-
-        // An orthonormal frame: u and w span the loop's nominal plane, n is its normal.
-        Vec3 u = new Vec3(Math.cos(spin), 0.0D, Math.sin(spin));
-        Vec3 w = new Vec3(-Math.sin(spin) * Math.cos(lean), Math.sin(lean),
-                Math.cos(spin) * Math.cos(lean));
-        Vec3 n = u.cross(w);
-
-        // Out-of-plane weave, which is what keeps the cage a tangle instead of a globe. The
-        // per-filament phases are constant along the loop, so they shift the pattern without
-        // breaking the periodicity the closure depends on.
-        double weave = 0.30D * Math.sin(angle * 2.0D + filament * 1.7D)
-                + 0.17D * Math.sin(angle * 3.0D - filament * 2.3D);
-        // Filaments are not perfectly on the surface — they ripple, which is part of why the
-        // real ones look like a tangle.
-        double ripple = 1.0D + 0.09D * Math.sin(angle * 3.0D + filament);
-
-        // Normalised, so the weave tilts the loop across the shell instead of lifting it off.
-        Vec3 direction = u.scale(Math.cos(angle))
-                .add(w.scale(Math.sin(angle)))
-                .add(n.scale(weave))
-                .normalize();
-        return centre.add(direction.scale(radius * ripple));
+        return CrabNebulaShape.filamentPoint(shapeParams(), centre, filament, fraction, ageTicks);
     }
 
-    /** Stable hash in [0,1) from the synced seed, an index and a field selector. */
-    public static double hash(int seed, int index, int field) {
-        int h = seed * 73_856_093 ^ index * 19_349_663 ^ field * 83_492_791;
-        h ^= h >>> 13;
-        h *= 1_274_126_177;
-        h ^= h >>> 16;
-        return (h & 0x7FFFFFFF) / (double) 0x7FFFFFFF;
-    }
 
     @Override
     public void tick() {
@@ -293,15 +235,15 @@ public final class CrabNebulaEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > FORM_END_TICK && timelineTick < WIND_END_TICK) {
+            if (timelineTick > CrabNebulaShape.FORM_END_TICK && timelineTick < CrabNebulaShape.WIND_END_TICK) {
                 if (timelineTick % FILAMENT_INTERVAL_TICKS == 0) {
                     resolveFilaments(serverLevel, timelineTick);
                 }
-                if (timelineTick % WIND_INTERVAL_TICKS == 0) {
+                if (timelineTick % CrabNebulaShape.WIND_INTERVAL_TICKS == 0) {
                     resolveWind(serverLevel, timelineTick);
                 }
             }
-            if (!this.collapseResolved && timelineTick >= WIND_END_TICK) {
+            if (!this.collapseResolved && timelineTick >= CrabNebulaShape.WIND_END_TICK) {
                 this.collapseResolved = true;
                 resolveCollapse(serverLevel);
             }
@@ -325,8 +267,8 @@ public final class CrabNebulaEntity extends Entity {
             return;
         }
 
-        double touchSqr = (FILAMENT_TOUCH_RADIUS + FILAMENT_HALF_WIDTH)
-                * (FILAMENT_TOUCH_RADIUS + FILAMENT_HALF_WIDTH);
+        double touchSqr = (FILAMENT_TOUCH_RADIUS + CrabNebulaShape.FILAMENT_HALF_WIDTH)
+                * (FILAMENT_TOUCH_RADIUS + CrabNebulaShape.FILAMENT_HALF_WIDTH);
         // Enough samples that consecutive ones are closer together than the touch radius.
         // A closed loop at this radius is around 130 blocks long, so 48 puts them under three
         // blocks apart; the 16 that covered the old half-arcs would leave gaps a player could
@@ -338,7 +280,7 @@ public final class CrabNebulaEntity extends Entity {
             }
             Vec3 at = target.getBoundingBox().getCenter();
             boolean touching = false;
-            for (int filament = 0; filament < FILAMENTS && !touching; ++filament) {
+            for (int filament = 0; filament < CrabNebulaShape.FILAMENTS && !touching; ++filament) {
                 for (int i = 0; i <= samples; ++i) {
                     if (filamentPoint(centre, filament, i / (double) samples, ageTicks)
                             .distanceToSqr(at) <= touchSqr) {
@@ -358,7 +300,7 @@ public final class CrabNebulaEntity extends Entity {
         LivingEntity caster = resolveCaster(level);
         DamageSource source = CrabNebulaDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
-        double reach = shellRadius(ageTicks) * WIND_FRACTION;
+        double reach = shellRadius(ageTicks) * CrabNebulaShape.WIND_FRACTION;
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,
@@ -383,7 +325,7 @@ public final class CrabNebulaEntity extends Entity {
         LivingEntity caster = resolveCaster(level);
         DamageSource source = CrabNebulaDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
-        double reach = shellRadius(WIND_END_TICK);
+        double reach = shellRadius(CrabNebulaShape.WIND_END_TICK);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,

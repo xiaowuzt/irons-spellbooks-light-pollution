@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.ConstellationEntity;
+import com.gang.lightpollution.api.ConstellationParams;
+import com.gang.lightpollution.fx.ConstellationShape;
+import com.gang.lightpollution.fx.ConstellationSource;
+import com.gang.lightpollution.fx.FxRegistry;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -59,7 +62,11 @@ public final class ConstellationWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<ConstellationEntity> stars = SpellLightEmitter.collectConstellations();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<ConstellationSource> stars =
+                new java.util.ArrayList<>(SpellLightEmitter.collectConstellations());
+        stars.addAll(FxRegistry.constellations());
         if (stars.isEmpty()) {
             return;
         }
@@ -84,8 +91,8 @@ public final class ConstellationWorldRenderer {
             modelView.setIdentity();
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
-            for (ConstellationEntity entity : stars) {
-                for (int star = 0; star < ConstellationEntity.STAR_COUNT; star++) {
+            for (ConstellationSource entity : stars) {
+                for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
                     drawStar(camera, entity, star, partialTick, shader);
                 }
             }
@@ -95,20 +102,20 @@ public final class ConstellationWorldRenderer {
         }
     }
 
-    private static void drawStar(Vec3 camera, ConstellationEntity entity,
+    private static void drawStar(Vec3 camera, ConstellationSource entity,
                                  int star, float partialTick, ShaderInstance shader) {
-        float brightness = entity.starBrightness(star, partialTick);
+        float brightness = ConstellationShape.starBrightness(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (brightness <= 0.02F) {
             return;
         }
-        Vec3 position = entity.starPosition(star, partialTick);
+        Vec3 position = ConstellationShape.starPosition(entity.shapeParams(), entity.anchorCenter(partialTick), entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         float age = entity.getVisualAgeTicks(partialTick);
 
         // A slow swell and a slow rise in temperature across the star's life, so
         // it reads as something building rather than a fixed prop, and shrinks
         // back as it burns out.
-        float lifetime = Mth.clamp(age / ConstellationEntity.LIFETIME_TICKS, 0.0F, 1.0F);
-        float radius = ConstellationEntity.STAR_BODY_RADIUS
+        float lifetime = Mth.clamp(age / entity.shapeParams().lifetimeTicks(), 0.0F, 1.0F);
+        float radius = ConstellationShape.STAR_BODY_RADIUS
                 * (1.0F + lifetime * 0.18F) * Mth.clamp(brightness, 0.35F, 1.0F);
         float heat = Mth.clamp(0.7F + lifetime * 0.25F, 0.0F, 1.0F);
 

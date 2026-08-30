@@ -4,6 +4,128 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.4.0
+
+Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### Nineteen of the effects are now open to other mods
+
+1.3.0 opened three. This opens sixteen more, plus the animated text and the tooltip frames.
+
+Visuals only, as before: no damage, no entity, no spell. Client-side, and nothing is synced — a mod
+that wants other players to see an effect sends its own packet and calls this in the client handler.
+
+- **Structures that hang there.** `magnetar`, `microquasar`, `pinwheel`, `quasarJet`, `crabNebula`,
+  `constellation`, `stellarConvergence`, `worldTree`
+- **Events that run and finish.** `tidalDisruption`, `helixNebula`, `secondSun`, `singularity`,
+  `skyCollapse`, `starfall`, `leviathan`, `eclipseSeverance`, `funeralNova`
+
+Each takes a params record — an azimuth or bearing, a seed, a scale, a lifetime — and returns a handle
+to move it or take it away. `/lightpollution fx <name> [scale]` goes through the same public entry
+points a caller would, and `/lightpollution fx clear` removes what it made.
+
+### Animated text and tooltip frames
+
+`LightPollutionText.styled(text, style)` returns a Component that animates wherever Minecraft draws
+it — a tooltip, a chat line, a book. Ten styles, as an enum rather than the format codes they were
+before. `LightPollutionText.inWorld(text, pos)` floats text at a world position with eighteen entrance
+and exit animations.
+
+`LightPollutionFx.registerTooltipAccent(item, colour)` gives another mod's item this pack's tooltip
+frame. A tag overload covers a whole set at once. The colour is the caller's; the *style* stays the
+player's, set in the config or with `/lightpollution frame` — a caller who could force a style would be
+overriding a preference, and two mods each forcing their own would leave the player with no way to get
+a consistent inventory.
+
+### Not opened
+
+Cosmic Horseshoe, Silhouette and Starless are full-screen passes with no geometry and no position, so
+a handle with `setPosition` on it would be a lie. Gargantua's lens copies the framebuffer twice per
+instance. Celestial Judgment, Chromatic Accretion and Stargrave Singularity draw through Minecraft's
+own entity renderers and key their look off entity UUIDs, so there is nothing to hand a position to.
+These need a different interface than the other nineteen, not a worse version of this one.
+
+### Things found while extracting
+
+The point of this work was to get the shape maths out from behind the spells, and moving it turned up
+several things that were invisible while each renderer owned its own copy.
+
+- **A public API that had been silently doing nothing.** `DynamicTextApi` reflectively looked up
+  `cn.blockforge.dynamictext.client.DynamicTextRuntime` — the package that code lived in *before* it
+  was flattened into this mod. The lookup failed every time and the exception was swallowed, so all
+  four runtime controls were no-ops. That path never existed in any released build of this mod.
+- **The Crab Nebula's anchor syncs and saves an azimuth that nothing reads.** Every filament's tilt
+  and spin is hashed out of the seed, so the cage has no single axis to turn.
+- **Eight copies of two hash functions.** These are the reason a spell's knots, filaments and meteors
+  land in the same places on the server and on every client with none of it synced. Copies that were
+  identical today could diverge under an innocent edit, and the symptom would be each player seeing a
+  subtly different arrangement rather than an error. One copy each now.
+- **The Helix Nebula's knot placement was written inline in its renderer**, so that renderer could not
+  have drawn anything but the spell's own entity even in principle.
+- Roughly 700 lines of duplicated timeline, fade and bookkeeping code came out of the anchor entities.
+
+Every extraction was checked numerically rather than by eye: knot, filament, meteor, branch and spine
+positions across several seeds, ages and indices are bit-identical to what they were, the Crab's
+filament loops still close, and the magnetar's field lines still terminate two star-radii apart. The
+four scripts that do this are in `scripts/`.
+
+## 1.3.0
+
+Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### Other mods can now draw these effects
+
+The renderings in this pack were locked to the spells that caused them. Each renderer walked a list
+of that spell's anchor entities, so there was no way to put a tidal disruption anywhere without also
+casting the spell, its damage and its cooldown. Three of them are now available on their own.
+
+- **`LightPollutionFx.tidalDisruption(pos, params)`** — a star stretched into a stream that wraps
+  back around and flares when the bound debris returns.
+- **`LightPollutionFx.helixNebula(pos, params)`** — an expanding shell of cometary knots in two
+  nested rings, each knot's tail streaming away from the white dwarf.
+- **`LightPollutionFx.crabNebula(pos, params)`** — a cage of tangled filament loops around a pulsar,
+  with the wind nebula pulsing inside it.
+
+Each returns a handle to move the effect or take it away, and each takes a params record for the
+azimuth, the seed, a scale and a lifetime. Visuals only: no damage, no entity, no spell. They are
+drawn rather than simulated and nothing is synced, so a mod that wants other players to see one
+sends its own packet and calls this in the client handler — the alternative would be a wrapper that
+worked in single player and quietly failed in multiplayer.
+
+`/lightpollution fx tidal_disruption|helix_nebula|crab_nebula [scale]` goes through the same public
+entry points a caller would use, and `/lightpollution fx clear` removes what it made.
+
+### Tooltip frames work alongside ModernUI
+
+One frame style drew correctly with ModernUI installed and the other seven drew a doubled border —
+ours over theirs. Forge checks whether an event has been cancelled once per listener, at the moment
+it invokes that listener, rather than breaking out of the loop when one cancels; so cancelling the
+tooltip event only suppresses the listeners that run *after* ours, and ModernUI's was running first.
+Raising our priority puts us ahead of it. The one style that is a background rather than a takeover
+now stands down entirely when ModernUI is present, since both were drawing a panel and neither was
+wrong to.
+
+### Under it
+
+Getting the effects out from behind the spells meant the shape maths had to stop living on the
+entities and inside the renderers, and pulling it out turned up a few things worth naming.
+
+- The Helix Nebula's knot placement was written **inline in its renderer** — the frame, the hash, the
+  scatter through the shell's thickness. That renderer could not have drawn anything but the spell's
+  own entity even in principle.
+- The Crab Nebula's anchor syncs and saves an azimuth that **nothing reads**. The cage has no single
+  axis to turn, because every filament's tilt and spin is hashed out of the seed, so the field never
+  had anything to mean. It is not in the public params.
+- The hash that places knots and filaments existed as two byte-identical copies. It is the reason the
+  server and every client agree on an arrangement without any of it being synced, so a silent
+  divergence between the copies would have shown each player a subtly different cage rather than
+  raising an error. One copy now.
+- The three effects' fade-in, ageing and removal bookkeeping was the same sixty lines three times.
+
+Every extraction was checked numerically rather than by eye: knot and filament positions across
+several seeds, ages and indices are bit-identical to what they were, and the Crab's loops still
+close.
+
 ## 1.2.1
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**

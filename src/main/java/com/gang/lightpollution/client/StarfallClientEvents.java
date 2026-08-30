@@ -3,6 +3,7 @@ package com.gang.lightpollution.client;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.renderer.SpellLightEmitter;
 import com.gang.lightpollution.entity.StarfallEntity;
+import com.gang.lightpollution.fx.StarfallShape;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
@@ -39,7 +40,7 @@ public final class StarfallClientEvents {
 
         for (StarfallEntity entity : SpellLightEmitter.collectStarfalls()) {
             int age = entity.getTimelineAgeTicks();
-            for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT; meteor++) {
+            for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT; meteor++) {
                 float brightness = entity.meteorBrightness(meteor, 1.0F);
                 if (brightness <= 0.05F) {
                     continue;

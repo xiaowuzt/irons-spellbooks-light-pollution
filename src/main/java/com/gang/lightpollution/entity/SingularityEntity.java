@@ -1,6 +1,10 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.registry.ModSounds;
+import com.gang.lightpollution.api.SingularityParams;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.SingularityShape;
+import com.gang.lightpollution.fx.SingularitySource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -42,30 +46,18 @@ import java.util.UUID;
  * together — the pull, the light, and the interval between bolts. Any one of them
  * alone reads as a countdown; all three read as something about to fail.</p>
  */
-public final class SingularityEntity extends Entity {
-    public static final int LIFETIME_TICKS = 220;
-    /** The core opens over this window. */
-    public static final int OPEN_END_TICK = 20;
-    /** Detonation. */
-    public static final int COLLAPSE_TICK = 120;
-    /** Shockwaves and afterglow run to here. */
-    public static final int AFTERGLOW_END_TICK = 200;
+public final class SingularityEntity extends Entity implements SingularitySource {
+    // The form lives in SingularityShape, which the renderer and the public API both read, so there
+    // is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = SingularityParams.SPELL_LIFETIME_TICKS;
 
     /** How far the pull reaches, in blocks. */
     public static final double PULL_RADIUS = 20.0D;
     /** Radius of the detonation, in blocks. */
     public static final double BLAST_RADIUS = 18.0D;
-    /** Visual radius of the core at full charge, in blocks. */
-    public static final float CORE_RADIUS = 2.4F;
     /** Bound used to gather candidates. */
     public static final double EFFECT_RADIUS = PULL_RADIUS + 2.0D;
 
-    /** Bolts lashing out at once, at most. */
-    public static final int MAX_BOLTS = 10;
-    /** How far a bolt reaches, in blocks. */
-    public static final float BOLT_REACH = 22.0F;
-    /** Shockwaves left expanding by the detonation. */
-    public static final int SHOCKWAVE_COUNT = 3;
     /** Radius of the charge's standing lens when it opens, in blocks. */
     public static final float CHARGE_LENS_MIN_RADIUS = 3.0F;
     /** Radius of the charge's standing lens at full charge, in blocks. */
@@ -157,53 +149,29 @@ public final class SingularityEntity extends Entity {
      * How far the charge has built, 0 to 1. Squared rather than linear, which is
      * what makes the last second feel like it is running away.
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public SingularityParams shapeParams() {
+        return SingularityParams.of(getSeed());
+    }
+
     public float charge(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age >= COLLAPSE_TICK) {
-            return 1.0F;
-        }
-        if (age <= OPEN_END_TICK) {
-            return 0.0F;
-        }
-        float t = (age - OPEN_END_TICK) / (float) (COLLAPSE_TICK - OPEN_END_TICK);
-        return t * t;
+        return SingularityShape.charge(getVisualAgeTicks(partialTick));
     }
 
     /** Radius of the core right now. It shrinks as it charges, then vanishes. */
     public float coreRadius(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= OPEN_END_TICK) {
-            return CORE_RADIUS * smoothstep(age / OPEN_END_TICK);
-        }
-        if (age < COLLAPSE_TICK) {
-            // Contracting: whatever it is pulling in has to go somewhere.
-            return CORE_RADIUS * (1.0F - charge(partialTick) * 0.45F);
-        }
-        return 0.0F;
+        return SingularityShape.coreRadius(shapeParams(), getVisualAgeTicks(partialTick));
     }
 
     /** Brightness of the core and its light, 0 once it has collapsed. */
     public float coreBrightness(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= OPEN_END_TICK) {
-            return smoothstep(age / OPEN_END_TICK) * 0.6F;
-        }
-        if (age < COLLAPSE_TICK) {
-            return 0.6F + charge(partialTick) * 2.6F;
-        }
-        return 0.0F;
+        return SingularityShape.coreBrightness(getVisualAgeTicks(partialTick));
     }
 
     /** Flash of the detonation, 0 outside its window. */
     public float blastFlash(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - COLLAPSE_TICK;
-        if (since < 0.0F || since > 30.0F) {
-            return 0.0F;
-        }
-        // Peaks a couple of ticks in rather than instantly, so the eye reads it as
-        // an event rather than a single white frame.
-        float t = since / 30.0F;
-        return Mth.sin(Math.min(t * 3.4F, 1.0F) * Mth.PI * 0.5F) * (1.0F - t * 0.6F);
+        return SingularityShape.blastFlash(getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -212,34 +180,13 @@ public final class SingularityEntity extends Entity {
      * thick shell.
      */
     public float shockwaveRadius(int wave, float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - COLLAPSE_TICK;
-        if (since < 0.0F) {
-            return 0.0F;
-        }
-        float speed = switch (wave) {
-            case 0 -> 1.5F;
-            case 1 -> 0.85F;
-            default -> 0.45F;
-        };
-        // Decelerating, like a real front losing energy: linear expansion reads as
-        // a growing sphere rather than as a blast.
-        float radius = speed * since * (1.0F - since / 260.0F);
-        return Math.max(0.0F, radius);
+        return SingularityShape.shockwaveRadius(
+                shapeParams(), wave, getVisualAgeTicks(partialTick));
     }
 
     /** Strength of one shockwave, 0 once it has faded. */
     public float shockwaveStrength(int wave, float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - COLLAPSE_TICK;
-        float life = switch (wave) {
-            case 0 -> 34.0F;
-            case 1 -> 58.0F;
-            default -> 76.0F;
-        };
-        if (since < 0.0F || since > life) {
-            return 0.0F;
-        }
-        float fade = 1.0F - since / life;
-        return fade * fade;
+        return SingularityShape.shockwaveStrength(wave, getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -248,7 +195,7 @@ public final class SingularityEntity extends Entity {
      * losing control.
      */
     public int boltInterval(float partialTick) {
-        return Math.max(1, Math.round(15.0F - charge(partialTick) * 14.0F));
+        return SingularityShape.boltInterval(getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -256,16 +203,12 @@ public final class SingularityEntity extends Entity {
      * lashes to new places rather than sitting still.
      */
     public Vec3 boltDirection(int bolt, int bucket) {
-        float yaw = hashUnit(bolt * 71 + bucket * 17, 0x9E3779B9L) * Mth.TWO_PI;
-        float pitch = (hashUnit(bolt * 91 + bucket * 31, 0x85EBCA6BL) - 0.5F) * Mth.PI;
-        float horizontal = Mth.cos(pitch);
-        return new Vec3(Mth.cos(yaw) * horizontal, Mth.sin(pitch),
-                Mth.sin(yaw) * horizontal);
+        return SingularityShape.boltDirection(shapeParams(), bolt, bucket);
     }
 
     /** Length of one bolt, in blocks. */
     public float boltLength(int bolt, int bucket) {
-        return BOLT_REACH * (0.35F + hashUnit(bolt * 53 + bucket * 7, 0xC2B2AE3DL) * 0.65F);
+        return SingularityShape.boltLength(shapeParams(), bolt, bucket);
     }
 
     /**
@@ -295,7 +238,7 @@ public final class SingularityEntity extends Entity {
         java.util.List<Lens> lenses = new java.util.ArrayList<>(4);
         float age = getVisualAgeTicks(partialTick);
 
-        if (age > OPEN_END_TICK && age < COLLAPSE_TICK) {
+        if (age > SingularityShape.OPEN_END_TICK && age < SingularityShape.COLLAPSE_TICK) {
             float charge = charge(partialTick);
             // Life is held mid-profile rather than swept: this one is not
             // travelling anywhere, it is a standing lens that grows.
@@ -308,7 +251,7 @@ public final class SingularityEntity extends Entity {
                     0.05F + charge * 0.2F));
         }
 
-        for (int wave = 0; wave < SHOCKWAVE_COUNT; wave++) {
+        for (int wave = 0; wave < SingularityShape.SHOCKWAVE_COUNT; wave++) {
             float radius = shockwaveRadius(wave, partialTick);
             float strength = shockwaveStrength(wave, partialTick);
             if (radius <= 0.2F || strength <= 0.01F) {
@@ -329,14 +272,7 @@ public final class SingularityEntity extends Entity {
     }
 
     private float hashUnit(int index, long salt) {
-        long hash = (getSeed() & 0xFFFFFFFFL) * 0x2545F4914F6CDD1DL
-                ^ (index + 1L) * salt;
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >>> 33;
-        return (float) ((hash >>> 1) / (double) Long.MAX_VALUE);
+        return FxHash.unit(getSeed(), index, salt);
     }
 
     @Override
@@ -348,7 +284,7 @@ public final class SingularityEntity extends Entity {
             if (timelineTick == 1) {
                 playCharge(serverLevel);
             }
-            if (timelineTick > OPEN_END_TICK && timelineTick < COLLAPSE_TICK) {
+            if (timelineTick > SingularityShape.OPEN_END_TICK && timelineTick < SingularityShape.COLLAPSE_TICK) {
                 applyPull(serverLevel);
                 if (timelineTick % CRUSH_INTERVAL_TICKS == 0) {
                     resolveCrush(serverLevel);
@@ -360,7 +296,7 @@ public final class SingularityEntity extends Entity {
                     playArc(serverLevel, timelineTick);
                 }
             }
-            if (!this.blastResolved && timelineTick >= COLLAPSE_TICK) {
+            if (!this.blastResolved && timelineTick >= SingularityShape.COLLAPSE_TICK) {
                 this.blastResolved = true;
                 resolveBlast(serverLevel);
                 playCollapse(serverLevel);

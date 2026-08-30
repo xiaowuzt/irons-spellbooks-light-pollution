@@ -137,15 +137,24 @@ public final class SpellTooltipStyle {
     }
 
     /**
-     * The accent for one of our items, or null if the stack is not ours. Shared with the frame.
+     * The accent for a stack, or null if nothing claims it. Shared with the frame.
      *
-     * <p>The table itself lives in {@link com.gang.lightpollution.SpellPalette}, in the common
+     * <p>Our own palette table lives in {@link com.gang.lightpollution.SpellPalette}, in the common
      * package, because the floating damage text needs the same colours and has to pick them on the
      * server where damage is resolved.</p>
+     *
+     * <p>Another mod's registration is checked first. A caller that registered one of our items
+     * deliberately overrode our colour for it, and silently preferring ours would make the
+     * registration look broken.</p>
      */
     static Integer accentFor(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;
+        }
+        Integer registered =
+                com.gang.lightpollution.fx.TooltipAccentRegistry.accentFor(stack);
+        if (registered != null) {
+            return registered;
         }
         ResourceLocation id = ForgeRegistries.ITEMS.getKey(stack.getItem());
         if (id == null || !ExampleMod.MODID.equals(id.getNamespace())) {

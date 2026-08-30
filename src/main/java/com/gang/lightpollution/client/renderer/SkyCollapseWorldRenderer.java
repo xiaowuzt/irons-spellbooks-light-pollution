@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.SkyCollapseEntity;
+import com.gang.lightpollution.api.SkyCollapseParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.SkyCollapseSource;
+import com.gang.lightpollution.fx.SkyCollapseShape;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -66,7 +69,11 @@ public final class SkyCollapseWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<SkyCollapseEntity> collapses = SpellLightEmitter.collectSkyCollapses();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<SkyCollapseSource> collapses =
+                new java.util.ArrayList<>(SpellLightEmitter.collectSkyCollapses());
+        collapses.addAll(FxRegistry.skyCollapses());
         if (collapses.isEmpty()) {
             return;
         }
@@ -89,7 +96,7 @@ public final class SkyCollapseWorldRenderer {
 
             BufferBuilder builder = begin();
             int vertices = 0;
-            for (SkyCollapseEntity entity : collapses) {
+            for (SkyCollapseSource entity : collapses) {
                 vertices += emitFracture(builder, entity, partialTick);
                 vertices += emitShards(builder, camera, entity, partialTick);
             }
@@ -111,17 +118,17 @@ public final class SkyCollapseWorldRenderer {
      * eye no single thing to follow. One arc that opens into a real gap is the
      * shape of a sky splitting.</p>
      */
-    private static int emitFracture(BufferBuilder builder, SkyCollapseEntity entity,
+    private static int emitFracture(BufferBuilder builder, SkyCollapseSource entity,
                                     float partialTick) {
-        float glow = entity.fractureGlow(partialTick);
+        float glow = SkyCollapseShape.fractureGlow(entity.getVisualAgeTicks(partialTick));
         if (glow <= 0.01F) {
             return 0;
         }
-        float spread = entity.fractureProgress(partialTick);
+        float spread = SkyCollapseShape.fractureProgress(entity.getVisualAgeTicks(partialTick));
         // g in the top band selects the rift branch in the shader.
         int packed = color(spread, 0.85F, Mth.clamp(glow * 0.5F, 0.0F, 1.0F), glow);
 
-        float bearing = entity.riftBearing();
+        float bearing = SkyCollapseShape.riftBearing(entity.shapeParams());
         float dirX = Mth.cos(bearing);
         float dirZ = Mth.sin(bearing);
         float sideX = -dirZ;
@@ -164,23 +171,23 @@ public final class SkyCollapseWorldRenderer {
      * of something broken.
      */
     private static int emitShards(BufferBuilder builder, Vec3 camera,
-                                  SkyCollapseEntity entity, float partialTick) {
+                                  SkyCollapseSource entity, float partialTick) {
         float age = entity.getVisualAgeTicks(partialTick);
         int vertices = 0;
-        for (int shard = 0; shard < SkyCollapseEntity.SHARD_COUNT; shard++) {
-            float brightness = entity.shardBrightness(shard, partialTick);
+        for (int shard = 0; shard < SkyCollapseShape.SHARD_COUNT; shard++) {
+            float brightness = SkyCollapseShape.shardBrightness(shard, entity.getVisualAgeTicks(partialTick));
             if (brightness <= 0.02F) {
                 continue;
             }
-            Vec3 centre = entity.shardPosition(shard, partialTick);
+            Vec3 centre = SkyCollapseShape.shardPosition(entity.shapeParams(), entity.shardLanding(shard), shard, entity.getVisualAgeTicks(partialTick));
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
-            float span = SkyCollapseEntity.halfSpan(shard);
-            float tilt = entity.shardTilt(shard, partialTick);
-            float spin = entity.shardSpin(shard, partialTick);
-            float fall = Mth.clamp((age - SkyCollapseEntity.shedTick(shard))
-                    / (float) SkyCollapseEntity.SHARD_FALL_TICKS, 0.0F, 1.0F);
+            float span = SkyCollapseShape.shardHalfSpan(entity.shapeParams(), shard);
+            float tilt = SkyCollapseShape.shardTilt(entity.shapeParams(), shard, entity.getVisualAgeTicks(partialTick));
+            float spin = SkyCollapseShape.shardSpin(entity.shapeParams(), shard, entity.getVisualAgeTicks(partialTick));
+            float fall = Mth.clamp((age - SkyCollapseShape.shedTick(shard))
+                    / (float) SkyCollapseShape.SHARD_FALL_TICKS, 0.0F, 1.0F);
 
             // The slab's own plane. It starts horizontal, as a piece of the dome,
             // and tips as it peels away.
@@ -198,15 +205,15 @@ public final class SkyCollapseWorldRenderer {
             float y = (float) (centre.y - camera.y);
             float z = (float) (centre.z - camera.z);
 
-            int corners = entity.shardCorners(shard);
+            int corners = SkyCollapseShape.shardCorners(entity.shapeParams(), shard);
             for (int corner = 0; corner < corners; corner++) {
                 int next = (corner + 1) % corners;
                 float a0 = Mth.TWO_PI * corner / corners
-                        + entity.shardCornerSkew(shard, corner);
+                        + SkyCollapseShape.shardCornerSkew(entity.shapeParams(), shard, corner);
                 float a1 = Mth.TWO_PI * next / corners
-                        + entity.shardCornerSkew(shard, next);
-                float r0 = entity.shardCornerScale(shard, corner) * span;
-                float r1 = entity.shardCornerScale(shard, next) * span;
+                        + SkyCollapseShape.shardCornerSkew(entity.shapeParams(), shard, next);
+                float r0 = SkyCollapseShape.shardCornerScale(entity.shapeParams(), shard, corner) * span;
+                float r1 = SkyCollapseShape.shardCornerScale(entity.shapeParams(), shard, next) * span;
 
                 float x0 = Mth.cos(a0) * r0;
                 float y0 = Mth.sin(a0) * r0;
@@ -242,16 +249,16 @@ public final class SkyCollapseWorldRenderer {
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
         float shake = 0.0F;
-        for (SkyCollapseEntity entity : SpellLightEmitter.collectSkyCollapses()) {
+        for (SkyCollapseSource entity : SpellLightEmitter.collectSkyCollapses()) {
             float age = entity.getVisualAgeTicks(partialTick);
-            for (int shard = 0; shard < SkyCollapseEntity.SHARD_COUNT; shard++) {
-                float since = age - SkyCollapseEntity.impactTick(shard);
+            for (int shard = 0; shard < SkyCollapseShape.SHARD_COUNT; shard++) {
+                float since = age - SkyCollapseShape.impactTick(shard);
                 if (since < 0.0F || since > SHAKE_TICKS) {
                     continue;
                 }
                 // Ordinary shards register, but only the keystone really moves the
                 // camera; six equal jolts in a row would just be noise.
-                float weight = SkyCollapseEntity.isKeystone(shard) ? 1.0F : 0.35F;
+                float weight = SkyCollapseShape.isKeystone(shard) ? 1.0F : 0.35F;
                 float decay = 1.0F - since / SHAKE_TICKS;
                 double distance = Math.sqrt(
                         camera.distanceToSqr(entity.shardLanding(shard)));

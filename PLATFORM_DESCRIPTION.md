@@ -62,6 +62,28 @@ Real-time coloured point lights and ray-traced shadows, without a shader pack.
 - **Spell captions.** Several spells display a prompt at their turning point.
 - **Languages.** English, Simplified Chinese, Literary Chinese.
 
+## For other mods
+
+Seventeen of the effects above, the animated text and the tooltip frames can be called from another
+mod. Visuals only — no damage, no entity, no spell.
+
+```gradle
+repositories { maven { url = "https://api.modrinth.com/maven" } }
+dependencies {
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.4.0")
+}
+```
+
+```java
+FxHandle handle = LightPollutionFx.magnetar(pos, 143.0F);
+handle.setPosition(newPos);
+handle.remove();
+```
+
+Client-side, and nothing is synced: to show an effect to other players, send your own packet and call
+this in its client handler. Full documentation, including the params records, the animated text styles
+and how to register your own items for a tooltip frame, is in `API.md` in the repository.
+
 ## Compatibility
 
 - Works with Oculus / Iris shader packs. World geometry is drawn after a pack has composited,

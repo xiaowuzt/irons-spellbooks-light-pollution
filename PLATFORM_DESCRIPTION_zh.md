@@ -48,6 +48,26 @@
 - **法术字幕**：部分法术在关键节点显示提示。
 - **语言**：英文、简体中文、文言文。
 
+## 供其他模组调用
+
+上述特效中的十七种、动态文字与物品提示框可由其他模组调用。仅视觉部分——不含伤害、实体与法术。
+
+```gradle
+repositories { maven { url = "https://api.modrinth.com/maven" } }
+dependencies {
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.4.0")
+}
+```
+
+```java
+FxHandle handle = LightPollutionFx.magnetar(pos, 143.0F);
+handle.setPosition(newPos);
+handle.remove();
+```
+
+仅限客户端，且不作同步：若需让其他玩家看见，请自行发包并在客户端处理中调用。完整文档（含参数
+记录类、动态文字样式、如何为自有物品注册提示框）见仓库中的 `API.md`。
+
 ## 兼容性
 
 - 兼容 Oculus / Iris 光影包。世界几何绘制于光影包合成之后，不会被覆盖。

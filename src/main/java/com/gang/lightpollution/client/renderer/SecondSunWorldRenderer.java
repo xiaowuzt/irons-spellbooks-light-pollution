@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.SecondSunEntity;
+import com.gang.lightpollution.api.SecondSunParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.SecondSunShape;
+import com.gang.lightpollution.fx.SecondSunSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -57,7 +60,11 @@ public final class SecondSunWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<SecondSunEntity> suns = SpellLightEmitter.collectSecondSuns();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<SecondSunSource> suns =
+                new java.util.ArrayList<>(SpellLightEmitter.collectSecondSuns());
+        suns.addAll(FxRegistry.secondSuns());
         if (suns.isEmpty()) {
             return;
         }
@@ -78,7 +85,7 @@ public final class SecondSunWorldRenderer {
             modelView.setIdentity();
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
-            for (SecondSunEntity sun : suns) {
+            for (SecondSunSource sun : suns) {
                 drawDisc(sun, partialTick, shader);
             }
         } finally {
@@ -88,7 +95,7 @@ public final class SecondSunWorldRenderer {
         }
     }
 
-    private static void drawDisc(SecondSunEntity sun, float partialTick,
+    private static void drawDisc(SecondSunSource sun, float partialTick,
                                  ShaderInstance shader) {
         float brightness = sun.brightness(partialTick);
         if (brightness <= 0.01F) {
@@ -97,19 +104,22 @@ public final class SecondSunWorldRenderer {
         // The billboard's half-size in blocks, from the angular radius. A disc
         // this far out has to be sized by angle or it stops matching the light it
         // is supposed to be emitting.
-        float angle = sun.discAngleDegrees(partialTick);
+        // Straight to the shared shape maths rather than through a method on the source, so a
+        // spell anchor and an API instance go down the same path.
+        SecondSunParams params = sun.shapeParams();
+        float age = sun.getVisualAgeTicks(partialTick);
+        float angle = SecondSunShape.discAngleDegrees(params, age);
         float halfSize = (float) (Math.tan(Math.toRadians(angle)) * SKY_DISTANCE)
                 * CORONA_MARGIN;
 
         // Camera-relative, so the disc keeps its place on the sky as the player
         // moves rather than being left behind.
-        Vec3 direction = sun.discDirection(partialTick);
+        Vec3 direction = SecondSunShape.discDirection(params, age);
         float centreX = (float) direction.x * SKY_DISTANCE;
         float centreY = (float) direction.y * SKY_DISTANCE;
         float centreZ = (float) direction.z * SKY_DISTANCE;
 
-        float age = sun.getVisualAgeTicks(partialTick);
-        int packed = color(Mth.frac(age * 0.006F), sun.temperature(partialTick),
+        int packed = color(Mth.frac(age * 0.006F), SecondSunShape.temperature(age),
                 Mth.clamp(brightness * 0.2F, 0.0F, 1.0F), 1.0F);
 
         float rightX = CAMERA_RIGHT.x * halfSize;
@@ -131,10 +141,10 @@ public final class SecondSunWorldRenderer {
 
         // The nova's shell is expressed as a fraction of the billboard, because
         // the billboard is what the shader's coordinates are relative to.
-        float novaAge = age - SecondSunEntity.NOVA_TICK;
+        float novaAge = age - SecondSunShape.NOVA_TICK;
         float nova = novaAge < 0.0F ? 0.0F
-                : Mth.clamp(novaAge / (float) (SecondSunEntity.NOVA_END_TICK
-                        - SecondSunEntity.NOVA_TICK), 0.0F, 1.0F);
+                : Mth.clamp(novaAge / (float) (SecondSunShape.NOVA_END_TICK
+                        - SecondSunShape.NOVA_TICK), 0.0F, 1.0F);
         float shell = nova <= 0.0F ? 0.0F : 0.3F + nova * 0.85F;
         // The photosphere's share of the billboard. The shader needs it because
         // the billboard is deliberately larger than the body.

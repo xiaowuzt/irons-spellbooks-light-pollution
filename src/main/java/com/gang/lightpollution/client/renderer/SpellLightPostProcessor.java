@@ -7,6 +7,7 @@ import com.gang.lightpollution.entity.GargantuaEntity;
 import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.SingularityEntity;
 import com.gang.lightpollution.entity.StarfallEntity;
+import com.gang.lightpollution.fx.StarfallShape;
 import com.gang.lightpollution.entity.StarlessEntity;
 import com.gang.lightpollution.client.GeminiKillEffectPostShaders.Pass;
 import com.gang.lightpollution.entity.SilhouetteEntity;
@@ -742,7 +743,7 @@ public final class SpellLightPostProcessor {
         List<MeteorShock> found = new java.util.ArrayList<>();
         for (StarfallEntity entity : showers) {
             float age = entity.getVisualAgeTicks(partialTick);
-            for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT; meteor++) {
+            for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT; meteor++) {
                 int spawn = StarfallEntity.spawnTick(meteor);
                 if (age < spawn || age >= StarfallEntity.impactTick(meteor)) {
                     continue;

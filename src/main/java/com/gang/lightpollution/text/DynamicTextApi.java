@@ -12,6 +12,7 @@ import com.gang.lightpollution.text.DynamicTextParser;
 import com.gang.lightpollution.text.EffectStyle;
 import net.minecraft.network.chat.Component;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
 import java.util.Locale;
@@ -19,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Java 与脚本通用入口。
- * KubeJS 可通过 Java.loadClass("cn.blockforge.dynamictext.api.DynamicTextApi") 调用这些静态方法。
+ * KubeJS 可通过 Java.loadClass("com.gang.lightpollution.text.DynamicTextApi") 调用这些静态方法。
  */
 public final class DynamicTextApi {
     private static final AtomicLong REFRESH_REVISION = new AtomicLong();
@@ -94,9 +95,7 @@ public final class DynamicTextApi {
 
     /** 设置客户端总开关的临时覆盖；重新启动游戏后仍以配置文件为准。 */
     public static void setClientEffectsEnabled(boolean enabled) {
-        if (isClient()) {
-            invokeClient("setMasterOverride", new Class<?>[]{Boolean.class}, enabled);
-        }
+        onClient(() -> DynamicTextRuntime.setMasterOverride(enabled));
     }
 
     /** effect 接受 p/g/h/q/y/s/t/v/u/m、对应完整英文名或带 & 的形式。 */
@@ -105,14 +104,12 @@ public final class DynamicTextApi {
         if (mask == 0 || !isClient()) {
             return false;
         }
-        invokeClient("setEffectOverride", new Class<?>[]{int.class, Boolean.class}, mask, enabled);
+        onClient(() -> DynamicTextRuntime.setEffectOverride(mask, enabled));
         return true;
     }
 
     public static void clearRuntimeOverrides() {
-        if (isClient()) {
-            invokeClient("clearOverrides", new Class<?>[0]);
-        }
+        onClient(DynamicTextRuntime::clearOverrides);
     }
 
     /**
@@ -122,9 +119,7 @@ public final class DynamicTextApi {
      * compat layer — this mod has no quest text to invalidate.</p>
      */
     public static long refresh() {
-        if (isClient()) {
-            invokeClient("invalidateScreenCache", new Class<?>[0]);
-        }
+        onClient(DynamicTextRuntime::invalidateScreenCache);
         return REFRESH_REVISION.incrementAndGet();
     }
 
@@ -136,14 +131,17 @@ public final class DynamicTextApi {
         return FMLEnvironment.dist == Dist.CLIENT;
     }
 
-    /** 反射隔离 net.minecraft.client 依赖，保证专用服务器加载脚本接口时安全。 */
-    private static void invokeClient(String method, Class<?>[] parameterTypes, Object... arguments) {
-        try {
-            Class<?> runtime = Class.forName("cn.blockforge.dynamictext.client.DynamicTextRuntime");
-            runtime.getMethod(method, parameterTypes).invoke(null, arguments);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // 客户端尚未初始化时保留配置默认行为。
-        }
+    /**
+     * Run something that touches {@link DynamicTextRuntime}, but only on a client.
+     *
+     * <p>That class reaches for {@code net.minecraft.client.Minecraft}, which a dedicated server does
+     * not have, so it must not be resolved there. This used to be a reflective lookup by class name —
+     * which kept the server safe but named the package this code lived in <em>before</em> it was
+     * flattened into this mod, so every call here had been silently doing nothing. Going through
+     * DistExecutor keeps the same isolation without a string that can rot.</p>
+     */
+    private static void onClient(Runnable action) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> action::run);
     }
 
     private static int effectMask(String effect) {

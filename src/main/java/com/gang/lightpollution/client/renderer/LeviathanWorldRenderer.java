@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.LeviathanEntity;
+import com.gang.lightpollution.api.LeviathanParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.LeviathanShape;
+import com.gang.lightpollution.fx.LeviathanSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -111,8 +114,8 @@ public final class LeviathanWorldRenderer {
             float headness = 1.0F - Mth.clamp((t - 0.05F) / 0.08F, 0.0F, 1.0F);
 
             float heightRatio = Mth.lerp(headness,
-                    LeviathanEntity.SECTION_HEIGHT_RATIO, 0.55F);
-            float ventral = LeviathanEntity.SECTION_VENTRAL_TAPER
+                    LeviathanShape.SECTION_HEIGHT_RATIO, 0.55F);
+            float ventral = LeviathanShape.SECTION_VENTRAL_TAPER
                     * (1.0F - 0.5F * headness);
             TubeMeshBuilder.trapezoid(angle, heightRatio, ventral, out);
 
@@ -142,7 +145,11 @@ public final class LeviathanWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<LeviathanEntity> effects = SpellLightEmitter.collectLeviathans();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<LeviathanSource> effects =
+                new java.util.ArrayList<>(SpellLightEmitter.collectLeviathans());
+        effects.addAll(FxRegistry.leviathans());
         if (effects.isEmpty()) {
             return;
         }
@@ -163,7 +170,7 @@ public final class LeviathanWorldRenderer {
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
 
-            for (LeviathanEntity entity : effects) {
+            for (LeviathanSource entity : effects) {
                 if (camera.distanceToSqr(entity.anchor(partialTick))
                         > RENDER_DISTANCE_SQR) {
                     continue;
@@ -173,7 +180,7 @@ public final class LeviathanWorldRenderer {
                 vertices += emitBody(builder, camera, entity, partialTick);
                 vertices += emitJaws(builder, camera, entity, partialTick);
                 vertices += emitEyes(builder, camera, entity, partialTick);
-                draw(builder, shader, vertices, entity.unravel(partialTick));
+                draw(builder, shader, vertices, LeviathanShape.unravel(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks()));
             }
         } finally {
             modelView.popPose();
@@ -184,9 +191,9 @@ public final class LeviathanWorldRenderer {
 
     /** The body: one closed tube along the spine, capped at the tail. */
     private static int emitBody(BufferBuilder builder, Vec3 camera,
-                                LeviathanEntity entity, float partialTick) {
-        float extended = entity.extended(partialTick);
-        float brightness = entity.brightness(partialTick);
+                                LeviathanSource entity, float partialTick) {
+        float extended = LeviathanShape.extended(entity.getVisualAgeTicks(partialTick));
+        float brightness = LeviathanShape.brightness(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (extended <= 0.01F || brightness <= 0.02F) {
             return 0;
         }
@@ -201,9 +208,9 @@ public final class LeviathanWorldRenderer {
         float[] rolls = new float[rings];
         for (int index = 0; index < rings; index++) {
             float t = ringWarp(index / (float) (rings - 1)) * extended;
-            path[index] = entity.spinePoint(t, partialTick).subtract(camera);
-            radii[index] = entity.bodyRadius(t, partialTick);
-            rolls[index] = entity.roll(t, partialTick);
+            path[index] = LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), t, entity.getVisualAgeTicks(partialTick)).subtract(camera);
+            radii[index] = LeviathanShape.bodyRadius(entity.shapeParams(), t, entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
+            rolls[index] = LeviathanShape.roll(entity.shapeParams(), t, entity.getVisualAgeTicks(partialTick));
         }
 
         TubeMeshBuilder.Section section = bodySection(extended);
@@ -214,7 +221,7 @@ public final class LeviathanWorldRenderer {
         // scale rows at a real physical size instead of stretching them with length.
         int vertices = TubeMeshBuilder.emit(builder, frames, BODY_SIDES, section,
                 MODE_BODY, 0.0F, intensity, alpha,
-                0.0F, extended * LeviathanEntity.BODY_LENGTH);
+                0.0F, extended * LeviathanShape.BODY_LENGTH);
 
         // Close the tail to a point rather than leaving the tube open.
         TubeMeshBuilder.Ring last = frames[frames.length - 1];
@@ -224,7 +231,7 @@ public final class LeviathanWorldRenderer {
             Vec3 tip = path[rings - 1].add(beyond.scale(1.2D / length));
             vertices += TubeMeshBuilder.emitCap(builder, last, tip, BODY_SIDES,
                     section, MODE_BODY, 0.0F, intensity, alpha,
-                    extended * LeviathanEntity.BODY_LENGTH);
+                    extended * LeviathanShape.BODY_LENGTH);
         }
         return vertices;
     }
@@ -238,9 +245,9 @@ public final class LeviathanWorldRenderer {
      * of what turns it into a face.</p>
      */
     private static int emitEyes(BufferBuilder builder, Vec3 camera,
-                                LeviathanEntity entity, float partialTick) {
-        float flesh = entity.flesh(partialTick);
-        float brightness = entity.brightness(partialTick);
+                                LeviathanSource entity, float partialTick) {
+        float flesh = LeviathanShape.flesh(entity.getVisualAgeTicks(partialTick));
+        float brightness = LeviathanShape.brightness(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (flesh <= 0.15F || brightness <= 0.02F) {
             return 0;
         }
@@ -251,8 +258,8 @@ public final class LeviathanWorldRenderer {
         if (head == null) {
             return 0;
         }
-        float radius = entity.bodyRadius(0.045F, partialTick);
-        Vec3 socket = entity.spinePoint(0.045F, partialTick).subtract(camera);
+        float radius = LeviathanShape.bodyRadius(entity.shapeParams(), 0.045F, entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
+        Vec3 socket = LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), 0.045F, entity.getVisualAgeTicks(partialTick)).subtract(camera);
         float grown = Mth.clamp((flesh - 0.15F) / 0.4F, 0.0F, 1.0F);
         float size = radius * 0.30F * grown;
 
@@ -292,9 +299,9 @@ public final class LeviathanWorldRenderer {
      * hinge about the animal's own transverse axis rather than the world's.
      */
     @org.jetbrains.annotations.Nullable
-    private static HeadFrame headFrame(LeviathanEntity entity, float partialTick) {
-        Vec3 head = entity.spinePoint(0.0F, partialTick);
-        Vec3 neck = entity.spinePoint(0.05F, partialTick);
+    private static HeadFrame headFrame(LeviathanSource entity, float partialTick) {
+        Vec3 head = LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), 0.0F, entity.getVisualAgeTicks(partialTick));
+        Vec3 neck = LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), 0.05F, entity.getVisualAgeTicks(partialTick));
         Vector3f forward = new Vector3f(
                 (float) (head.x - neck.x), (float) (head.y - neck.y),
                 (float) (head.z - neck.z));
@@ -311,7 +318,7 @@ public final class LeviathanWorldRenderer {
 
         // Same bank the body has, so the mouth is not level while the neck is
         // rolled over.
-        float roll = entity.roll(0.02F, partialTick);
+        float roll = LeviathanShape.roll(entity.shapeParams(), 0.02F, entity.getVisualAgeTicks(partialTick));
         float cos = Mth.cos(roll);
         float sin = Mth.sin(roll);
         Vector3f rolledSide = new Vector3f(
@@ -331,9 +338,9 @@ public final class LeviathanWorldRenderer {
      * angle — see {@link #LOWER_JAW_SHARE}.</p>
      */
     private static int emitJaws(BufferBuilder builder, Vec3 camera,
-                                LeviathanEntity entity, float partialTick) {
-        float flesh = entity.flesh(partialTick);
-        float brightness = entity.brightness(partialTick);
+                                LeviathanSource entity, float partialTick) {
+        float flesh = LeviathanShape.flesh(entity.getVisualAgeTicks(partialTick));
+        float brightness = LeviathanShape.brightness(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         if (flesh <= 0.2F || brightness <= 0.02F) {
             return 0;
         }
@@ -346,9 +353,9 @@ public final class LeviathanWorldRenderer {
 
         // Hinged at the back of the skull, not at the snout, so the jaws frame the
         // head instead of sprouting off the end of it like a beak.
-        Vec3 hinge = entity.spinePoint(0.075F, partialTick).subtract(camera);
-        float open = entity.jawOpen(partialTick) * JAW_GAPE;
-        float base = entity.bodyRadius(0.045F, partialTick);
+        Vec3 hinge = LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), 0.075F, entity.getVisualAgeTicks(partialTick)).subtract(camera);
+        float open = LeviathanShape.jawOpen(entity.getVisualAgeTicks(partialTick)) * JAW_GAPE;
+        float base = LeviathanShape.bodyRadius(entity.shapeParams(), 0.045F, entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
         float length = JAW_LENGTH * Math.min(1.0F, flesh * 1.4F);
 
         int vertices = 0;
@@ -462,15 +469,15 @@ public final class LeviathanWorldRenderer {
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
         float shake = 0.0F;
-        for (LeviathanEntity entity : SpellLightEmitter.collectLeviathans()) {
+        for (LeviathanSource entity : SpellLightEmitter.collectLeviathans()) {
             float since = entity.getVisualAgeTicks(partialTick)
-                    - LeviathanEntity.BITE_TICK;
+                    - LeviathanShape.BITE_TICK;
             if (since < 0.0F || since > SHAKE_TICKS) {
                 continue;
             }
             float decay = 1.0F - since / SHAKE_TICKS;
             double distance = Math.sqrt(camera.distanceToSqr(
-                    entity.spinePoint(0.0F, partialTick)));
+                    LeviathanShape.spinePoint(entity.shapeParams(), entity.anchor(partialTick), 0.0F, entity.getVisualAgeTicks(partialTick))));
             float reach = (float) Mth.clamp(1.0D - distance / SHAKE_RANGE, 0.0D, 1.0D);
             shake = Math.max(shake, SHAKE_STRENGTH * decay * decay * reach);
         }

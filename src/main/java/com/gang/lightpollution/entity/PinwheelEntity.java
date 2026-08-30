@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.PinwheelParams;
+import com.gang.lightpollution.fx.PinwheelShape;
+import com.gang.lightpollution.fx.PinwheelSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -48,17 +51,11 @@ import java.util.UUID;
  * <p>Figures here are established results, not values verified in the session that wrote
  * this file.</p>
  */
-public final class PinwheelEntity extends Entity {
-    public static final int LIFETIME_TICKS = 300;
-    /** The binary lights and the first dust appears. */
-    public static final int SPIN_UP_END_TICK = 34;
-    /** The spiral turns. This is the body of the spell. */
-    public static final int SPIN_END_TICK = 250;
+public final class PinwheelEntity extends Entity implements PinwheelSource {
+    // The form lives in PinwheelShape, which the renderer and the public API both read, so there is
+    // one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = PinwheelParams.SPELL_LIFETIME_TICKS;
 
-    /** Arms. Two, because the colliding-wind surface has two sides. */
-    public static final int ARMS = 2;
-    /** How far the outermost dust reaches, in blocks. */
-    public static final double SPIRAL_REACH = 26.0D;
     /**
      * Turns of spiral within that reach.
      *
@@ -66,18 +63,11 @@ public final class PinwheelEntity extends Entity {
      * number of turns over a constant radius means constant spacing between successive arm
      * crossings, which is what an Archimedean spiral is.</p>
      */
-    public static final double SPIRAL_TURNS = 2.2D;
-    /** Turns the whole pattern rotates through while it burns. */
-    public static final double ROTATION_TURNS = 1.4D;
-    /** Half-width of an arm, in blocks. */
-    public static final double ARM_HALF_WIDTH = 1.1D;
     /** How close to an arm counts as being in the dust, in blocks. */
     public static final double ARM_TOUCH_RADIUS = 2.2D;
-    /** Tilt of the spiral plane from horizontal, degrees. Nearly face-on, as observed. */
-    public static final double PLANE_TILT = 18.0D;
 
     public static final double HOVER_HEIGHT = 12.0D;
-    public static final double EFFECT_RADIUS = SPIRAL_REACH + ARM_TOUCH_RADIUS + 4.0D;
+    public static final double EFFECT_RADIUS = PinwheelShape.SPIRAL_REACH + ARM_TOUCH_RADIUS + 4.0D;
 
     /** Caught in the dust, as a fraction of max health. */
     private static final float ARM_DAMAGE_FRACTION = 0.021F;
@@ -164,9 +154,9 @@ public final class PinwheelEntity extends Entity {
             // window is 1.4 turns, and wrapping there would send the phase from 2.8*pi back
             // to zero, which is a different angle — the pattern would visibly jump. Same
             // trap the microquasar's precession fell into.
-            float ticksPerTurn = (SPIN_END_TICK - SPIN_UP_END_TICK)
-                    / (float) ROTATION_TURNS;
-            return SPIN_UP_END_TICK + (age % ticksPerTurn);
+            float ticksPerTurn = (PinwheelShape.SPIN_END_TICK - PinwheelShape.SPIN_UP_END_TICK)
+                    / (float) PinwheelShape.ROTATION_TURNS;
+            return PinwheelShape.SPIN_UP_END_TICK + (age % ticksPerTurn);
         }
         return Math.min(LIFETIME_TICKS, age);
     }
@@ -180,40 +170,41 @@ public final class PinwheelEntity extends Entity {
     }
 
     /** Normal of the spiral plane, as a unit vector. */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public PinwheelParams shapeParams() {
+        return PinwheelParams.of(azimuth());
+    }
+
     public Vec3 planeNormal() {
-        double azimuth = Math.toRadians(azimuth());
-        double tilt = Math.toRadians(PLANE_TILT);
-        return new Vec3(Math.sin(tilt) * Math.cos(azimuth), Math.cos(tilt),
-                Math.sin(tilt) * Math.sin(azimuth)).normalize();
+        return PinwheelShape.planeNormal(shapeParams());
     }
 
     /** How much of the pattern has appeared, 0 to 1. */
     public float spunUp(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / SPIN_UP_END_TICK);
+        return PinwheelShape.spunUp(getVisualAgeTicks(partialTick));
     }
 
     /** Rigid rotation of the whole pattern, in radians. */
     public double rotation(float ageTicks) {
-        double lit = Math.max(1.0D, SPIN_END_TICK - SPIN_UP_END_TICK);
-        double progress = (ageTicks - SPIN_UP_END_TICK) / lit;
-        return progress * ROTATION_TURNS * Math.PI * 2.0D;
+        return PinwheelShape.rotation(ageTicks);
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= SPIN_END_TICK) {
+        if (age <= PinwheelShape.SPIN_END_TICK) {
             return 0.0F;
         }
-        return Mth.clamp((age - SPIN_END_TICK)
-                / (float) (LIFETIME_TICKS - SPIN_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - PinwheelShape.SPIN_END_TICK)
+                / (float) (LIFETIME_TICKS - PinwheelShape.SPIN_END_TICK), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= SPIN_UP_END_TICK) {
+        if (age <= PinwheelShape.SPIN_UP_END_TICK) {
             return spunUp(partialTick);
         }
-        if (age <= SPIN_END_TICK) {
+        if (age <= PinwheelShape.SPIN_END_TICK) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -235,27 +226,12 @@ public final class PinwheelEntity extends Entity {
      * @param fraction 0 at the centre, 1 at the outer end of the arm
      */
     public Vec3 armPoint(Vec3 centre, int arm, double fraction, double rotation) {
-        Vec3 normal = planeNormal();
-        Vec3 axisU = normal.cross(new Vec3(0.0D, 1.0D, 0.0D));
-        if (axisU.lengthSqr() < 1.0e-6D) {
-            axisU = normal.cross(new Vec3(1.0D, 0.0D, 0.0D));
-        }
-        axisU = axisU.normalize();
-        Vec3 axisV = normal.cross(axisU).normalize();
-
-        double angle = fraction * SPIRAL_TURNS * Math.PI * 2.0D
-                + arm * (Math.PI * 2.0D / ARMS)
-                + rotation;
-        double radius = SPIRAL_REACH * fraction;
-
-        return centre.add(axisU.scale(Math.cos(angle) * radius))
-                .add(axisV.scale(Math.sin(angle) * radius));
+        return PinwheelShape.armPoint(shapeParams(), centre, arm, fraction, rotation);
     }
 
     /** Half-width of an arm at a fraction along it, in blocks. */
-    public static double armWidth(double fraction) {
-        // Dust spreads as it travels, so the arm thickens outward.
-        return ARM_HALF_WIDTH * (0.45D + 0.75D * fraction);
+    public double armWidth(double fraction) {
+        return PinwheelShape.armWidth(shapeParams(), fraction);
     }
 
     @Override
@@ -268,11 +244,11 @@ public final class PinwheelEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > SPIN_UP_END_TICK && timelineTick < SPIN_END_TICK
+            if (timelineTick > PinwheelShape.SPIN_UP_END_TICK && timelineTick < PinwheelShape.SPIN_END_TICK
                     && timelineTick % ARM_INTERVAL_TICKS == 0) {
                 resolveArms(serverLevel, timelineTick);
             }
-            if (!this.flareResolved && timelineTick >= SPIN_END_TICK) {
+            if (!this.flareResolved && timelineTick >= PinwheelShape.SPIN_END_TICK) {
                 this.flareResolved = true;
                 resolveFlare(serverLevel);
             }
@@ -310,7 +286,7 @@ public final class PinwheelEntity extends Entity {
             }
             Vec3 at = target.getBoundingBox().getCenter();
             boolean caught = false;
-            for (int arm = 0; arm < ARMS && !caught; ++arm) {
+            for (int arm = 0; arm < PinwheelShape.ARMS && !caught; ++arm) {
                 for (int i = 1; i <= samples; ++i) {
                     double fraction = i / (double) samples;
                     double reach = ARM_TOUCH_RADIUS + armWidth(fraction);
@@ -334,13 +310,13 @@ public final class PinwheelEntity extends Entity {
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
         for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(centre.x - SPIRAL_REACH, centre.y - SPIRAL_REACH,
-                        centre.z - SPIRAL_REACH, centre.x + SPIRAL_REACH,
-                        centre.y + SPIRAL_REACH, centre.z + SPIRAL_REACH))) {
+                new AABB(centre.x - PinwheelShape.SPIRAL_REACH, centre.y - PinwheelShape.SPIRAL_REACH,
+                        centre.z - PinwheelShape.SPIRAL_REACH, centre.x + PinwheelShape.SPIRAL_REACH,
+                        centre.y + PinwheelShape.SPIRAL_REACH, centre.z + PinwheelShape.SPIRAL_REACH))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
-            if (target.getBoundingBox().getCenter().distanceTo(centre) <= SPIRAL_REACH) {
+            if (target.getBoundingBox().getCenter().distanceTo(centre) <= PinwheelShape.SPIRAL_REACH) {
                 SpellDamage.apply(this, target, source, FLARE_DAMAGE_FRACTION);
             }
         }

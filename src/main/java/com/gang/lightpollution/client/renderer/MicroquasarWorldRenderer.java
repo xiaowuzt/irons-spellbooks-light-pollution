@@ -2,7 +2,10 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
-import com.gang.lightpollution.entity.MicroquasarEntity;
+import com.gang.lightpollution.api.MicroquasarParams;
+import com.gang.lightpollution.fx.FxRegistry;
+import com.gang.lightpollution.fx.MicroquasarShape;
+import com.gang.lightpollution.fx.MicroquasarSource;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
@@ -54,7 +57,11 @@ public final class MicroquasarWorldRenderer {
                 event, RenderLevelStageEvent.Stage.AFTER_WEATHER)) {
             return;
         }
-        List<MicroquasarEntity> jets = SpellLightEmitter.collectMicroquasars();
+        // The spell's own anchors plus anything another mod asked for through the API. The
+        // renderer does not distinguish them, which is the point of the source interface.
+        List<MicroquasarSource> jets =
+                new java.util.ArrayList<>(SpellLightEmitter.collectMicroquasars());
+        jets.addAll(FxRegistry.microquasars());
         if (jets.isEmpty()) {
             return;
         }
@@ -85,12 +92,12 @@ public final class MicroquasarWorldRenderer {
         }
     }
 
-    private static void drawJets(List<MicroquasarEntity> jets, Vec3 camera,
+    private static void drawJets(List<MicroquasarSource> jets, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
         BufferBuilder builder = begin();
         int vertices = 0;
 
-        for (MicroquasarEntity entity : jets) {
+        for (MicroquasarSource entity : jets) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
@@ -100,6 +107,9 @@ public final class MicroquasarWorldRenderer {
                 continue;
             }
             float age = entity.getVisualAgeTicks(partialTick);
+            // Straight to the shared shape maths rather than through a method on the source, so a
+            // spell anchor and an API instance go down the same path.
+            MicroquasarParams params = entity.shapeParams();
             // The accretion disk the jets are launched from. Without it they come out of
             // nothing, which is exactly how it looked.
             EffectCore.add(centre, 2.6D, 1.00F, 0.90F, 0.72F, brightness * 1.6F);
@@ -112,8 +122,8 @@ public final class MicroquasarWorldRenderer {
                 // per jet rather than per point because a tube carries one colour for the whole
                 // emit, and splitting the tube to vary it would put a seam at every split.
                 vertices += CurveTube.emit(builder, camera,
-                        MicroquasarEntity.BULLETS_PER_JET * 3, 0.004D, 1.0D,
-                        fraction -> entity.helixPoint(centre, age, forward, fraction),
+                        MicroquasarShape.BULLETS_PER_JET * 3, 0.004D, 1.0D,
+                        fraction -> MicroquasarShape.helixPoint(params, centre, age, forward, fraction),
                         fraction -> JET_RADIUS * (1.0D - fraction * 0.45D),
                         CurveTube.MODE_JET, forward ? 1.0F : 0.0F,
                         Math.min(1.0F, brightness * 0.17F), alpha);

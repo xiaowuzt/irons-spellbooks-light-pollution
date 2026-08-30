@@ -1,5 +1,8 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.ConstellationParams;
+import com.gang.lightpollution.fx.ConstellationShape;
+import com.gang.lightpollution.fx.ConstellationSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -43,30 +46,15 @@ import java.util.UUID;
  * renderer, the light emitter and the server-side pull all read the same point
  * and stay in lockstep without any extra syncing.</p>
  */
-public final class ConstellationEntity extends Entity {
-    /** One star. It orbits the anchor for the whole timeline. */
-    public static final int STAR_COUNT = 1;
-    public static final int LIFETIME_TICKS = 240;
-    public static final int GATHER_END_TICK = 30;
-    /** When the star begins to burn out. It keeps orbiting while it fades. */
-    public static final int FADE_START_TICK = 210;
+public final class ConstellationEntity extends Entity implements ConstellationSource {
+    // The form lives in ConstellationShape, which the renderer and the public API both read, so
+    // there is one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = ConstellationParams.SPELL_LIFETIME_TICKS;
 
-    /** Radius of the orbit, in blocks. */
-    public static final float RING_RADIUS = 9.0F;
-    /** Height of the orbit above the anchor, in blocks. */
-    public static final float RING_HEIGHT = 7.0F;
-    /** Visual radius of the star body, in blocks. */
-    public static final float STAR_BODY_RADIUS = 1.6F;
-    /**
-     * Full turns completed across the timeline. Slow on purpose: the orbit is
-     * what sweeps the cast shadows around, and a fast circuit turns that into a
-     * strobe instead of something the eye can follow.
-     */
-    public static final float ORBIT_TURNS = 1.0F;
     /** How far the star's gravity reaches, in blocks. */
     public static final double PULL_RADIUS = 14.0D;
     /** Bound used to gather candidates; the ring plus the pull's full reach. */
-    public static final double EFFECT_RADIUS = RING_RADIUS + PULL_RADIUS + 1.0D;
+    public static final double EFFECT_RADIUS = ConstellationShape.RING_RADIUS + PULL_RADIUS + 1.0D;
 
     /**
      * Strength of the pull at the star itself, in blocks per tick added to a
@@ -149,38 +137,20 @@ public final class ConstellationEntity extends Entity {
      * <p>It descends into orbit and then circles the anchor for the rest of its
      * life, including while it fades. It never reaches the ground.</p>
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public ConstellationParams shapeParams() {
+        return ConstellationParams.of(this.entityData.get(DATA_SPIN_OFFSET));
+    }
+
     public Vec3 starPosition(int star, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        Vec3 anchor = anchorCenter(partialTick);
-        float spin = this.entityData.get(DATA_SPIN_OFFSET);
-
-        float orbitProgress = Mth.clamp(age / LIFETIME_TICKS, 0.0F, 1.0F);
-        float angle = spin + Mth.TWO_PI * ORBIT_TURNS * orbitProgress;
-        float ringX = Mth.cos(angle) * RING_RADIUS;
-        float ringZ = Mth.sin(angle) * RING_RADIUS;
-        Vec3 orbitPos = anchor.add(ringX, RING_HEIGHT, ringZ);
-
-        if (age < GATHER_END_TICK) {
-            // Fall in from high and far, easing into the orbit.
-            float t = smoothstep(age / GATHER_END_TICK);
-            Vec3 start = anchor.add(ringX * 2.2D, RING_HEIGHT + 26.0D, ringZ * 2.2D);
-            return start.lerp(orbitPos, t);
-        }
-        return orbitPos;
+        return ConstellationShape.starPosition(shapeParams(), anchorCenter(partialTick),
+                getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     /** Star brightness envelope, 0 to 1: fades in, holds, then burns out. */
     public float starBrightness(int star, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age < GATHER_END_TICK) {
-            return smoothstep(age / GATHER_END_TICK);
-        }
-        if (age < FADE_START_TICK) {
-            return 1.0F;
-        }
-        float fade = (age - FADE_START_TICK)
-                / (float) (LIFETIME_TICKS - FADE_START_TICK);
-        return Math.max(0.0F, 1.0F - smoothstep(fade));
+        return ConstellationShape.starBrightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     private static float smoothstep(float t) {
@@ -197,7 +167,7 @@ public final class ConstellationEntity extends Entity {
             // The orbit and the pull both read the anchor, so moving it here is
             // enough to make the whole spell track its mark.
             followTarget(serverLevel);
-            if (timelineTick >= GATHER_END_TICK) {
+            if (timelineTick >= ConstellationShape.GATHER_END_TICK) {
                 // Every tick, so the pull is a continuous force rather than a
                 // series of shoves.
                 applyPull(serverLevel);
@@ -238,7 +208,7 @@ public final class ConstellationEntity extends Entity {
      */
     private void applyPull(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
-        for (int star = 0; star < STAR_COUNT; star++) {
+        for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
             float brightness = starBrightness(star, 1.0F);
             if (brightness <= 0.05F) {
                 continue;
@@ -276,7 +246,7 @@ public final class ConstellationEntity extends Entity {
     /** Burns everything the star is holding, harder the closer it is held. */
     private void resolveBurn(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
-        for (int star = 0; star < STAR_COUNT; star++) {
+        for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
             if (starBrightness(star, 1.0F) <= 0.05F) {
                 continue;
             }

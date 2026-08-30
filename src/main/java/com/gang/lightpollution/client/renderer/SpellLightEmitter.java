@@ -12,18 +12,23 @@ import com.gang.lightpollution.entity.CrabNebulaEntity;
 import com.gang.lightpollution.entity.CelestialJudgmentEntity;
 import com.gang.lightpollution.entity.ChromaticAccretionEntity;
 import com.gang.lightpollution.entity.ConstellationEntity;
+import com.gang.lightpollution.fx.ConstellationShape;
 import com.gang.lightpollution.entity.EclipseSeveranceEntity;
 import com.gang.lightpollution.entity.LeviathanEntity;
 import com.gang.lightpollution.entity.SecondSunEntity;
 import com.gang.lightpollution.entity.SilhouetteEntity;
 import com.gang.lightpollution.entity.SingularityEntity;
 import com.gang.lightpollution.entity.SkyCollapseEntity;
+import com.gang.lightpollution.fx.SkyCollapseShape;
 import com.gang.lightpollution.entity.StellarConvergenceEntity;
+import com.gang.lightpollution.fx.StellarConvergenceShape;
 import com.gang.lightpollution.entity.FuneralNovaEntity;
 import com.gang.lightpollution.entity.StargraveSingularityEntity;
 import com.gang.lightpollution.entity.StarfallEntity;
+import com.gang.lightpollution.fx.StarfallShape;
 import com.gang.lightpollution.entity.StarlessEntity;
 import com.gang.lightpollution.entity.WorldTreeEntity;
+import com.gang.lightpollution.fx.WorldTreeShape;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -321,7 +326,7 @@ public final class SpellLightEmitter {
         // star passes, which many dim sources cannot do -- they average into a
         // flat wash and cancel each other's shadows out.
         for (ConstellationEntity entity : CONSTELLATION) {
-            for (int star = 0; star < ConstellationEntity.STAR_COUNT; star++) {
+            for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
                 float brightness = entity.starBrightness(star, partialTick);
                 if (brightness <= 0.02F) {
                     continue;
@@ -345,7 +350,7 @@ public final class SpellLightEmitter {
             int emitted = 0;
             for (int pass = 0; pass < 2 && emitted < STARFALL_LIGHT_CAP; pass++) {
                 boolean wantFinale = pass == 0;
-                for (int meteor = 0; meteor < StarfallEntity.METEOR_COUNT
+                for (int meteor = 0; meteor < StarfallShape.METEOR_COUNT
                         && emitted < STARFALL_LIGHT_CAP; meteor++) {
                     boolean finale = StarfallEntity.isFinaleMeteor(meteor);
                     if (finale != wantFinale) {
@@ -370,7 +375,7 @@ public final class SpellLightEmitter {
         // world from a point that is nowhere.
         for (SkyCollapseEntity entity : SKY_COLLAPSE) {
             int emitted = 0;
-            for (int shard = SkyCollapseEntity.SHARD_COUNT - 1;
+            for (int shard = SkyCollapseShape.SHARD_COUNT - 1;
                     shard >= 0 && emitted < SKY_COLLAPSE_LIGHT_CAP; shard--) {
                 float brightness = entity.shardBrightness(shard, partialTick);
                 if (brightness <= 0.05F) {
@@ -388,7 +393,7 @@ public final class SpellLightEmitter {
         // Stellar Convergence: this is the case the multi-light pass was built
         // for. Nine coloured sources at once, each throwing its own shadow.
         for (StellarConvergenceEntity entity : CONVERGENCE) {
-            for (int star = 0; star < StellarConvergenceEntity.STAR_COUNT; star++) {
+            for (int star = 0; star < StellarConvergenceShape.STAR_COUNT; star++) {
                 float brightness = entity.starBrightness(star, partialTick);
                 if (brightness <= 0.05F) {
                     continue;
@@ -500,14 +505,14 @@ public final class SpellLightEmitter {
             float blue = 0.38F + hardened * 0.55F;
             if (trunk > 0.05F) {
                 result.add(new Light(
-                        seed.add(0.0D, WorldTreeEntity.TRUNK_HEIGHT * trunk * 0.5D, 0.0D),
+                        seed.add(0.0D, WorldTreeShape.TRUNK_HEIGHT * trunk * 0.5D, 0.0D),
                         30.0F, (0.7F + trunk * 1.4F) * fade, 1.0F, green, blue));
             }
             float crown = entity.crownProgress(partialTick);
             if (crown > 0.05F) {
                 result.add(new Light(
-                        seed.add(0.0D, WorldTreeEntity.TRUNK_HEIGHT * trunk
-                                + WorldTreeEntity.BRANCH_REACH * 0.4D, 0.0D),
+                        seed.add(0.0D, WorldTreeShape.TRUNK_HEIGHT * trunk
+                                + WorldTreeShape.BRANCH_REACH * 0.4D, 0.0D),
                         34.0F, crown * 2.2F * fade,
                         1.0F, Math.min(1.0F, green + 0.1F), Math.min(1.0F, blue + 0.1F)));
             }

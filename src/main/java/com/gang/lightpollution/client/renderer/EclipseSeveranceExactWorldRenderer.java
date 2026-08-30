@@ -84,7 +84,8 @@ public final class EclipseSeveranceExactWorldRenderer {
         }
 
         collectFrame(event, minecraft);
-        if (FRAME.isEmpty()) {
+        if (FRAME.isEmpty()
+                && com.gang.lightpollution.fx.FxRegistry.eclipseSeverances().isEmpty()) {
             postAppliedThisFrame = false;
             return;
         }
@@ -100,6 +101,19 @@ public final class EclipseSeveranceExactWorldRenderer {
                     continue;
                 }
                 renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition, visual, age);
+            }
+            // Anything another mod asked for through the API. Drawn by the same call, because
+            // renderOne only ever needed the visual state — the entity was just where it came from.
+            for (com.gang.lightpollution.fx.EclipseSeveranceSource source
+                    : com.gang.lightpollution.fx.FxRegistry.eclipseSeverances()) {
+                EclipseSeveranceVisualInstance visual = source.visual();
+                float age = visual.ageSeconds();
+                visual.advanceTo(age);
+                if (!visual.isAlive(age)) {
+                    continue;
+                }
+                renderOne(SpellRenderStage.levelPoseStack(event), event.getCamera(), cameraPosition,
+                        visual, age);
             }
         } finally {
             state.restore();

@@ -1,5 +1,9 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.api.LeviathanParams;
+import com.gang.lightpollution.fx.FxHash;
+import com.gang.lightpollution.fx.LeviathanShape;
+import com.gang.lightpollution.fx.LeviathanSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -39,23 +43,11 @@ import java.util.UUID;
  * synchronized seed, so the renderer and the server-side sweeps read the same
  * curve without any extra syncing.</p>
  */
-public final class LeviathanEntity extends Entity {
-    public static final int LIFETIME_TICKS = 190;
-    /** The spine traces in from off in the distance over this window. */
-    public static final int APPROACH_END_TICK = 70;
-    /** Ribs and fins extrude, making the silhouette legible. */
-    public static final int FLESH_END_TICK = 95;
-    /** The head rears up and holds. */
-    public static final int REAR_END_TICK = 120;
-    /** The bite. */
-    public static final int BITE_TICK = 128;
-    /** The body tears into ribbons from here.  */
-    public static final int UNRAVEL_START_TICK = 140;
+public final class LeviathanEntity extends Entity implements LeviathanSource {
+    // The form lives in LeviathanShape, which the renderer and the public API both read, so there is
+    // one definition rather than a spell copy and an API copy that can drift.
+    public static final int LIFETIME_TICKS = LeviathanParams.SPELL_LIFETIME_TICKS;
 
-    /** Segments the spine is sampled into. */
-    public static final int SPINE_SEGMENTS = 48;
-    /** Length of the body, in blocks. */
-    public static final float BODY_LENGTH = 90.0F;
     /**
      * How far the S-curve swings off its axis, in blocks.
      *
@@ -63,19 +55,6 @@ public final class LeviathanEntity extends Entity {
      * body length. At 90 blocks that is 9 to 16, so the old 26 was well outside
      * anything a real animal does and read as a flapping ribbon.</p>
      */
-    public static final float SWING_AMPLITUDE = 14.0F;
-    /**
-     * How far the body rises and falls as the wave passes, in blocks. Small,
-     * because lateral undulation is overwhelmingly horizontal.
-     */
-    public static final float VERTICAL_AMPLITUDE = 3.0F;
-    /**
-     * Complete undulation cycles held along the body at once. Anguilliform
-     * wavelength is 0.6 to 0.7 body lengths, which is 1.4 to 1.7 waves.
-     */
-    public static final float UNDULATION_WAVES = 1.6F;
-    /** Height the body swims at above the aimed point, in blocks. */
-    public static final float SWIM_HEIGHT = 16.0F;
     /**
      * Thickest radius of the body, in blocks.
      *
@@ -84,28 +63,17 @@ public final class LeviathanEntity extends Entity {
      * 90-block body — stubbier than any real snake, which is part of why it read
      * as a pipe. 2.0 gives 22:1, the proportion of a large constrictor.</p>
      */
-    public static final float BODY_RADIUS = 2.0F;
-    /** Section height as a fraction of its width. Terrestrial snakes: 1.0 to 1.2. */
-    public static final float SECTION_HEIGHT_RATIO = 1.05F;
-    /** How much narrower the ventral plate is than the back, 0 to 1. */
-    public static final float SECTION_VENTRAL_TAPER = 0.30F;
     /** Dorsal scale rows at midbody. Real large snakes carry 19 to 25. */
     public static final int DORSAL_ROWS_MID = 21;
     /** Dorsal scale rows before the vent; row count drops as the body tapers. */
     public static final int DORSAL_ROWS_REAR = 17;
-    /** How far the head rears above the swim height, in blocks. */
-    public static final float REAR_HEIGHT = 22.0F;
-    /** Share of the swing amplitude the head keeps; small, but not zero. */
-    private static final float HEAD_AMPLITUDE_SHARE = 0.08F;
-    /** How far the body banks into a bend at peak curvature, in radians. */
-    private static final float BANK_ANGLE = 0.38F;
 
     /** Radius of the bite, in blocks. */
     public static final double BITE_RADIUS = 9.0D;
     /** Radius swept by the body as it passes, in blocks. */
     public static final double SWEEP_RADIUS = 5.0D;
     /** Bound used to gather candidates. */
-    public static final double EFFECT_RADIUS = BODY_LENGTH * 0.5D + BITE_RADIUS + 4.0D;
+    public static final double EFFECT_RADIUS = LeviathanShape.BODY_LENGTH * 0.5D + BITE_RADIUS + 4.0D;
 
     /** Max-health fraction for being caught by the passing body. */
     private static final float SWEEP_DAMAGE_FRACTION = 0.056F;
@@ -211,41 +179,31 @@ public final class LeviathanEntity extends Entity {
      * How much of the body has arrived, 0 to 1. The head leads, so at 0.3 only the
      * front third exists.
      */
+    /** What this entity's synced state amounts to, for the shared shape maths. */
+    @Override
+    public LeviathanParams shapeParams() {
+        return LeviathanParams.of(getBearing(), getSeed());
+    }
+
     public float extended(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age >= APPROACH_END_TICK) {
-            return 1.0F;
-        }
-        return smoothstep(age / APPROACH_END_TICK);
+        return LeviathanShape.extended(getVisualAgeTicks(partialTick));
     }
 
     /** How far the ribs and fins have grown out, 0 to 1. */
     public float flesh(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= APPROACH_END_TICK * 0.5F) {
-            return 0.0F;
-        }
-        return Mth.clamp((age - APPROACH_END_TICK * 0.5F)
-                / (FLESH_END_TICK - APPROACH_END_TICK * 0.5F), 0.0F, 1.0F);
+        return LeviathanShape.flesh(getVisualAgeTicks(partialTick));
     }
 
     /** How far the head has reared, 0 to 1. */
     public float rear(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= FLESH_END_TICK) {
-            return 0.0F;
-        }
-        if (age >= REAR_END_TICK) {
-            return 1.0F;
-        }
-        return smoothstep((age - FLESH_END_TICK) / (REAR_END_TICK - FLESH_END_TICK));
+        return LeviathanShape.rear(getVisualAgeTicks(partialTick));
     }
 
     /**
      * The strike, 0 before it starts and 1 once the jaws are on the target.
      *
-     * <p>This is what was missing. The body swims {@link #SWIM_HEIGHT} blocks above
-     * the aimed point and the head rears another {@link #REAR_HEIGHT} on top of
+     * <p>This is what was missing. The body swims {@link #LeviathanShape.SWIM_HEIGHT} blocks above
+     * the aimed point and the head rears another {@link #LeviathanShape.REAR_HEIGHT} on top of
      * that, so at the moment of the bite the jaws were closing thirty-eight blocks
      * above the creature they were aimed at — well outside {@link #BITE_RADIUS}, so
      * the bite hit nothing and visibly snapped shut in empty sky. The front of the
@@ -253,43 +211,17 @@ public final class LeviathanEntity extends Entity {
      * striking snake does and what puts the jaws where the damage is.</p>
      */
     public float strike(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= REAR_END_TICK) {
-            return 0.0F;
-        }
-        if (age >= BITE_TICK) {
-            return 1.0F;
-        }
-        // Accelerating rather than eased: a strike is a snap, not a lean.
-        float raw = (age - REAR_END_TICK) / (BITE_TICK - REAR_END_TICK);
-        return raw * raw;
+        return LeviathanShape.strike(getVisualAgeTicks(partialTick));
     }
 
     /** How wide the jaws are open, 0 shut to 1 fully open. */
     public float jawOpen(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= FLESH_END_TICK) {
-            return 0.0F;
-        }
-        if (age < REAR_END_TICK) {
-            // Opens as it rears.
-            return smoothstep((age - FLESH_END_TICK) / (REAR_END_TICK - FLESH_END_TICK));
-        }
-        if (age < BITE_TICK) {
-            // Snaps shut. Fast, because the snap is the beat the whole spell is for.
-            return 1.0F - smoothstep((age - REAR_END_TICK) / (BITE_TICK - REAR_END_TICK));
-        }
-        return 0.0F;
+        return LeviathanShape.jawOpen(getVisualAgeTicks(partialTick));
     }
 
     /** How far the body has come apart, 0 intact to 1 gone. */
     public float unravel(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age <= UNRAVEL_START_TICK) {
-            return 0.0F;
-        }
-        return Mth.clamp((age - UNRAVEL_START_TICK)
-                / (float) (LIFETIME_TICKS - UNRAVEL_START_TICK), 0.0F, 1.0F);
+        return LeviathanShape.unravel(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     /**
@@ -304,53 +236,8 @@ public final class LeviathanEntity extends Entity {
      * what stops it looking like a flag.</p>
      */
     public Vec3 spinePoint(float t, float partialTick) {
-        float clamped = Mth.clamp(t, 0.0F, 1.0F);
-        Vec3 anchor = anchor(partialTick);
-        float bearing = getBearing();
-        float dirX = Mth.cos(bearing);
-        float dirZ = Mth.sin(bearing);
-        float sideX = -dirZ;
-        float sideZ = dirX;
-
-        float along = -clamped * BODY_LENGTH;
-        // Negative, so the head starts behind the caster and travels forward past
-        // the aimed point. With this added instead of subtracted the head began in
-        // front of the target and moved backward, which put the tail at the leading
-        // end -- the body arrived tail first.
-        float approach = (1.0F - extended(partialTick)) * BODY_LENGTH * 1.6F;
-        along -= approach;
-
-        // The wave travels tail-ward: subtracting time from the position term is
-        // what makes the body slither rather than sway.
-        float wave = wavePhase(clamped, partialTick);
-
-        // Lateral swing. Amplitude grows toward the tail as s^1.5, which is the
-        // measured envelope for anguilliform swimming, plus a small constant so the
-        // head is not pinned dead still. The old clamp(t * 2.2) saturated a third of
-        // the way along and was flat after that, so the back two thirds of the body
-        // all swung by the same amount -- a flag, not an animal.
-        float envelope = HEAD_AMPLITUDE_SHARE
-                + (1.0F - HEAD_AMPLITUDE_SHARE) * (float) Math.pow(clamped, 1.5D);
-        float swing = Mth.sin(wave) * SWING_AMPLITUDE * envelope;
-
-        // A smaller vertical wave a quarter cycle out of phase. Without this the
-        // body is a flat ribbon of motion however round the mesh is.
-        float bob = Mth.sin(wave + Mth.HALF_PI) * VERTICAL_AMPLITUDE * envelope;
-
-        float rear = rear(partialTick);
-        // Only the front third of the body rears and strikes; the rest holds its
-        // swimming height, which is what makes the motion read as a strike rather
-        // than the whole animal moving up and down.
-        float headBias = Math.max(0.0F, 1.0F - clamped * 3.0F);
-        float lift = REAR_HEIGHT * rear * headBias;
-        // Brings the jaws all the way down onto the aimed point. See strike().
-        float plunge = strike(partialTick)
-                * (SWIM_HEIGHT + REAR_HEIGHT * rear) * headBias;
-
-        return anchor.add(
-                dirX * along + sideX * swing,
-                SWIM_HEIGHT + lift + bob - plunge,
-                dirZ * along + sideZ * swing);
+        return LeviathanShape.spinePoint(shapeParams(), anchor(partialTick), t,
+                getVisualAgeTicks(partialTick));
     }
 
     /**
@@ -369,35 +256,7 @@ public final class LeviathanEntity extends Entity {
      * to a point instead of ending in a stub.</p>
      */
     public float bodyRadius(float t, float partialTick) {
-        float clamped = Mth.clamp(t, 0.0F, 1.0F);
-        float profile;
-        if (clamped < 0.02F) {
-            // Rostral tip.
-            profile = 0.30F + clamped / 0.02F * 0.25F;
-        } else if (clamped < 0.055F) {
-            // Skull, broader than the neck behind it.
-            profile = 0.55F + Mth.sin((clamped - 0.02F) / 0.035F * Mth.PI) * 0.40F;
-        } else if (clamped < 0.10F) {
-            // Neck pinch. This is the detail that makes a head read as a head.
-            profile = 0.95F - (clamped - 0.055F) / 0.045F * 0.27F;
-        } else if (clamped < 0.15F) {
-            // Filling out to full girth.
-            profile = 0.68F + (clamped - 0.10F) / 0.05F * 0.32F;
-        } else if (clamped < 0.55F) {
-            // The plateau. A few percent of drift so it is not a machined
-            // cylinder, but essentially constant.
-            profile = 1.0F - 0.03F * Mth.sin((clamped - 0.15F) / 0.40F * Mth.PI);
-        } else if (clamped < 0.85F) {
-            // Gentle taper through the posterior body.
-            float back = (clamped - 0.55F) / 0.30F;
-            profile = 1.0F - back * back * (3.0F - 2.0F * back) * 0.45F;
-        } else {
-            // The tail, 15% of total length. Power falloff, so it thins slowly at
-            // first and whips to a point at the very end.
-            float tail = (clamped - 0.85F) / 0.15F;
-            profile = 0.55F * (1.0F - (float) Math.pow(tail, 2.2D)) + 0.02F;
-        }
-        return BODY_RADIUS * profile * (1.0F - unravel(partialTick) * 0.6F);
+        return LeviathanShape.bodyRadius(shapeParams(), t, getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     /**
@@ -411,42 +270,18 @@ public final class LeviathanEntity extends Entity {
      * with the displacement, which is where the peak curvature is.</p>
      */
     public float roll(float t, float partialTick) {
-        float clamped = Mth.clamp(t, 0.0F, 1.0F);
-        float envelope = HEAD_AMPLITUDE_SHARE
-                + (1.0F - HEAD_AMPLITUDE_SHARE) * (float) Math.pow(clamped, 1.5D);
-        return Mth.cos(wavePhase(clamped, partialTick)) * BANK_ANGLE * envelope;
+        return LeviathanShape.roll(shapeParams(), t, getVisualAgeTicks(partialTick));
     }
 
     /** Phase of the travelling undulation at {@code t}. */
-    private float wavePhase(float t, float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        float phase = hashUnit(0, 0x9E3779B9L) * Mth.TWO_PI;
-        return t * Mth.PI * UNDULATION_WAVES * 2.0F - age * 0.16F + phase;
-    }
-
     /** Brightness envelope of the whole body. */
     public float brightness(float partialTick) {
-        float age = getVisualAgeTicks(partialTick);
-        if (age < APPROACH_END_TICK) {
-            return 0.35F + extended(partialTick) * 0.65F;
-        }
-        if (age < BITE_TICK) {
-            return 1.0F;
-        }
-        if (age < UNRAVEL_START_TICK) {
-            // Flares on the bite.
-            return 1.0F + (BITE_TICK + 12.0F - age) * 0.09F;
-        }
-        return Math.max(0.0F, 1.0F - unravel(partialTick));
+        return LeviathanShape.brightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
     }
 
     /** Flash of the bite, 0 outside its window. */
     public float biteFlash(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - BITE_TICK;
-        if (since < 0.0F || since > 14.0F) {
-            return 0.0F;
-        }
-        return 1.0F - since / 14.0F;
+        return LeviathanShape.biteFlash(getVisualAgeTicks(partialTick));
     }
 
     private static float smoothstep(float t) {
@@ -455,14 +290,7 @@ public final class LeviathanEntity extends Entity {
     }
 
     private float hashUnit(int index, long salt) {
-        long hash = (getSeed() & 0xFFFFFFFFL) * 0x2545F4914F6CDD1DL
-                ^ (index + 1L) * salt;
-        hash ^= hash >>> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >>> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >>> 33;
-        return (float) ((hash >>> 1) / (double) Long.MAX_VALUE);
+        return FxHash.unit(getSeed(), index, salt);
     }
 
     @Override
@@ -475,15 +303,15 @@ public final class LeviathanEntity extends Entity {
             // rather than on where it stood when the spell was cast. Eased rather
             // than snapped: the whole ninety-block body hangs off this point, and
             // teleporting it would make the animal jerk.
-            if (timelineTick < BITE_TICK) {
+            if (timelineTick < LeviathanShape.BITE_TICK) {
                 chaseTarget(serverLevel);
             }
             // Anything the body passes through while it is swimming.
-            if (timelineTick > 4 && timelineTick < BITE_TICK
+            if (timelineTick > 4 && timelineTick < LeviathanShape.BITE_TICK
                     && timelineTick % SWEEP_INTERVAL_TICKS == 0) {
                 resolveSweep(serverLevel);
             }
-            if (!this.biteResolved && timelineTick >= BITE_TICK) {
+            if (!this.biteResolved && timelineTick >= LeviathanShape.BITE_TICK) {
                 this.biteResolved = true;
                 resolveBite(serverLevel);
             }
