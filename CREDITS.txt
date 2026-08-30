@@ -6,17 +6,29 @@ Some of FX (github.com/YangMao-Minister/some_of_fx), MIT, (c) 2026 Pizuka
   textures, and the sound effects derive from that project. Full licence text in
   SOME_OF_FX_LICENSE.txt.
 
-ArcaneVortex, by ErChien — used with the author's written permission
+TextAnimator (github.com/Snownee/TextAnimator), Apache 2.0, (c) 2023 Snownee
+  The seventeen animated text effects — shake, wave, wiggle, swing, bounce,
+  pendulum, turbulence, scroll, rainbow, gradient, pulse, fade, shadow, glitch,
+  neon, typewriter — are ported from that project's effect package, with the maths
+  of each effect and its constants unchanged. Full licence text in
+  TEXTANIMATOR_LICENSE.txt.
+  Changed from the original: seventeen classes and a registry became one enum, the
+  control-code syntax is &{name params} rather than XML-ish tags, the direction
+  table is seeded so a letter shakes the same way every launch, and glitch does not
+  split a glyph into masked halves. The spectrum effect is ours, not theirs.
+  Robert Penner's bounce easing reaches this by way of that project, via Tween.js
+  (MIT); its constants are unchanged.
+
+ArcaneVortex, by ErChien — the same author as this mod
   Gargantua's ray-marched black hole draws on ArcaneVortex's rendering work, and
   the optional tooltip frames follow its custom tooltip renderers — the glow rays,
   the title separator, the per-item accent border, the threaded ring, the
   counter-rotating sigil, the orbiting backdrop and the pinwheel text layout.
   The sigil's plasma shell is its volumetric_shader, ported as it stands.
-  ArcaneVortex is All Rights Reserved; the author gave permission for direct use
-  of the code on the condition that it be credited, and this notice is that
-  condition being met. Please do not redistribute ArcaneVortex's own code on the
-  strength of this notice — the permission was granted to this project, not
-  onward.
+  ArcaneVortex is All Rights Reserved and shares an author with this mod, so the
+  reuse is the author reusing their own work; the credit is kept because the code
+  did not originate here. Please do not redistribute ArcaneVortex's own code on
+  the strength of this notice — it is not a grant to anyone else.
   The physics and every radius come from James, von Tunzelmann, Franklin &
   Thorne, "Gravitational lensing by spinning black holes in astrophysics, and in
   the movie Interstellar", Classical and Quantum Gravity 32, 065001 (2015).

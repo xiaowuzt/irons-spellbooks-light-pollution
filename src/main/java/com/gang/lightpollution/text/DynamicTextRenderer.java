@@ -8,6 +8,10 @@ package com.gang.lightpollution.text;
  * engine it also fed, and that compat layer was left behind in the port.
  */
 
+import com.gang.lightpollution.text.anim.AnimSpec;
+import com.gang.lightpollution.text.anim.GlyphState;
+import net.minecraft.Util;
+import net.minecraft.util.Mth;
 import com.gang.lightpollution.mixin.FontInvoker;
 import com.gang.lightpollution.text.EffectStyle;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -68,6 +72,12 @@ public final class DynamicTextRenderer {
 
         float[] cursor = {x};
         int[] visibleIndex = {0};
+        // Identifies this run for effects that need progress across frames. The visible text is the
+        // right key: the same string drawn twice is one reveal, which is what a typewriter means, and
+        // a different string is a different reveal. Built lazily — only the typewriter reads it, and
+        // building it walks the whole sequence.
+        String[] runKey = {null};
+        boolean[] runKeyBuilt = {false};
 
         text.accept((stringIndex, encodedStyle, codePoint) -> {
             Style baseStyle = EffectStyle.clean(encodedStyle);
@@ -81,6 +91,63 @@ public final class DynamicTextRenderer {
             float drawY = y;
             int primaryColor = normalizedColor;
             Style primaryStyle = baseStyle;
+
+            // The animated effects, which move and recolour the glyph rather than drawing extra
+            // copies of it. Applied before the ten shading effects below, so those still decide the
+            // final look of anything they touch.
+            AnimSpec anim = AnimSpec.byId(EffectStyle.animId(encodedStyle));
+            Matrix4f glyphPose = pose;
+            if (anim != null) {
+                GlyphState glyph = ANIM_STATE.get();
+                // False, not the caller's flag. This means "we are drawing the shadow pass", and we
+                // never draw one: each glyph goes to drawInBatch with the flag and vanilla draws both
+                // passes itself, dimming the shadow with its own factor. Passing the flag through made
+                // it read "this text has a shadow", so every colour effect bailed out on shadowed text
+                // — which is most text.
+                glyph.reset(codePoint, glyphIndex, false,
+                        ((normalizedColor >> 16) & 0xFF) / 255.0F,
+                        ((normalizedColor >> 8) & 0xFF) / 255.0F,
+                        (normalizedColor & 0xFF) / 255.0F,
+                        ((normalizedColor >>> 24) & 0xFF) / 255.0F,
+                        anim.needsRunKey() ? runKeyOf(text, runKey, runKeyBuilt) : null);
+                anim.apply(glyph, Util.getMillis());
+                // Fully transparent means hidden, which is how the typewriter conceals what it has
+                // not yet revealed. Returning here rather than drawing with alpha 0 because
+                // Font.adjustColor turns an alpha under 4 back into opaque, so the glyph would show.
+                if (glyph.a <= 0.0F) {
+                    cursor[0] += advance;
+                    return true;
+                }
+                drawX += glyph.x;
+                drawY += glyph.y;
+                primaryColor = glyph.packedColour();
+                // Written onto the Style as well as passed as the argument. Font's renderer reads the
+                // colour off the Style whenever it has one and only falls back to the argument when it
+                // does not — so on text with any colour code, passing it as the argument alone means
+                // every recolouring effect is computed and then thrown away.
+                primaryStyle = primaryStyle.withColor(primaryColor & 0xFFFFFF);
+                // Two different pivots, as upstream has them: a swing turns about the glyph's centre,
+                // a pendulum hangs from its top. Using the centre for both makes the pendulum spin.
+                if (glyph.rotation != 0.0F) {
+                    glyphPose = turned(pose, drawX + advance * 0.5F, drawY + ANIM_LINE_HEIGHT * 0.5F,
+                            glyph.rotation);
+                } else if (glyph.pendulum != 0.0F) {
+                    glyphPose = turned(pose, drawX + advance * 0.5F, drawY,
+                            glyph.pendulum * ANIM_RAD_TO_DEG);
+                }
+                if (glyph.glowPasses > 0 && glyph.glowRadius > 0.0F) {
+                    // Saturated, not the glyph's own colour: white text glowing white shows nothing.
+                    int glowColour = multiplyAlpha(replaceRgb(primaryColor, saturate(primaryColor)),
+                            glyph.glowAlpha);
+                    for (int pass = 0; pass < glyph.glowPasses; pass++) {
+                        double around = Math.PI * 2.0 * pass / glyph.glowPasses;
+                        drawGlyph(font, codePoint, primaryStyle,
+                                drawX + (float) Math.cos(around) * glyph.glowRadius,
+                                drawY + (float) Math.sin(around) * glyph.glowRadius,
+                                glowColour, false, glyphPose, buffers, mode, 0, packedLight);
+                    }
+                }
+            }
 
             if (mask != 0) {
                 long frame = DynamicTextRuntime.animationFrame();
@@ -308,13 +375,90 @@ public final class DynamicTextRenderer {
 
             drawGlyph(
                     font, codePoint, primaryStyle, drawX, drawY, primaryColor, shadow,
-                    pose, buffers, mode, backgroundColor, packedLight
+                    glyphPose, buffers, mode, backgroundColor, packedLight
             );
+            // Advances by the unanimated width, deliberately: the cursor is what the next glyph and
+            // every width measurement agree on, so letting an offset feed into it would make an
+            // animated string measure differently each frame and shake its own container.
             cursor[0] += advance;
             return true;
         });
 
         return (int) cursor[0] + (shadow ? 1 : 0);
+    }
+
+    /** Degrees per radian, for the pendulum's radians. */
+    private static final float ANIM_RAD_TO_DEG = (float) (180.0 / Math.PI);
+
+    /** Font line height, for the swing's pivot. Vanilla's, and not configurable. */
+    private static final float ANIM_LINE_HEIGHT = 9.0F;
+
+    /**
+     * Reused per glyph rather than allocated.
+     *
+     * <p>Thread-local because text is drawn from the render thread but ModernUI lays out on its own
+     * workers, and a shared instance would be torn between them.</p>
+     */
+    private static final ThreadLocal<GlyphState> ANIM_STATE = ThreadLocal.withInitial(GlyphState::new);
+
+    /**
+     * A copy of {@code pose} turned about a point, in screen space.
+     *
+     * <p>A copy rather than a mutation: the caller's matrix is the shared GUI pose and every later
+     * glyph would inherit the rotation.</p>
+     */
+    private static Matrix4f turned(Matrix4f pose, float pivotX, float pivotY, float degrees) {
+        return new Matrix4f(pose)
+                .translate(pivotX, pivotY, 0.0F)
+                .rotateZ(degrees * Mth.DEG_TO_RAD)
+                .translate(-pivotX, -pivotY, 0.0F);
+    }
+
+    /**
+     * The most saturated version of a colour, for a glow that reads against the glyph.
+     *
+     * <p>A glow in the glyph's own colour is invisible on bright text, which is most text. Pushing the
+     * dominant channel up and the others down keeps the hue recognisable while giving the halo
+     * something to be.</p>
+     */
+    private static int saturate(int argb) {
+        float r = ((argb >> 16) & 0xFF) / 255.0F;
+        float g = ((argb >> 8) & 0xFF) / 255.0F;
+        float b = (argb & 0xFF) / 255.0F;
+        float max = Math.max(r, Math.max(g, b));
+        if (max <= 0.0F) {
+            return 0x4488FF;
+        }
+        float min = Math.min(r, Math.min(g, b));
+        // Grey text has no hue to preserve, so give it a cyan cast rather than a grey halo.
+        if (max - min < 0.08F) {
+            return 0x66CCFF;
+        }
+        float scale = 1.0F / max;
+        return (glowChannel(r * scale) << 16) | (glowChannel(g * scale) << 8) | glowChannel(b * scale);
+    }
+
+    private static int glowChannel(float value) {
+        return Math.max(0, Math.min(255, Math.round(value * 255.0F)));
+    }
+
+    /** The run key, built on first use and reused for the rest of this draw. */
+    private static String runKeyOf(FormattedCharSequence text, String[] cache, boolean[] built) {
+        if (!built[0]) {
+            cache[0] = plainTextOf(text);
+            built[0] = true;
+        }
+        return cache[0];
+    }
+
+    /** The visible characters of a sequence, for use as a stable key. */
+    private static String plainTextOf(FormattedCharSequence text) {
+        StringBuilder plain = new StringBuilder();
+        text.accept((position, style, codePoint) -> {
+            plain.appendCodePoint(codePoint);
+            return true;
+        });
+        return plain.toString();
     }
 
     private static float[] effectBounds(Font font, FormattedCharSequence text, float startX, int effect) {

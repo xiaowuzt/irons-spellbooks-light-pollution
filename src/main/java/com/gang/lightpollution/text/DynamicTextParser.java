@@ -8,6 +8,8 @@ package com.gang.lightpollution.text;
  * those mods on the compile classpath, and this mod has no quest text to style.
  */
 
+import com.gang.lightpollution.text.anim.AnimCodes;
+import com.gang.lightpollution.text.anim.AnimSpec;
 import com.gang.lightpollution.text.DynamicTextClientConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -35,6 +37,15 @@ public final class DynamicTextParser {
     public static final char MARK_LITERAL_AMPERSAND = '\uE0FA';
     public static final char MARK_RED_SPEED_NEON = '\uE0FB';
     public static final char MARK_SYNTHWAVE_NEON = '\uE0FC';
+    /**
+     * Opens an interned animation spec id, closed by {@link #MARK_ANIM_END}, with decimal digits
+     * between. Id 0 closes the current spec.
+     *
+     * <p>Needed because an animation is written with braces, an equals sign and mixed case, none
+     * of which reliably survive being handed to another mod's colour-code parser. Digits do.</p>
+     */
+    public static final char MARK_ANIM = '\uE0FD';
+    public static final char MARK_ANIM_END = '\uE0FE';
 
     private DynamicTextParser() {
     }
@@ -140,6 +151,12 @@ public final class DynamicTextParser {
             if (current == '&' && index + 1 < text.length() && isControlCode(text.charAt(index + 1))) {
                 return true;
             }
+            // The animated forms too, or FTB Quests text written with the animation codes would
+            // be handed straight through and never animate.
+            if (current == '&' && (AnimCodes.longFormEnd(text, index) > 0
+                    || AnimCodes.isShortForm(text, index))) {
+                return true;
+            }
         }
         return false;
     }
@@ -161,7 +178,7 @@ public final class DynamicTextParser {
      * 这样 FTB 的替换变量、JSON Component、链接和图片语法仍由原模组处理。
      */
     public static String prepareForFtb(String rawText) {
-        if (rawText == null || rawText.isEmpty()) {
+        if (rawText == null || rawText.isEmpty() || DynamicTextPort.standDown()) {
             return rawText;
         }
 
@@ -177,6 +194,36 @@ public final class DynamicTextParser {
                 index += 2;
                 changed = true;
                 continue;
+            }
+
+            if (current == '&' && AnimCodes.isClose(rawText, index)) {
+                result.append(MARK_ANIM).append('0').append(MARK_ANIM_END);
+                index += AnimCodes.CLOSE.length() - 1;
+                changed = true;
+                continue;
+            }
+
+            if (current == '&') {
+                int longEnd = AnimCodes.longFormEnd(rawText, index);
+                if (longEnd > 0) {
+                    AnimSpec spec = AnimCodes.parseLongForm(rawText, index);
+                    if (spec != null) {
+                        result.append(MARK_ANIM).append(spec.id()).append(MARK_ANIM_END);
+                    }
+                    index = longEnd - 1;
+                    changed = true;
+                    continue;
+                }
+                int shortLength = AnimCodes.shortFormLength(rawText, index);
+                if (shortLength > 0) {
+                    AnimSpec shortSpec = AnimCodes.parseShortForm(rawText, index);
+                    if (shortSpec != null) {
+                        result.append(MARK_ANIM).append(shortSpec.id()).append(MARK_ANIM_END);
+                    }
+                    index += shortLength - 1;
+                    changed = true;
+                    continue;
+                }
             }
 
             if (current == '&' && index + 1 < rawText.length()) {
@@ -241,8 +288,23 @@ public final class DynamicTextParser {
         return result.toString();
     }
 
+    /** The decimal id between two animation markers, or 0 if it is not one. */
+    private static int readId(String text, int from, int to) {
+        int value = 0;
+        for (int index = from; index < to; index++) {
+            char digit = text.charAt(index);
+            if (digit < '0' || digit > '9') {
+                return 0;
+            }
+            value = value * 10 + (digit - '0');
+        }
+        return value;
+    }
+
     private static boolean isMarker(char value) {
-        return value == MARK_RAINBOW
+        return value == MARK_ANIM
+                || value == MARK_ANIM_END
+                || value == MARK_RAINBOW
                 || value == MARK_GLITCH
                 || value == MARK_CYBER
                 || value == MARK_MAGIC
@@ -334,6 +396,8 @@ public final class DynamicTextParser {
         private Style bufferStyle = Style.EMPTY;
         private int effectMask;
         private int bufferMask;
+        private int animId;
+        private int bufferAnimId;
         private int visibleCharacters;
 
         private ParseState(MutableComponent target) {
@@ -344,9 +408,11 @@ public final class DynamicTextParser {
             flush();
             boolean encoded = EffectStyle.isEncoded(nextStyle);
             int encodedMask = EffectStyle.mask(nextStyle);
+            int encodedAnim = EffectStyle.animId(nextStyle);
             style = cleanEffectMetadata(nextStyle);
             if (encoded) {
                 effectMask = encodedMask;
+                animId = encodedAnim;
             }
         }
 
@@ -369,12 +435,26 @@ public final class DynamicTextParser {
                     flush();
                     style = resetFormatting(style);
                     effectMask = 0;
+                    animId = 0;
                     continue;
                 }
                 int markerMask = maskForMarker(current);
                 if (markerMask != 0) {
                     flush();
                     effectMask |= markerMask;
+                    continue;
+                }
+                if (current == MARK_ANIM) {
+                    int end = text.indexOf(MARK_ANIM_END, index + 1);
+                    if (end > index) {
+                        flush();
+                        animId = readId(text, index + 1, end);
+                        index = end;
+                        continue;
+                    }
+                }
+                if (current == MARK_ANIM_END) {
+                    // Only reachable if the opening marker was lost. Drop it rather than show it.
                     continue;
                 }
 
@@ -385,6 +465,37 @@ public final class DynamicTextParser {
                     appendVisible(text.charAt(index + 2));
                     index += 2;
                     continue;
+                }
+
+                if (current == '&' && AnimCodes.isClose(text, index)) {
+                    flush();
+                    animId = 0;
+                    index += AnimCodes.CLOSE.length() - 1;
+                    continue;
+                }
+                if (current == '&') {
+                    int longEnd = AnimCodes.longFormEnd(text, index);
+                    if (longEnd > 0) {
+                        AnimSpec spec = AnimCodes.parseLongForm(text, index);
+                        if (spec != null) {
+                            flush();
+                            animId = spec.id();
+                        }
+                        // Consumed either way: an unknown effect name should not leave a literal
+                        // brace form showing in an item name.
+                        index = longEnd - 1;
+                        continue;
+                    }
+                    int shortLength = AnimCodes.shortFormLength(text, index);
+                    if (shortLength > 0) {
+                        AnimSpec shortSpec = AnimCodes.parseShortForm(text, index);
+                        if (shortSpec != null) {
+                            flush();
+                            animId = shortSpec.id();
+                        }
+                        index += shortLength - 1;
+                        continue;
+                    }
                 }
 
                 if ((current == '&' || current == ChatFormatting.PREFIX_CODE) && index + 1 < text.length()) {
@@ -422,12 +533,16 @@ public final class DynamicTextParser {
         }
 
         private void appendVisible(char value) {
-            int activeMask = visibleCharacters < DynamicTextClientConfig.maxTextLength() ? effectMask : 0;
-            if (!buffer.isEmpty() && (bufferMask != activeMask || !bufferStyle.equals(style))) {
+            boolean withinLimit = visibleCharacters < DynamicTextClientConfig.maxTextLength();
+            int activeMask = withinLimit ? effectMask : 0;
+            int activeAnim = withinLimit ? animId : 0;
+            if (!buffer.isEmpty() && (bufferMask != activeMask || bufferAnimId != activeAnim
+                    || !bufferStyle.equals(style))) {
                 flush();
             }
             if (buffer.isEmpty()) {
                 bufferMask = activeMask;
+                bufferAnimId = activeAnim;
                 bufferStyle = style;
             }
             buffer.append(value);
@@ -440,7 +555,7 @@ public final class DynamicTextParser {
             if (buffer.isEmpty()) {
                 return;
             }
-            Style renderedStyle = EffectStyle.withMask(bufferStyle, bufferMask);
+            Style renderedStyle = EffectStyle.encode(bufferStyle, bufferMask, bufferAnimId);
             target.append(Component.literal(buffer.toString()).setStyle(renderedStyle));
             buffer.setLength(0);
         }

@@ -50,14 +50,57 @@ public final class EffectStyle {
     }
 
     public static Style withMask(Style style, int mask) {
+        return encode(style, mask, 0);
+    }
+
+    /**
+     * Carry both the ten-code bit mask and an animation spec id.
+     *
+     * <p>The two are packed as {@code <mask>.<animId>}. A dot is legal in a resource path and cannot
+     * occur in a decimal integer, so a path written by an older version — which had no dot — still
+     * decodes. That matters because two mods ship this encoding and a player may have either
+     * version.</p>
+     */
+    public static Style encode(Style style, int mask, int animId) {
         Style source = style == null ? Style.EMPTY : style;
         ResourceLocation base = baseFont(source.getFont());
         int activeMask = mask & ALL;
-        if (activeMask == 0) {
+        if (activeMask == 0 && animId == 0) {
             return source.withFont(base);
         }
-        String path = PREFIX + activeMask + "/" + base.getNamespace() + "/" + base.getPath();
+        String slot = animId == 0 ? String.valueOf(activeMask) : activeMask + "." + animId;
+        String path = PREFIX + slot + "/" + base.getNamespace() + "/" + base.getPath();
         return source.withFont(ResourceLocation.fromNamespaceAndPath(ExampleMod.MODID, path));
+    }
+
+    /** The animation spec id carried by this style, or 0. */
+    public static int animId(Style style) {
+        return style == null ? 0 : animId(style.getFont());
+    }
+
+    public static int animId(ResourceLocation font) {
+        String slot = slot(font);
+        if (slot == null) {
+            return 0;
+        }
+        int dot = slot.indexOf('.');
+        if (dot < 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(slot.substring(dot + 1));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    /** The {@code <mask>} or {@code <mask>.<animId>} segment, or null when not encoded. */
+    private static String slot(ResourceLocation font) {
+        if (!isEncoded(font)) {
+            return null;
+        }
+        String[] parts = font.getPath().split("/", 4);
+        return parts.length < 4 ? null : parts[1];
     }
 
     public static int mask(Style style) {
@@ -65,17 +108,13 @@ public final class EffectStyle {
     }
 
     public static int mask(ResourceLocation font) {
-        if (!isEncoded(font)) {
+        String slot = slot(font);
+        if (slot == null) {
             return 0;
         }
-
-        String[] parts = font.getPath().split("/", 4);
-        if (parts.length < 4) {
-            return 0;
-        }
-
+        int dot = slot.indexOf('.');
         try {
-            return Integer.parseInt(parts[1]) & ALL;
+            return Integer.parseInt(dot < 0 ? slot : slot.substring(0, dot)) & ALL;
         } catch (NumberFormatException ignored) {
             return 0;
         }
@@ -120,7 +159,7 @@ public final class EffectStyle {
 
         boolean[] found = {false};
         text.visit((style, segment) -> {
-            if (mask(style) != 0) {
+            if (mask(style) != 0 || animId(style) != 0) {
                 found[0] = true;
             }
             return Optional.empty();
@@ -135,7 +174,7 @@ public final class EffectStyle {
 
         boolean[] found = {false};
         sequence.accept((index, style, codePoint) -> {
-            if (mask(style) != 0) {
+            if (mask(style) != 0 || animId(style) != 0) {
                 found[0] = true;
                 return false;
             }

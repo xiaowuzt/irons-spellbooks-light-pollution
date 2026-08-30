@@ -7,6 +7,10 @@
   "mixins": [
     "InscriptionTableScrollSlotMixin"
   ],
+  "client": [
+    "FtbTextUtilsMixin",
+    "ModernUiTextLayoutEngineMixin"
+  ],
   "injectors": {
     "defaultRequire": 0
   }

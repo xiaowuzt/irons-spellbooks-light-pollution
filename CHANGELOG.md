@@ -4,6 +4,73 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.5.0
+
+Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### Seventeen animated text effects
+
+Text can now move, not just change colour. Seventeen effects, ported from Snownee's TextAnimator
+(Apache 2.0, credited in `CREDITS.txt`), on top of the ten this pack already had.
+
+Two ways to write one. The short form takes an effect's defaults:
+
+```
+&xsh shaken     &xwa waved      &xra rainbow
+&xpu pulsing    &xty typed out  &xne glowing
+```
+
+The long form takes parameters, and several effects at once:
+
+```
+&{shake a=2 f=1.5}text&{/}
+&{grad from=5BCEFA to=F5A9B8}text&{/}
+&{shake; wave a=0.5}text&{/}
+```
+
+`&{/}` ends a scope. Both forms work anywhere the ten colour codes already did — item names, lore,
+tooltips, chat, books, signs, and FTB Quests text.
+
+Full list: `shake` `wave` `wiggle` `swing` `bounce` `pend` `turb` `scroll` `rainb` `grad` `pulse`
+`fade` `shadow` `glitch` `neon` `typewriter`, plus `spec` which is ours rather than upstream's.
+
+### Three rendering faults that had been hiding effects
+
+These are worth naming because each one silently disabled whole effects rather than producing an
+error, and two of them predate this release.
+
+- **A glyph's colour was computed and then discarded on most text.** Vanilla's font renderer reads
+  the colour off the `Style` when the style carries one, and only falls back to the colour argument
+  when it does not. We were passing the computed colour as the argument alone — so on any text with a
+  colour code, every recolouring effect ran and had its result thrown away.
+- **Alpha under 4 was forced back to opaque.** `Font.adjustColor` treats a nearly-clear colour as an
+  oversight and sets it fully opaque. The typewriter hides characters it has not revealed by setting
+  alpha to zero, which meant it never hid anything. Transparent glyphs are now skipped outright.
+- **The shadow flag meant the wrong thing.** Upstream sets it while drawing its own shadow pass, and
+  every colour effect skips that pass — recolouring a shadow defeats the point of a shadow. This port
+  never draws a separate pass; vanilla does, and dims it itself. Passing the caller's flag through
+  made the check read "this text has a shadow", so `pulse`, `rainbow`, `gradient`, `neon` and
+  `spectrum` returned immediately on shadowed text, which is nearly all text.
+
+### FTB Quests and ModernUI
+
+Both compatibility layers are now present rather than left behind.
+
+- **FTB Quests.** Codes work in quest titles, subtitles, descriptions and reward text. Two injections
+  rather than one: the codes become private-use markers on the way in, so FTB's own substitution
+  variables, JSON components and link syntax still see the shape they expect, and the finished
+  component is parsed on the way out.
+- **ModernUI.** It picks a font collection from `Style.font`, which is where this mod hides its effect
+  data — so without decoding that lookup, every styled character fell back to the default face.
+- **`FtbQuestTextApi`** writes codes into quest data reflectively. With FTB Quests absent every method
+  returns false rather than throwing, so a script can call it unguarded.
+
+### The text effects are also a separate mod
+
+The same effects now ship as **Luminotype**, for players who want them without the spell pack. With
+both installed Luminotype wins and this copy stands down — otherwise both sets of mixins would parse
+the same string, stacking styles twice and crashing on startup.
+
 ## 1.4.0
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
