@@ -114,15 +114,17 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 · `celestialJudgment.cooldownSeconds`、`manaCost`、`castTimeTicks`、`damageFraction`、`healFraction`、`targetRange`、`impactTick`、`lifetimeTicks`
 · `stargraveSingularity.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`damageFraction`、`lifetimeTicks`、`damageTick`
 · `eclipseSeverance.cooldownSeconds`、`manaCost`、`castTimeTicks`、`damage`、`attackRadius`、`attackAngleDegrees`、`verticalTolerance`、`maxTargets`、`lifetimeTicks`、`damageTick`
-· `funeralNova.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`accretionDamageFraction`、`collapseDamageFraction`、`hypernovaDamageFraction`、`lifetimeTicks`
-· `chromaticAccretion.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`pulseDamageFraction`、`collapseDamageFraction`、`projectileDamageFraction`、`maxProjectileCharge`、`lifetimeTicks`、`formationEndTick`、`collapseTick`
+· `funeralNova.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`accretionDamageFraction`、`collapseDamageFraction`、`hypernovaDamageFraction`、`accretionDamageTick`、`collapseDamageTick`、`lifetimeTicks` 以及八个阶段 tick 键
+· `chromaticAccretion.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`pulseDamageFraction`、`collapseDamageFraction`、`projectileDamageFraction`、`maxProjectileCharge`、`lifetimeTicks`、`formationEndTick`、`collapseTick`、`pulseOneTick`–`pulseFourTick`
 · `worldTree.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`lifetimeTicks`、`healingFraction`、`healingIntervalTicks`、`absorptionHearts`、`protectMagic`、`protectProjectile`、`protectFire`
 
-其余法术的通用键为 `spells.<id>.cooldownSeconds`、`manaCost`、`castTimeTicks` 和 `castRange`；例如 `spells.gargantua.cooldownSeconds`。通用小节的 `<id>` 使用驼峰式（如 `skyCollapse`、`cosmicHorseshoe`）。
+其余法术的通用键为 `spells.<id>.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`lifetimeTicks`、`effectRadius`、`damageFraction`、`secondaryDamageFraction`、`damageIntervalTicks`、`phaseOneTick`、`phaseTwoTick`、`phaseThreeTick` 和 `maxTargets`；例如 `spells.gargantua.effectRadius`。通用小节的 `<id>` 使用驼峰式（如 `skyCollapse`、`cosmicHorseshoe`）。
+
+服务器还可以在 `[server]` 小节设置 `maxActiveSpellEntities`、`maxEntitiesPerSpell` 和 `targetScanLimit`，避免多人同时施法造成过多实体和目标扫描。
 
 其中伤害/治疗比例使用 0–1 的小数（例如 `0.08` 表示最大生命值的 8%），时间使用 tick（20 tick = 1 秒），范围使用方块数。Forge 会在超出允许范围时回退到默认值。
 
-客户端配置文件 `config/irons_spellbooks_light_pollution-client.toml` 提供光照渲染的质量开关：
+客户端配置文件 `config/irons_spellbooks_light_pollution-client.toml` 提供光照渲染的质量开关：`qualityPreset`、`maxLights` 和 `shadowSteps`。超过光源上限时会优先保留最亮的光源。
 
 enabled　　　　是否启用法术的屏幕空间光照，默认开启
 shadowSteps　　每个光源的阴影采样数，默认 32，范围 8–256。数值越高接触阴影越精细，GPU 开销也越大

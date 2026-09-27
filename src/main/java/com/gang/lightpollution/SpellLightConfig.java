@@ -15,11 +15,15 @@ public final class SpellLightConfig {
             .comment("Enable screen-space illumination from migrated spell anchors")
             .define("enabled", true);
     private static final ForgeConfigSpec.IntValue MAX_LIGHTS = BUILDER
-            .comment("Legacy light-count hint. The renderer now uploads every active light; this value is retained for config compatibility.")
-            .defineInRange("maxLights", Integer.MAX_VALUE, 1, Integer.MAX_VALUE);
+            .comment("Hard cap for active spell light sources uploaded each frame.",
+                    "When the cap is reached, the strongest sources are kept.")
+            .defineInRange("maxLights", 64, 1, 512);
     private static final ForgeConfigSpec.IntValue SHADOW_STEPS = BUILDER
             .comment("Depth-buffer shadow samples per light. Higher values improve contact shadows at a GPU cost.")
             .defineInRange("shadowSteps", 32, 8, 256);
+    private static final ForgeConfigSpec.EnumValue<QualityPreset> QUALITY_PRESET = BUILDER
+            .comment("Quality ceiling applied to light count and shadow samples.")
+            .defineEnum("qualityPreset", QualityPreset.HIGH);
 
     private static final ForgeConfigSpec.EnumValue<TooltipStyle> TOOLTIP_STYLE = BUILDER
             .comment("How this mod's own tooltips are drawn.",
@@ -44,8 +48,9 @@ public final class SpellLightConfig {
     public static final ForgeConfigSpec SPEC = BUILDER.build();
 
     public static volatile boolean enabled = true;
-    public static volatile int maxLights = Integer.MAX_VALUE;
+    public static volatile int maxLights = 64;
     public static volatile int shadowSteps = 32;
+    public static volatile QualityPreset qualityPreset = QualityPreset.HIGH;
     /**
      * Which tooltip treatment to draw.
      *
@@ -104,6 +109,21 @@ public final class SpellLightConfig {
     private SpellLightConfig() {
     }
 
+    public enum QualityPreset {
+        LOW(16, 12),
+        MEDIUM(32, 24),
+        HIGH(64, 32),
+        ULTRA(128, 64);
+
+        private final int lightCap;
+        private final int shadowCap;
+
+        QualityPreset(int lightCap, int shadowCap) {
+            this.lightCap = lightCap;
+            this.shadowCap = shadowCap;
+        }
+    }
+
     @SubscribeEvent
     public static void onLoad(ModConfigEvent event) {
         if (event.getConfig().getSpec() != SPEC) {
@@ -112,7 +132,8 @@ public final class SpellLightConfig {
         enabled = ENABLED.get();
         tooltipStyle = TOOLTIP_STYLE.get();
         floatingDamage = FLOATING_DAMAGE.get();
-        maxLights = MAX_LIGHTS.get();
-        shadowSteps = SHADOW_STEPS.get();
+        qualityPreset = QUALITY_PRESET.get();
+        maxLights = Math.max(1, Math.min(MAX_LIGHTS.get(), qualityPreset.lightCap));
+        shadowSteps = Math.max(8, Math.min(SHADOW_STEPS.get(), qualityPreset.shadowCap));
     }
 }

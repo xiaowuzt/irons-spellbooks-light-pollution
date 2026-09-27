@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.ConstellationParams;
 import com.gang.lightpollution.fx.ConstellationShape;
 import com.gang.lightpollution.fx.ConstellationSource;
@@ -47,6 +49,27 @@ import java.util.UUID;
  * and stay in lockstep without any extra syncing.</p>
  */
 public final class ConstellationEntity extends Entity implements ConstellationSource {
+    private static final String CONFIG_ID = "constellation";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
     // The form lives in ConstellationShape, which the renderer and the public API both read, so
     // there is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = ConstellationParams.SPELL_LIFETIME_TICKS;
@@ -102,10 +125,10 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -113,7 +136,7 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     public boolean isCastBy(LivingEntity caster) {
@@ -145,12 +168,12 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
 
     public Vec3 starPosition(int star, float partialTick) {
         return ConstellationShape.starPosition(shapeParams(), anchorCenter(partialTick),
-                getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+                getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     /** Star brightness envelope, 0 to 1: fades in, holds, then burns out. */
     public float starBrightness(int star, float partialTick) {
-        return ConstellationShape.starBrightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return ConstellationShape.starBrightness(getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     private static float smoothstep(float t) {
@@ -171,13 +194,13 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
                 // Every tick, so the pull is a continuous force rather than a
                 // series of shoves.
                 applyPull(serverLevel);
-                if (timelineTick % BURN_INTERVAL_TICKS == 0) {
+                if (timelineTick % configuredInterval() == 0) {
                     resolveBurn(serverLevel);
                 }
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -223,7 +246,7 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
                 // Linear falloff, scaled by the star's own brightness so the pull
                 // dies away with the light as it burns out.
                 double strength = PULL_ACCELERATION * brightness
-                        * (1.0D - distance / PULL_RADIUS);
+                        * (1.0D - distance / configuredRadius());
                 if (strength <= 0.0D) {
                     continue;
                 }
@@ -261,9 +284,9 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
                         target.getBoundingBox().getCenter());
                 // Squared so the damage climbs steeply only near the surface: the
                 // outer field is a nuisance, being held against the star is not.
-                double closeness = 1.0D - Mth.clamp(distance / PULL_RADIUS, 0.0D, 1.0D);
+                double closeness = 1.0D - Mth.clamp(distance / configuredRadius(), 0.0D, 1.0D);
                 float fraction = (float) Mth.lerp(closeness * closeness,
-                        BURN_MIN_FRACTION, BURN_MAX_FRACTION);
+                        configuredPrimaryDamage(), configuredSecondaryDamage());
                 SpellDamage.apply(this, target, source, fraction);
                 target.setSecondsOnFire(closeness > 0.5D ? 6 : 3);
             }
@@ -272,14 +295,14 @@ public final class ConstellationEntity extends Entity implements ConstellationSo
 
     private List<LivingEntity> pullCandidates(ServerLevel level, LivingEntity caster,
                                               Vec3 centre) {
-        return level.getEntitiesOfClass(
+        return SpellConfig.limitTargets("constellation", level.getEntitiesOfClass(
                 LivingEntity.class,
-                new AABB(centre.x - PULL_RADIUS, centre.y - PULL_RADIUS,
-                        centre.z - PULL_RADIUS, centre.x + PULL_RADIUS,
-                        centre.y + PULL_RADIUS, centre.z + PULL_RADIUS),
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius()),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= PULL_RADIUS * PULL_RADIUS);
+                                <= configuredRadius() * configuredRadius()));
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {

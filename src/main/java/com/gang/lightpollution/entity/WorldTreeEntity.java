@@ -335,12 +335,12 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = seedPoint(1.0F);
         double radius = sanctuaryRadius();
-        List<LivingEntity> allies = level.getEntitiesOfClass(
+        List<LivingEntity> allies = SpellConfig.limitTargets("worldTree", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
                         centre.x + radius, centre.y + radius, centre.z + radius),
                 target -> isAlly(caster, target) && target.getBoundingBox().getCenter()
-                        .distanceToSqr(centre) <= radius * radius);
+                        .distanceToSqr(centre) <= radius * radius));
         float healFraction = (float) Math.max(0.0D, SpellConfig.worldTreeHealingFraction);
         float absorption = (float) Math.max(0.0D, SpellConfig.worldTreeAbsorptionHearts * 2.0D);
         for (LivingEntity target : allies) {
@@ -367,7 +367,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
             if (target == null || !isAlly(caster, target)
                     || !insideSanctuary(target, centre)) {
                 if (target != null) {
-                    removeTreeAbsorption(target, entry.getValue().own());
+                    removeTreeAbsorption(target, remainingTreeAbsorption(
+                            entry.getValue(), target.getAbsorptionAmount()));
                 }
                 sanctuaryTargets.remove(entry.getKey());
                 iterator.remove();
@@ -385,34 +386,26 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         UUID uuid = target.getUUID();
         sanctuaryTargets.put(uuid, target);
         AbsorptionState previous = sanctuaryAbsorption.get(uuid);
-        float previousGrant = previous == null ? 0.0F : previous.own();
         float current = Math.max(0.0F, target.getAbsorptionAmount());
+        float remainingOwn = remainingTreeAbsorption(previous, current);
         if (desired <= 0.0F) {
-            if (previousGrant > 0.0F) {
-                removeTreeAbsorption(target, previousGrant);
+            if (remainingOwn > 0.0F) {
+                removeTreeAbsorption(target, remainingOwn);
             }
             sanctuaryAbsorption.remove(uuid);
             sanctuaryTargets.remove(uuid);
             return;
         }
-        // When the total dropped since the previous pulse, some of the tree's
-        // own grant may have been consumed. Keep the remaining own amount from
-        // being mistaken for an external shield, then calculate the external
-        // portion and fill only the missing tree amount. This also handles a
-        // different source adding absorption while the tree is active.
-        float consumed = previous == null ? 0.0F
-                : Math.max(0.0F, previous.lastTotal() - current);
-        float remainingOwn = previous == null
-                ? 0.0F
-                : Math.max(0.0F, previousGrant - consumed);
-        float external = Math.max(0.0F, current - remainingOwn);
-        float newOwn = Math.max(0.0F, desired - external);
-        float total = external + newOwn;
-        if (Math.abs(total - current) > 1.0E-4F) {
+        // Treat any amount above the previous total as an external grant. If the
+        // total dropped, consume the tree's own grant first; this keeps unrelated
+        // absorption intact and makes cleanup safe after the shield is damaged.
+        float missingOwn = Math.max(0.0F, desired - remainingOwn);
+        float total = current + missingOwn;
+        if (missingOwn > 0.0F) {
             target.setAbsorptionAmount(total);
         }
-        if (newOwn > 0.0F) {
-            sanctuaryAbsorption.put(uuid, new AbsorptionState(newOwn, total));
+        if (desired > 0.0F) {
+            sanctuaryAbsorption.put(uuid, new AbsorptionState(desired, total));
         } else {
             sanctuaryAbsorption.remove(uuid);
             sanctuaryTargets.remove(uuid);
@@ -420,6 +413,16 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     }
 
     /** Remove this tree's contribution without touching unrelated absorption. */
+    private float remainingTreeAbsorption(AbsorptionState previous, float current) {
+        if (previous == null) {
+            return 0.0F;
+        }
+        if (current >= previous.lastTotal()) {
+            return previous.own();
+        }
+        return Math.max(0.0F, previous.own() - (previous.lastTotal() - current));
+    }
+
     private void removeTreeAbsorption(LivingEntity target, float grant) {
         float current = Math.max(0.0F, target.getAbsorptionAmount());
         target.setAbsorptionAmount(Math.max(0.0F, current - Math.max(0.0F, grant)));
@@ -431,7 +434,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
             LivingEntity target = entity instanceof LivingEntity living
                     ? living : sanctuaryTargets.get(entry.getKey());
             if (target != null) {
-                removeTreeAbsorption(target, entry.getValue().own());
+                removeTreeAbsorption(target, remainingTreeAbsorption(
+                        entry.getValue(), target.getAbsorptionAmount()));
             }
         }
         sanctuaryAbsorption.clear();

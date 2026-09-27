@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.HelixNebulaParams;
 import com.gang.lightpollution.fx.HelixNebulaShape;
 import com.gang.lightpollution.fx.HelixNebulaSource;
@@ -44,6 +46,39 @@ import java.util.UUID;
  * is when the shell arrives.</p>
  */
 public final class HelixNebulaEntity extends Entity implements HelixNebulaSource {
+    private static final String CONFIG_ID = "helixNebula";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form of the nebula lives in HelixNebulaShape, which is what the renderer and the public API
     // both read, so there is one definition rather than a spell copy and an API copy that can drift.
     // What stays here is only what the server needs in order to hurt things.
@@ -124,9 +159,9 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
     public int getTimelineAgeTicks() {
         long start = this.entityData.get(DATA_START_GAME_TICK);
         if (start < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
-        return (int) Math.min(LIFETIME_TICKS,
+        return (int) Math.min(configuredLifetime(),
                 Math.max(0L, this.level().getGameTime() - start));
     }
 
@@ -140,9 +175,9 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
             // Held just short of the collapse, at full extent. Unlike the microquasar
             // there is nothing cyclic to watch here — the shell only grows — so looping it
             // would restart the expansion over and over instead of letting it be looked at.
-            return Math.min(age, HelixNebulaShape.SHELL_END_TICK - 1.0F);
+            return Math.min(age, configuredPhaseTwo() - 1.0F);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the nebula, where the white dwarf sits. */
@@ -166,24 +201,24 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
 
     /** How far the white dwarf has lit, 0 to 1. */
     public float ignition(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / HelixNebulaShape.IGNITION_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / configuredPhaseOne());
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= HelixNebulaShape.SHELL_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 0.0F;
         }
-        return Mth.clamp((age - HelixNebulaShape.SHELL_END_TICK)
-                / (float) (LIFETIME_TICKS - HelixNebulaShape.SHELL_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredPhaseTwo())
+                / (float) (configuredLifetime() - configuredPhaseTwo()), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= HelixNebulaShape.IGNITION_END_TICK) {
+        if (age <= configuredPhaseOne()) {
             return ignition(partialTick);
         }
-        if (age <= HelixNebulaShape.SHELL_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -204,15 +239,15 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > HelixNebulaShape.IGNITION_END_TICK && timelineTick < HelixNebulaShape.SHELL_END_TICK
-                    && timelineTick % SHELL_INTERVAL_TICKS == 0) {
+            if (timelineTick > configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveShell(serverLevel, timelineTick);
             }
-            if (!this.collapseResolved && timelineTick >= HelixNebulaShape.SHELL_END_TICK) {
+            if (!this.collapseResolved && timelineTick >= configuredPhaseTwo()) {
                 this.collapseResolved = true;
                 resolveCollapse(serverLevel);
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -241,15 +276,15 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
         DamageSource source = HelixNebulaDamage.shell(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("helixNebula", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - outer, centre.y - outer, centre.z - outer,
-                        centre.x + outer, centre.y + outer, centre.z + outer))) {
+                        centre.x + outer, centre.y + outer, centre.z + outer)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
             double distance = target.getBoundingBox().getCenter().distanceTo(centre);
             if (distance >= inner && distance <= outer) {
-                SpellDamage.apply(this, target, source, SHELL_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }
     }
@@ -261,14 +296,14 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
         double reach = HelixNebulaShape.SHELL_END_RADIUS * HelixNebulaShape.OUTER_RING_SCALE;
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("helixNebula", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,
-                        centre.x + reach, centre.y + reach, centre.z + reach))) {
+                        centre.x + reach, centre.y + reach, centre.z + reach)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= reach) {
-                SpellDamage.apply(this, target, source, COLLAPSE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             }
         }
     }

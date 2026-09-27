@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -46,6 +48,35 @@ import java.util.UUID;
  * billion solar mass black hole.</p>
  */
 public final class CosmicHorseshoeEntity extends Entity {
+    private static final String CONFIG_ID = "cosmicHorseshoe";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredAlignEnd() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredHoldEnd() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
     public static final int LIFETIME_TICKS = 360;
     /** The alignment closes and the arc lights up. */
     public static final int ALIGN_END_TICK = 50;
@@ -202,10 +233,10 @@ public final class CosmicHorseshoeEntity extends Entity {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -215,9 +246,9 @@ public final class CosmicHorseshoeEntity extends Entity {
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
         age = Math.max(0.0F, age);
         if (isDisplay()) {
-            return Math.min(age, HOLD_END_TICK - 1.0F);
+            return Math.min(age, configuredHoldEnd() - 1.0F);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the lens galaxy. It hangs above the aimed point rather than at it. */
@@ -230,26 +261,26 @@ public final class CosmicHorseshoeEntity extends Entity {
 
     /** How far the alignment has closed, 0 to 1. */
     public float aligned(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / ALIGN_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / configuredAlignEnd());
     }
 
     /** How far into the closing fade it is, 0 to 1. */
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= HOLD_END_TICK) {
+        if (age <= configuredHoldEnd()) {
             return 0.0F;
         }
-        return Mth.clamp((age - HOLD_END_TICK)
-                / (float) (LIFETIME_TICKS - HOLD_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredHoldEnd())
+                / (float) (configuredLifetime() - configuredHoldEnd()), 0.0F, 1.0F);
     }
 
     /** Overall brightness envelope. */
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= ALIGN_END_TICK) {
+        if (age <= configuredAlignEnd()) {
             return aligned(partialTick);
         }
-        if (age <= HOLD_END_TICK) {
+        if (age <= configuredHoldEnd()) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -270,15 +301,15 @@ public final class CosmicHorseshoeEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > ALIGN_END_TICK && timelineTick < HOLD_END_TICK
-                    && timelineTick % RING_INTERVAL_TICKS == 0) {
-                resolveRing(serverLevel, RING_DAMAGE_FRACTION);
+            if (timelineTick > configuredAlignEnd() && timelineTick < configuredHoldEnd()
+                    && timelineTick % configuredInterval() == 0) {
+                resolveRing(serverLevel, configuredPrimaryDamage());
             }
-            if (!this.collapseResolved && timelineTick >= HOLD_END_TICK) {
+            if (!this.collapseResolved && timelineTick >= configuredHoldEnd()) {
                 this.collapseResolved = true;
-                resolveRing(serverLevel, COLLAPSE_DAMAGE_FRACTION);
+                resolveRing(serverLevel, configuredSecondaryDamage());
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -298,9 +329,9 @@ public final class CosmicHorseshoeEntity extends Entity {
         float inner = EINSTEIN_RADIUS - RING_HALF_WIDTH;
         float outer = EINSTEIN_RADIUS + RING_HALF_WIDTH;
 
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(axis.x - outer, axis.y - EFFECT_RADIUS, axis.z - outer,
-                        axis.x + outer, axis.y + EFFECT_RADIUS, axis.z + outer));
+        List<LivingEntity> targets = SpellConfig.limitTargets("cosmicHorseshoe", level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(axis.x - outer, axis.y - configuredRadius(), axis.z - outer,
+                        axis.x + outer, axis.y + configuredRadius(), axis.z + outer)));
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;

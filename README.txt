@@ -48,24 +48,29 @@ Gameplay values are server-authoritative. After the first launch, edit:
 
 `config/irons_spellbooks_light_pollution-server.toml`
 
-The first five spells and World Tree use dedicated sections such as `celestialJudgment`, `stargraveSingularity`, `funeralNova`, `chromaticAccretion`, and `worldTree`. The other spells use `spells.<id>` sections with the common keys `cooldownSeconds`, `manaCost`, `castTimeTicks`, and `castRange`; `<id>` is camel-case (`skyCollapse`, `cosmicHorseshoe`, and so on). Dedicated sections also expose effect, timeline, damage, and protection values. World Tree exposes:
+The first five spells and World Tree use dedicated sections such as `celestialJudgment`, `stargraveSingularity`, `funeralNova`, `chromaticAccretion`, and `worldTree`. The other spells use `spells.<id>` sections with the common keys `cooldownSeconds`, `manaCost`, `castTimeTicks`, `castRange`, `lifetimeTicks`, `effectRadius`, `damageFraction`, `secondaryDamageFraction`, `damageIntervalTicks`, `phaseOneTick`, `phaseTwoTick`, `phaseThreeTick`, and `maxTargets`; `<id>` is camel-case (`skyCollapse`, `cosmicHorseshoe`, and so on). Dedicated sections also expose effect, timeline, damage, and protection values. World Tree exposes:
 
 - `worldTree.healingFraction` (default `0.08`, maximum-health fraction per pulse)
 - `worldTree.healingIntervalTicks` (default `20`, where 20 ticks = 1 second)
 - `worldTree.absorptionHearts` (default `4.0`)
 - `worldTree.protectMagic`, `worldTree.protectProjectile`, `worldTree.protectFire` (default `true`)
 
+Funeral Nova also exposes `accretionDamageTick` and `collapseDamageTick`; these control
+when its first two damage pulses resolve and stay synchronized with the client timeline.
+
 Damage and healing fractions use decimal values (`0.08` means 8%). Forge validates numeric ranges and falls back to defaults for invalid values. Restart the server or reload the Forge config after editing.
 
 If a server was created with an early development build, its generic spell values may still be
-nested under `spells.spells`. Version 1.6.1 reports this legacy path at load time; copy those
+nested under `spells.spells`. Version 1.7.0 reports this legacy path at load time; copy those
 values into the matching `spells.<spellId>` sections before removing the old entries.
 
 Client lighting and presentation options are in:
 
 `config/irons_spellbooks_light_pollution-client.toml`
 
-The `enabled` switch controls screen-space spell lighting and `shadowSteps` controls shadow quality (8–256).
+The `enabled` switch controls screen-space spell lighting. `qualityPreset` (`LOW`, `MEDIUM`, `HIGH`,
+`ULTRA`) applies a safe ceiling to light count and shadow quality; `maxLights` and `shadowSteps`
+can further lower that ceiling. The renderer keeps the brightest active sources when the cap is hit.
 
 ## Building
 

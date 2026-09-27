@@ -106,10 +106,10 @@ public final class EclipseSeveranceEntity extends Entity {
         }
 
         Vec3 forward = horizontalForward();
-        List<LivingEntity> candidates = level.getEntitiesOfClass(
+        List<LivingEntity> candidates = SpellConfig.limitTargets("eclipseSeverance", level.getEntitiesOfClass(
                 LivingEntity.class,
                 attackBounds(),
-                target -> canTarget(caster, target));
+                target -> canTarget(caster, target)));
         candidates.sort(Comparator.comparingDouble(this::distanceToSqr));
 
         SpellDamageSource source = ModSpells.ECLIPSE_SEVERANCE.get().getDamageSource(this, caster);

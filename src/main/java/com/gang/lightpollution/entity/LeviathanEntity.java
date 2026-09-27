@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.LeviathanParams;
 import com.gang.lightpollution.fx.FxHash;
 import com.gang.lightpollution.fx.LeviathanShape;
@@ -44,6 +46,39 @@ import java.util.UUID;
  * curve without any extra syncing.</p>
  */
 public final class LeviathanEntity extends Entity implements LeviathanSource {
+    private static final String CONFIG_ID = "leviathan";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in LeviathanShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = LeviathanParams.SPELL_LIFETIME_TICKS;
@@ -153,10 +188,10 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -164,7 +199,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Aimed point. The body swims past it and the bite lands on it. */
@@ -221,7 +256,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
 
     /** How far the body has come apart, 0 intact to 1 gone. */
     public float unravel(float partialTick) {
-        return LeviathanShape.unravel(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return LeviathanShape.unravel(getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     /**
@@ -256,7 +291,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
      * to a point instead of ending in a stub.</p>
      */
     public float bodyRadius(float t, float partialTick) {
-        return LeviathanShape.bodyRadius(shapeParams(), t, getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return LeviathanShape.bodyRadius(shapeParams(), t, getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     /**
@@ -276,7 +311,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
     /** Phase of the travelling undulation at {@code t}. */
     /** Brightness envelope of the whole body. */
     public float brightness(float partialTick) {
-        return LeviathanShape.brightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return LeviathanShape.brightness(getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     /** Flash of the bite, 0 outside its window. */
@@ -303,21 +338,21 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
             // rather than on where it stood when the spell was cast. Eased rather
             // than snapped: the whole ninety-block body hangs off this point, and
             // teleporting it would make the animal jerk.
-            if (timelineTick < LeviathanShape.BITE_TICK) {
+            if (timelineTick < configuredPhaseTwo()) {
                 chaseTarget(serverLevel);
             }
             // Anything the body passes through while it is swimming.
-            if (timelineTick > 4 && timelineTick < LeviathanShape.BITE_TICK
-                    && timelineTick % SWEEP_INTERVAL_TICKS == 0) {
+            if (timelineTick > 4 && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveSweep(serverLevel);
             }
-            if (!this.biteResolved && timelineTick >= LeviathanShape.BITE_TICK) {
+            if (!this.biteResolved && timelineTick >= configuredPhaseTwo()) {
                 this.biteResolved = true;
                 resolveBite(serverLevel);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -353,14 +388,14 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
         for (int sample = 0; sample < SWEEP_SAMPLES; sample++) {
             float t = sample / (float) (SWEEP_SAMPLES - 1) * extended;
             Vec3 point = spinePoint(t, 1.0F);
-            List<LivingEntity> touched = level.getEntitiesOfClass(
+            List<LivingEntity> touched = SpellConfig.limitTargets("leviathan", level.getEntitiesOfClass(
                     LivingEntity.class,
                     new AABB(point.x - SWEEP_RADIUS, point.y - SWEEP_RADIUS,
                             point.z - SWEEP_RADIUS, point.x + SWEEP_RADIUS,
                             point.y + SWEEP_RADIUS, point.z + SWEEP_RADIUS),
                     target -> canAffect(caster, target)
                             && target.getBoundingBox().getCenter().distanceToSqr(point)
-                                    <= SWEEP_RADIUS * SWEEP_RADIUS);
+                                    <= SWEEP_RADIUS * SWEEP_RADIUS));
             if (touched.isEmpty()) {
                 continue;
             }
@@ -368,7 +403,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
                 source = LeviathanDamage.source(level, this, caster);
             }
             for (LivingEntity target : touched) {
-                SpellDamage.apply(this, target, source, SWEEP_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredPrimaryDamage());
                 // Thrown aside along the body's own heading, so being clipped by
                 // it reads as being hit by something moving.
                 Vec3 aside = target.getBoundingBox().getCenter().subtract(point);
@@ -391,19 +426,19 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
     private void resolveBite(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 jaws = spinePoint(0.0F, 1.0F);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("leviathan", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(jaws.x - BITE_RADIUS, jaws.y - BITE_RADIUS, jaws.z - BITE_RADIUS,
                         jaws.x + BITE_RADIUS, jaws.y + BITE_RADIUS, jaws.z + BITE_RADIUS),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(jaws)
-                                <= BITE_RADIUS * BITE_RADIUS);
+                                <= BITE_RADIUS * BITE_RADIUS));
         if (targets.isEmpty()) {
             return;
         }
         DamageSource source = LeviathanDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, BITE_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredSecondaryDamage());
         }
     }
 

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.MicroquasarParams;
 import com.gang.lightpollution.fx.MicroquasarShape;
 import com.gang.lightpollution.fx.MicroquasarSource;
@@ -43,6 +45,39 @@ import java.util.UUID;
  * information a player needs is on screen.</p>
  */
 public final class MicroquasarEntity extends Entity implements MicroquasarSource {
+    private static final String CONFIG_ID = "microquasar";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in MicroquasarShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = MicroquasarParams.SPELL_LIFETIME_TICKS;
@@ -140,9 +175,9 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
     public int getTimelineAgeTicks() {
         long start = this.entityData.get(DATA_START_GAME_TICK);
         if (start < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
-        return (int) Math.min(LIFETIME_TICKS,
+        return (int) Math.min(configuredLifetime(),
                 Math.max(0L, this.level().getGameTime() - start));
     }
 
@@ -162,11 +197,11 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
             // orientation once per cycle and looked like a twitch. Wrapping the time only
             // works when the wrapped quantity is congruent in the quantity that matters,
             // and here that is the phase.
-            float ticksPerTurn = (MicroquasarShape.HOLD_END_TICK - MicroquasarShape.SPINUP_END_TICK)
+            float ticksPerTurn = (configuredPhaseTwo() - configuredPhaseOne())
                     / (float) MicroquasarShape.PRECESSION_CYCLES;
-            return MicroquasarShape.SPINUP_END_TICK + (age % ticksPerTurn);
+            return configuredPhaseOne() + (age % ticksPerTurn);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the disk. It hangs above the aimed point rather than at it. */
@@ -179,24 +214,24 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
 
     /** How far the jets have lit, 0 to 1. */
     public float ignition(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / MicroquasarShape.SPINUP_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / configuredPhaseOne());
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= MicroquasarShape.HOLD_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 0.0F;
         }
-        return Mth.clamp((age - MicroquasarShape.HOLD_END_TICK)
-                / (float) (LIFETIME_TICKS - MicroquasarShape.HOLD_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredPhaseTwo())
+                / (float) (configuredLifetime() - configuredPhaseTwo()), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= MicroquasarShape.SPINUP_END_TICK) {
+        if (age <= configuredPhaseOne()) {
             return ignition(partialTick);
         }
-        if (age <= MicroquasarShape.HOLD_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -237,15 +272,15 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > MicroquasarShape.SPINUP_END_TICK && timelineTick < MicroquasarShape.HOLD_END_TICK
-                    && timelineTick % JET_INTERVAL_TICKS == 0) {
-                resolveSweep(serverLevel, timelineTick, JET_DAMAGE_FRACTION);
+            if (timelineTick > configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
+                resolveSweep(serverLevel, timelineTick, configuredPrimaryDamage());
             }
-            if (!this.terminalResolved && timelineTick >= MicroquasarShape.HOLD_END_TICK) {
+            if (!this.terminalResolved && timelineTick >= configuredPhaseTwo()) {
                 this.terminalResolved = true;
-                resolveSweep(serverLevel, MicroquasarShape.HOLD_END_TICK, TERMINAL_DAMAGE_FRACTION);
+                resolveSweep(serverLevel, configuredPhaseTwo(), configuredSecondaryDamage());
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -264,10 +299,10 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
         DamageSource source = MicroquasarDamage.jet(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(centre.x - EFFECT_RADIUS, centre.y - EFFECT_RADIUS,
-                        centre.z - EFFECT_RADIUS, centre.x + EFFECT_RADIUS,
-                        centre.y + EFFECT_RADIUS, centre.z + EFFECT_RADIUS));
+        List<LivingEntity> targets = SpellConfig.limitTargets("microquasar", level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius())));
         if (targets.isEmpty()) {
             return;
         }

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.SecondSunParams;
 import com.gang.lightpollution.fx.SecondSunShape;
 import com.gang.lightpollution.fx.SecondSunSource;
@@ -41,6 +43,39 @@ import java.util.UUID;
  * cast at something.</p>
  */
 public final class SecondSunEntity extends Entity implements SecondSunSource {
+    private static final String CONFIG_ID = "secondSun";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in SecondSunShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = SecondSunParams.SPELL_LIFETIME_TICKS;
@@ -97,10 +132,10 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -108,7 +143,7 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Aimed point on the ground; the scorch and the nova are centred here. */
@@ -151,7 +186,7 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
     /** Overall brightness, driving both the visual and the emitted light. */
     @Override
     public float brightness(float partialTick) {
-        return SecondSunShape.brightness(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return SecondSunShape.brightness(getVisualAgeTicks(partialTick), configuredLifetime());
     }
 
     /** Full-screen flash of the nova, 0 outside its window. */
@@ -186,17 +221,17 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
         if (this.level() instanceof ServerLevel serverLevel) {
             // Only once it is properly up: a disc still on the horizon is not
             // burning anything.
-            if (timelineTick >= SecondSunShape.RISE_END_TICK && timelineTick < SecondSunShape.NOVA_TICK
-                    && timelineTick % SCORCH_INTERVAL_TICKS == 0) {
+            if (timelineTick >= configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveScorch(serverLevel);
             }
-            if (!this.novaResolved && timelineTick >= SecondSunShape.NOVA_TICK) {
+            if (!this.novaResolved && timelineTick >= configuredPhaseTwo()) {
                 this.novaResolved = true;
                 resolveNova(serverLevel);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -205,10 +240,10 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
     private void resolveScorch(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 ground = groundCentre(1.0F);
-        for (LivingEntity target : gather(level, caster, ground, EFFECT_RADIUS)) {
+        for (LivingEntity target : gather(level, caster, ground, configuredRadius())) {
             SpellDamage.apply(this, target,
                     SecondSunDamage.source(level, this, caster),
-                    SCORCH_DAMAGE_FRACTION);
+                    configuredPrimaryDamage());
             target.setSecondsOnFire(4);
         }
     }
@@ -216,26 +251,26 @@ public final class SecondSunEntity extends Entity implements SecondSunSource {
     private void resolveNova(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 ground = groundCentre(1.0F);
-        List<LivingEntity> targets = gather(level, caster, ground, EFFECT_RADIUS);
+        List<LivingEntity> targets = gather(level, caster, ground, configuredRadius());
         if (targets.isEmpty()) {
             return;
         }
         DamageSource source = SecondSunDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, NOVA_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             target.setSecondsOnFire(10);
         }
     }
 
     private List<LivingEntity> gather(ServerLevel level, LivingEntity caster,
                                       Vec3 centre, double radius) {
-        return level.getEntitiesOfClass(
+        return SpellConfig.limitTargets("secondSun", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
                         centre.x + radius, centre.y + radius, centre.z + radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= radius * radius);
+                                <= radius * radius));
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {

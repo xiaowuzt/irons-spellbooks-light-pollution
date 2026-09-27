@@ -1,5 +1,6 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -43,6 +44,16 @@ import java.util.UUID;
  * simply goes out over five and a half seconds.</p>
  */
 public final class GargantuaEntity extends Entity {
+    private static final String CONFIG_ID = "gargantua";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
     public static final int LIFETIME_TICKS = 400;
     /** A point of light is torn open and the disk lights up. */
     public static final int TEAR_END_TICK = 40;
@@ -256,10 +267,10 @@ public final class GargantuaEntity extends Entity {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -273,7 +284,7 @@ public final class GargantuaEntity extends Entity {
         if (isDisplay()) {
             return Math.min(age, HOLD_END_TICK - 1.0F);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the hole. It hangs above the aimed point rather than at it. */
@@ -302,7 +313,7 @@ public final class GargantuaEntity extends Entity {
             return 0.0F;
         }
         return Mth.clamp((age - FADE_START_TICK)
-                / (float) (LIFETIME_TICKS - FADE_START_TICK), 0.0F, 1.0F);
+                / (float) (configuredLifetime() - FADE_START_TICK), 0.0F, 1.0F);
     }
 
     /** How far it has opened, 0 to 1. Scales the disk in during the tear. */
@@ -370,7 +381,7 @@ public final class GargantuaEntity extends Entity {
         if (this.level() instanceof ServerLevel serverLevel) {
             if (timelineTick > TEAR_END_TICK / 2 && timelineTick < BLAST_TICK) {
                 applyPull(serverLevel);
-                if (timelineTick % TIDAL_INTERVAL_TICKS == 0) {
+                if (timelineTick % Math.max(1, SpellConfig.damageIntervalTicks(CONFIG_ID)) == 0) {
                     resolveTidal(serverLevel);
                     countSwallowedLights(serverLevel);
                 }
@@ -381,7 +392,7 @@ public final class GargantuaEntity extends Entity {
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -402,7 +413,7 @@ public final class GargantuaEntity extends Entity {
         double strength = PULL_ACCELERATION * radius * radius * opened(1.0F);
         double horizon = radius * HORIZON_RADIUS;
 
-        for (Entity target : gatherAny(level, caster, centre, PULL_RADIUS)) {
+        for (Entity target : gatherAny(level, caster, centre, configuredRadius())) {
             Vec3 toCentre = centre.subtract(target.getBoundingBox().getCenter());
             double distance = toCentre.length();
             if (distance < 0.001D) {
@@ -414,7 +425,7 @@ public final class GargantuaEntity extends Entity {
             // of a hundred across the radius and only the last few blocks read as suction.
             double effective = Math.max(distance, PULL_FALLOFF_FLOOR);
             double falloff = 1.0D / (effective * effective);
-            double accel = strength * falloff * PULL_RADIUS;
+            double accel = strength * falloff * configuredRadius();
 
             // Projectiles are light and fast, and adding a small acceleration to something
             // already travelling at speed barely bends its path. They get a much harder pull
@@ -456,7 +467,7 @@ public final class GargantuaEntity extends Entity {
         double horizon = radius * HORIZON_RADIUS;
         DamageSource source = null;
 
-        for (LivingEntity target : gather(level, caster, centre, PULL_RADIUS)) {
+        for (LivingEntity target : gather(level, caster, centre, configuredRadius())) {
             double distance = target.getBoundingBox().getCenter().distanceTo(centre);
             if (source == null) {
                 source = GargantuaDamage.source(level, this, caster);
@@ -469,7 +480,7 @@ public final class GargantuaEntity extends Entity {
                 continue;
             }
             float closeness = (float) Mth.clamp(
-                    1.0D - (distance - horizon) / (PULL_RADIUS - horizon), 0.0D, 1.0D);
+                    1.0D - (distance - horizon) / (configuredRadius() - horizon), 0.0D, 1.0D);
             float fraction = Mth.lerp(closeness * closeness,
                     TIDAL_MIN_FRACTION, TIDAL_MAX_FRACTION);
             SpellDamage.apply(this, target, source, fraction);
@@ -526,13 +537,13 @@ public final class GargantuaEntity extends Entity {
         Vec3 centre = centre(1.0F);
         int seen = 0;
         for (Entity nearby : level.getEntities(this,
-                new AABB(centre.x - PULL_RADIUS, centre.y - PULL_RADIUS,
-                        centre.z - PULL_RADIUS, centre.x + PULL_RADIUS,
-                        centre.y + PULL_RADIUS, centre.z + PULL_RADIUS))) {
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius()))) {
             if (nearby == this || !isSpellLightSource(nearby)) {
                 continue;
             }
-            if (nearby.position().distanceToSqr(centre) <= PULL_RADIUS * PULL_RADIUS) {
+            if (nearby.position().distanceToSqr(centre) <= configuredRadius() * configuredRadius()) {
                 seen++;
             }
         }
@@ -560,13 +571,13 @@ public final class GargantuaEntity extends Entity {
 
     private List<LivingEntity> gather(ServerLevel level, LivingEntity caster,
                                       Vec3 centre, double radius) {
-        return level.getEntitiesOfClass(
+        return SpellConfig.limitTargets("gargantua", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
                         centre.x + radius, centre.y + radius, centre.z + radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= radius * radius);
+                                <= radius * radius));
     }
 
     /**

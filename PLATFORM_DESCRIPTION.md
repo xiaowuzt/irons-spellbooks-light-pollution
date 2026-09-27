@@ -84,7 +84,7 @@ mod. Visuals only — no damage, no entity, no spell.
 ```gradle
 repositories { maven { url = "https://api.modrinth.com/maven" } }
 dependencies {
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.6.1")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.0")
 }
 ```
 

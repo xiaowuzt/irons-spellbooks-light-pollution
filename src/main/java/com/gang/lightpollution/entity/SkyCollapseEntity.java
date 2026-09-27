@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.SkyCollapseParams;
 import com.gang.lightpollution.fx.FxHash;
 import com.gang.lightpollution.fx.SkyCollapseShape;
@@ -40,6 +42,23 @@ import java.util.UUID;
  * any extra syncing.</p>
  */
 public final class SkyCollapseEntity extends Entity implements SkyCollapseSource {
+    private static final String CONFIG_ID = "skyCollapse";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
     // The form lives in SkyCollapseShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = SkyCollapseParams.SPELL_LIFETIME_TICKS;
@@ -94,10 +113,10 @@ public final class SkyCollapseEntity extends Entity implements SkyCollapseSource
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -105,7 +124,7 @@ public final class SkyCollapseEntity extends Entity implements SkyCollapseSource
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** How far the fracture has spread across the sky, 0 to 1. */
@@ -197,7 +216,7 @@ public final class SkyCollapseEntity extends Entity implements SkyCollapseSource
         float unitRadius = hashUnit(shard, 0x85EBCA6BL);
         // sqrt spreads them evenly over the disc instead of clustering the
         // centre.
-        double radius = Math.sqrt(unitRadius) * EFFECT_RADIUS;
+        double radius = Math.sqrt(unitRadius) * configuredRadius();
         double angle = unitAngle * Mth.TWO_PI;
         double x = this.getX() + Math.cos(angle) * radius;
         double z = this.getZ() + Math.sin(angle) * radius;
@@ -250,7 +269,7 @@ public final class SkyCollapseEntity extends Entity implements SkyCollapseSource
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -259,20 +278,20 @@ public final class SkyCollapseEntity extends Entity implements SkyCollapseSource
         LivingEntity caster = resolveCaster(level);
         Vec3 impact = shardLanding(shard);
         double radius = blastRadius(shard);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("skyCollapse", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(impact.x - radius, impact.y - radius, impact.z - radius,
                         impact.x + radius, impact.y + radius, impact.z + radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(impact)
-                                <= radius * radius);
+                                <= radius * radius));
         if (targets.isEmpty()) {
             return;
         }
 
         DamageSource source = SkyCollapseDamage.source(level, this, caster);
         float fraction = isKeystone(shard)
-                ? KEYSTONE_DAMAGE_FRACTION : SHARD_DAMAGE_FRACTION;
+                ? configuredSecondaryDamage() : configuredPrimaryDamage();
         for (LivingEntity target : targets) {
             SpellDamage.apply(this, target, source, fraction);
         }

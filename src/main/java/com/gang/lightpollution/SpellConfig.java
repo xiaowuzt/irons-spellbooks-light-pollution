@@ -6,6 +6,8 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +67,7 @@ public final class SpellConfig {
             "stargraveSingularity.damageFraction", 0.93D, 0.0D, 1.0D,
             "Stargrave Singularity collapse maximum-health damage fraction.");
     private static final ForgeConfigSpec.IntValue STARGRAVE_LIFETIME = intValue(
-            "stargraveSingularity.lifetimeTicks", 200, 1, 20 * 60 * 10,
+            "stargraveSingularity.lifetimeTicks", 200, 2, 20 * 60 * 10,
             "Stargrave Singularity lifetime in ticks.");
     private static final ForgeConfigSpec.IntValue STARGRAVE_DAMAGE_TICK = intValue(
             "stargraveSingularity.damageTick", 160, 1, 20 * 60 * 10,
@@ -80,6 +82,9 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.IntValue ECLIPSE_CAST_TIME = intValue(
             "eclipseSeverance.castTimeTicks", 20, 0, 20 * 60,
             "Eclipse Severance cast time in ticks.");
+    private static final ForgeConfigSpec.IntValue ECLIPSE_RANGE = intValue(
+            "eclipseSeverance.castRange", 40, 1, 256,
+            "Eclipse Severance target range in blocks.");
     private static final ForgeConfigSpec.DoubleValue ECLIPSE_DAMAGE = doubleValue(
             "eclipseSeverance.damage", 500.0D, 0.0D, 1_000_000.0D,
             "Eclipse Severance base damage.");
@@ -127,8 +132,38 @@ public final class SpellConfig {
             "funeralNova.hypernovaDamageFraction", 0.27D, 0.0D, 1.0D,
             "Funeral Nova hypernova maximum-health damage fraction.");
     private static final ForgeConfigSpec.IntValue NOVA_LIFETIME = intValue(
-            "funeralNova.lifetimeTicks", 344, 1, 20 * 60 * 10,
+            "funeralNova.lifetimeTicks", 344, 8, 20 * 60 * 10,
             "Funeral Nova timeline lifetime in ticks.");
+    private static final ForgeConfigSpec.IntValue NOVA_BLACK_HOLE_TICK = intValue(
+            "funeralNova.blackHoleStartTick", 48, 0, 20 * 60 * 10,
+            "Funeral Nova black-hole phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_ACCRETION_TICK = intValue(
+            "funeralNova.accretionStartTick", 68, 0, 20 * 60 * 10,
+            "Funeral Nova accretion phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_COLLAPSE_TICK = intValue(
+            "funeralNova.collapseStartTick", 100, 0, 20 * 60 * 10,
+            "Funeral Nova collapse phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_VOID_TICK = intValue(
+            "funeralNova.voidStartTick", 120, 0, 20 * 60 * 10,
+            "Funeral Nova void phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_FLASH_TICK = intValue(
+            "funeralNova.flashStartTick", 150, 0, 20 * 60 * 10,
+            "Funeral Nova flash phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_HYPERNOVA_TICK = intValue(
+            "funeralNova.hypernovaStartTick", 164, 0, 20 * 60 * 10,
+            "Funeral Nova hypernova phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_AFTERGLOW_TICK = intValue(
+            "funeralNova.afterglowStartTick", 250, 0, 20 * 60 * 10,
+            "Funeral Nova afterglow phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_FADE_TICK = intValue(
+            "funeralNova.fadeOutStartTick", 300, 0, 20 * 60 * 10,
+            "Funeral Nova fade-out phase start tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_ACCRETION_DAMAGE_TICK = intValue(
+            "funeralNova.accretionDamageTick", 68, 0, 20 * 60 * 10,
+            "Funeral Nova accretion damage tick.");
+    private static final ForgeConfigSpec.IntValue NOVA_COLLAPSE_DAMAGE_TICK = intValue(
+            "funeralNova.collapseDamageTick", 110, 0, 20 * 60 * 10,
+            "Funeral Nova collapse damage tick.");
 
     private static final ForgeConfigSpec.IntValue ACCRETION_COOLDOWN = intValue(
             "chromaticAccretion.cooldownSeconds", 420, 0, 86_400,
@@ -158,7 +193,7 @@ public final class SpellConfig {
             "chromaticAccretion.maxProjectileCharge", 6, 0, 10_000,
             "Chromatic Accretion maximum absorbed projectile charge.");
     private static final ForgeConfigSpec.IntValue ACCRETION_LIFETIME = intValue(
-            "chromaticAccretion.lifetimeTicks", 170, 1, 20 * 60 * 10,
+            "chromaticAccretion.lifetimeTicks", 170, 8, 20 * 60 * 10,
             "Chromatic Accretion timeline lifetime in ticks.");
     private static final ForgeConfigSpec.IntValue ACCRETION_FORMATION = intValue(
             "chromaticAccretion.formationEndTick", 24, 1, 20 * 60 * 10,
@@ -166,6 +201,18 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.IntValue ACCRETION_COLLAPSE_TICK = intValue(
             "chromaticAccretion.collapseTick", 136, 1, 20 * 60 * 10,
             "Chromatic Accretion collapse tick.");
+    private static final ForgeConfigSpec.IntValue ACCRETION_PULSE_ONE = intValue(
+            "chromaticAccretion.pulseOneTick", 36, 1, 20 * 60 * 10,
+            "Chromatic Accretion first pulse tick.");
+    private static final ForgeConfigSpec.IntValue ACCRETION_PULSE_TWO = intValue(
+            "chromaticAccretion.pulseTwoTick", 64, 1, 20 * 60 * 10,
+            "Chromatic Accretion second pulse tick.");
+    private static final ForgeConfigSpec.IntValue ACCRETION_PULSE_THREE = intValue(
+            "chromaticAccretion.pulseThreeTick", 92, 1, 20 * 60 * 10,
+            "Chromatic Accretion third pulse tick.");
+    private static final ForgeConfigSpec.IntValue ACCRETION_PULSE_FOUR = intValue(
+            "chromaticAccretion.pulseFourTick", 120, 1, 20 * 60 * 10,
+            "Chromatic Accretion fourth pulse tick.");
 
     private static final ForgeConfigSpec.IntValue WORLD_TREE_COOLDOWN = intValue(
             "worldTree.cooldownSeconds", 460, 0, 86_400,
@@ -204,7 +251,43 @@ public final class SpellConfig {
             .comment("Prevent fire damage to allies inside the World Tree sanctuary.")
             .define("worldTree.protectFire", true);
 
+    private static final ForgeConfigSpec.IntValue SERVER_MAX_ACTIVE_ENTITIES = BUILDER
+            .comment("Maximum number of active spell entities in one server level.",
+                    "New spell casts are refused after this limit is reached.")
+            .defineInRange("server.maxActiveSpellEntities", 64, 1, 4096);
+    private static final ForgeConfigSpec.IntValue SERVER_MAX_ENTITIES_PER_SPELL = BUILDER
+            .comment("Maximum active entities of one spell type in one server level.")
+            .defineInRange("server.maxEntitiesPerSpell", 16, 1, 1024);
+    private static final ForgeConfigSpec.IntValue SERVER_TARGET_SCAN_LIMIT = BUILDER
+            .comment("Safety cap for living targets considered by one spell pulse.")
+            .defineInRange("server.targetScanLimit", 128, 1, 10_000);
+
     private static final Map<String, GenericValues> GENERIC_SPELLS = new LinkedHashMap<>();
+
+    /** Defaults for the shared gameplay fields used by the eighteen generic spells. */
+    private static GenericDefaults genericDefaults(String id) {
+        return switch (id) {
+            case "starless" -> new GenericDefaults(260, 12.0D, 0.16D, 0.26D, 20, 110, 150, 160, 4);
+            case "constellation" -> new GenericDefaults(240, 15.0D, 0.010D, 0.052D, 10, 50, 120, 180, 32);
+            case "silhouette" -> new GenericDefaults(240, 32.0D, 0.030D, 0.0D, 20, 12, 160, 200, 32);
+            case "starfall" -> new GenericDefaults(310, 14.0D, 0.037D, 0.28D, 10, 100, 220, 280, 32);
+            case "skyCollapse" -> new GenericDefaults(220, 20.0D, 0.065D, 0.37D, 10, 60, 150, 190, 32);
+            case "stellarConvergence" -> new GenericDefaults(260, 18.0D, 0.033D, 0.44D, 10, 80, 180, 220, 32);
+            case "secondSun" -> new GenericDefaults(320, 26.0D, 0.018D, 0.61D, 15, 80, 240, 280, 32);
+            case "singularity" -> new GenericDefaults(220, 22.0D, 0.006D, 0.66D, 10, 80, 160, 190, 32);
+            case "leviathan" -> new GenericDefaults(190, 28.0D, 0.056D, 0.58D, 6, 70, 140, 170, 32);
+            case "gargantua" -> new GenericDefaults(400, 28.0D, 0.013D, 0.72D, 8, 40, 260, 290, 32);
+            case "cosmicHorseshoe" -> new GenericDefaults(360, 17.0D, 0.028D, 0.33D, 15, 50, 300, 330, 32);
+            case "microquasar" -> new GenericDefaults(320, 22.0D, 0.048D, 0.50D, 5, 70, 220, 280, 32);
+            case "helixNebula" -> new GenericDefaults(340, 22.0D, 0.072D, 0.42D, 6, 100, 240, 300, 32);
+            case "magnetar" -> new GenericDefaults(300, 26.0D, 0.024D, 0.78D, 8, 80, 220, 260, 32);
+            case "tidalDisruption" -> new GenericDefaults(360, 28.0D, 0.058D, 0.47D, 5, 80, 250, 310, 32);
+            case "quasarJet" -> new GenericDefaults(340, 30.0D, 0.068D, 0.53D, 6, 80, 240, 300, 32);
+            case "pinwheel" -> new GenericDefaults(300, 24.0D, 0.021D, 0.36D, 4, 70, 220, 260, 32);
+            case "crabNebula" -> new GenericDefaults(320, 24.0D, 0.016D, 0.30D, 7, 100, 220, 280, 32);
+            default -> throw new IllegalArgumentException("Unknown spell config id: " + id);
+        };
+    }
 
     static {
         genericSpell("starless", 300, 1400, 40, 40);
@@ -241,9 +324,31 @@ public final class SpellConfig {
                 .defineInRange("castTimeTicks", castTime, 0, 20 * 60);
         ForgeConfigSpec.IntValue rangeValue = BUILDER.comment("Targeting range in blocks.")
                 .defineInRange("castRange", range, 1, 256);
+        GenericDefaults defaults = genericDefaults(id);
+        ForgeConfigSpec.IntValue lifetimeValue = BUILDER.comment("Gameplay lifetime in ticks.")
+                .defineInRange("lifetimeTicks", defaults.lifetimeTicks(),
+                        Math.max(4, defaults.phaseThreeTick() + 1), 20 * 60 * 10);
+        ForgeConfigSpec.DoubleValue radiusValue = BUILDER.comment("Gameplay effect radius in blocks.")
+                .defineInRange("effectRadius", defaults.effectRadius(), 0.1D, 256.0D);
+        ForgeConfigSpec.DoubleValue damageValue = BUILDER.comment("Primary damage fraction per pulse or contact.")
+                .defineInRange("damageFraction", defaults.damageFraction(), 0.0D, 1.0D);
+        ForgeConfigSpec.DoubleValue secondaryDamageValue = BUILDER.comment("Secondary or final damage fraction.")
+                .defineInRange("secondaryDamageFraction", defaults.secondaryDamageFraction(), 0.0D, 1.0D);
+        ForgeConfigSpec.IntValue intervalValue = BUILDER.comment("Ticks between repeated damage pulses.")
+                .defineInRange("damageIntervalTicks", defaults.damageIntervalTicks(), 1, 20 * 60);
+        ForgeConfigSpec.IntValue phaseOneValue = BUILDER.comment("First configurable phase boundary in ticks.")
+                .defineInRange("phaseOneTick", defaults.phaseOneTick(), 0, 20 * 60 * 10);
+        ForgeConfigSpec.IntValue phaseTwoValue = BUILDER.comment("Second configurable phase boundary in ticks.")
+                .defineInRange("phaseTwoTick", defaults.phaseTwoTick(), 0, 20 * 60 * 10);
+        ForgeConfigSpec.IntValue phaseThreeValue = BUILDER.comment("Third configurable phase boundary in ticks.")
+                .defineInRange("phaseThreeTick", defaults.phaseThreeTick(), 0, 20 * 60 * 10);
+        ForgeConfigSpec.IntValue maxTargetsValue = BUILDER.comment("Maximum living targets affected by one pulse.")
+                .defineInRange("maxTargets", defaults.maxTargets(), 1, 10_000);
         BUILDER.pop();
         BUILDER.pop();
-        GENERIC_SPELLS.put(id, new GenericValues(cooldownValue, manaValue, castTimeValue, rangeValue));
+        GENERIC_SPELLS.put(id, new GenericValues(cooldownValue, manaValue, castTimeValue, rangeValue,
+                lifetimeValue, radiusValue, damageValue, secondaryDamageValue, intervalValue,
+                phaseOneValue, phaseTwoValue, phaseThreeValue, maxTargetsValue));
     }
 
     public static final ForgeConfigSpec SPEC = BUILDER.build();
@@ -269,6 +374,7 @@ public final class SpellConfig {
     public static volatile int eclipseCooldownSeconds = 250;
     public static volatile int eclipseManaCost = 1000;
     public static volatile int eclipseCastTimeTicks = 20;
+    public static volatile int eclipseCastRange = 40;
     public static volatile double eclipseDamage = 500.0D;
     public static volatile double eclipseAttackRadius = 12.0D;
     public static volatile double eclipseAttackAngleDegrees = 150.0D;
@@ -286,6 +392,16 @@ public final class SpellConfig {
     public static volatile double funeralNovaCollapseDamageFraction = 0.19D;
     public static volatile double funeralNovaHypernovaDamageFraction = 0.27D;
     public static volatile int funeralNovaLifetimeTicks = 344;
+    public static volatile int funeralNovaBlackHoleStartTick = 48;
+    public static volatile int funeralNovaAccretionStartTick = 68;
+    public static volatile int funeralNovaCollapseStartTick = 100;
+    public static volatile int funeralNovaVoidStartTick = 120;
+    public static volatile int funeralNovaFlashStartTick = 150;
+    public static volatile int funeralNovaHypernovaStartTick = 164;
+    public static volatile int funeralNovaAfterglowStartTick = 250;
+    public static volatile int funeralNovaFadeOutStartTick = 300;
+    public static volatile int funeralNovaAccretionDamageTick = 68;
+    public static volatile int funeralNovaCollapseDamageTick = 110;
 
     public static volatile int chromaticAccretionCooldownSeconds = 420;
     public static volatile int chromaticAccretionManaCost = 1500;
@@ -299,6 +415,10 @@ public final class SpellConfig {
     public static volatile int chromaticAccretionLifetimeTicks = 170;
     public static volatile int chromaticAccretionFormationEndTick = 24;
     public static volatile int chromaticAccretionCollapseTick = 136;
+    public static volatile int chromaticAccretionPulseOneTick = 36;
+    public static volatile int chromaticAccretionPulseTwoTick = 64;
+    public static volatile int chromaticAccretionPulseThreeTick = 92;
+    public static volatile int chromaticAccretionPulseFourTick = 120;
 
     public static volatile int worldTreeCooldownSeconds = 460;
     public static volatile int worldTreeManaCost = 1750;
@@ -312,6 +432,9 @@ public final class SpellConfig {
     public static volatile boolean worldTreeProtectMagic = true;
     public static volatile boolean worldTreeProtectProjectile = true;
     public static volatile boolean worldTreeProtectFire = true;
+    public static volatile int serverMaxActiveEntities = 64;
+    public static volatile int serverMaxEntitiesPerSpell = 16;
+    public static volatile int serverTargetScanLimit = 128;
 
     private static boolean legacyPathWarningShown;
 
@@ -355,12 +478,123 @@ public final class SpellConfig {
         return switch (spellId) {
             case "celestialJudgment" -> celestialTargetRange;
             case "stargraveSingularity" -> stargraveCastRange;
-            case "eclipseSeverance" -> 40;
+            case "eclipseSeverance" -> eclipseCastRange;
             case "funeralNova" -> funeralNovaCastRange;
             case "chromaticAccretion" -> chromaticAccretionCastRange;
             case "worldTree" -> worldTreeCastRange;
             default -> generic(spellId).range.get();
         };
+    }
+
+    public static int lifetimeTicks(String spellId) {
+        return switch (spellId) {
+            case "celestialJudgment" -> celestialLifetimeTicks;
+            case "stargraveSingularity" -> stargraveLifetimeTicks;
+            case "eclipseSeverance" -> eclipseLifetimeTicks;
+            case "funeralNova" -> funeralNovaLifetimeTicks;
+            case "chromaticAccretion" -> chromaticAccretionLifetimeTicks;
+            case "worldTree" -> worldTreeLifetimeTicks;
+            default -> Math.max(1, generic(spellId).lifetimeTicks().get());
+        };
+    }
+
+    public static double effectRadius(String spellId) {
+        return switch (spellId) {
+            case "stargraveSingularity" -> stargraveEffectRadius;
+            case "eclipseSeverance" -> eclipseAttackRadius;
+            case "funeralNova" -> funeralNovaEffectRadius;
+            case "chromaticAccretion" -> chromaticAccretionEffectRadius;
+            case "worldTree" -> worldTreeEffectRadius;
+            default -> generic(spellId).effectRadius().get();
+        };
+    }
+
+    public static double damageFraction(String spellId) {
+        return switch (spellId) {
+            case "celestialJudgment" -> celestialDamageFraction;
+            case "stargraveSingularity" -> stargraveDamageFraction;
+            case "eclipseSeverance" -> eclipseDamage / 20.0D;
+            case "funeralNova" -> funeralNovaAccretionDamageFraction;
+            case "chromaticAccretion" -> chromaticAccretionPulseDamageFraction;
+            default -> generic(spellId).damageFraction().get();
+        };
+    }
+
+    public static double secondaryDamageFraction(String spellId) {
+        return switch (spellId) {
+            case "funeralNova" -> funeralNovaHypernovaDamageFraction;
+            case "chromaticAccretion" -> chromaticAccretionCollapseDamageFraction;
+            default -> generic(spellId).secondaryDamageFraction().get();
+        };
+    }
+
+    public static int damageIntervalTicks(String spellId) {
+        return Math.max(1, generic(spellId).damageIntervalTicks().get());
+    }
+
+    public static int phaseTick(String spellId, int phase) {
+        GenericValues values = generic(spellId);
+        int lifetime = lifetimeTicks(spellId);
+        int phaseOne = clampTimelineValue(values.phaseOneTick().get(), 0, lifetime - 3);
+        int phaseTwo = clampTimelineValue(values.phaseTwoTick().get(), phaseOne + 1, lifetime - 2);
+        int phaseThree = clampTimelineValue(values.phaseThreeTick().get(), phaseTwo + 1, lifetime - 1);
+        return switch (phase) {
+            case 1 -> phaseOne;
+            case 2 -> phaseTwo;
+            case 3 -> phaseThree;
+            default -> throw new IllegalArgumentException("phase must be 1..3");
+        };
+    }
+
+    public static int chromaticAccretionPulseTick(int index) {
+        return switch (index) {
+            case 0 -> chromaticAccretionPulseOneTick;
+            case 1 -> chromaticAccretionPulseTwoTick;
+            case 2 -> chromaticAccretionPulseThreeTick;
+            case 3 -> chromaticAccretionPulseFourTick;
+            default -> throw new IllegalArgumentException("pulse index must be 0..3");
+        };
+    }
+
+    public static int maxTargets(String spellId) {
+        return Math.max(1, generic(spellId).maxTargets().get());
+    }
+
+    /**
+     * Applies both the spell-specific target budget and the server safety ceiling to a query result.
+     * The returned view keeps the original distance ordering supplied by the caller.
+     */
+    public static <T> List<T> limitTargets(String spellId, List<T> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return targets;
+        }
+        int configuredLimit = switch (spellId) {
+            case "celestialJudgment", "stargraveSingularity", "eclipseSeverance",
+                    "funeralNova", "chromaticAccretion", "worldTree" -> serverTargetScanLimit;
+            default -> maxTargets(spellId);
+        };
+        int limit = Math.max(1, Math.min(serverTargetScanLimit, configuredLimit));
+        return targets.size() <= limit ? targets : targets.subList(0, limit);
+    }
+
+    /** Server-wide cap used by the entity admission guard. */
+    public static int activeEntityLimit() {
+        return Math.max(1, serverMaxActiveEntities);
+    }
+
+    /** Per-spell cap used by the entity admission guard. */
+    public static int entityLimit(String spellId) {
+        return switch (spellId) {
+            case "celestialJudgment", "stargraveSingularity", "eclipseSeverance",
+                    "funeralNova", "chromaticAccretion", "worldTree" ->
+                    Math.max(1, serverMaxEntitiesPerSpell);
+            default -> Math.max(1, Math.min(serverMaxEntitiesPerSpell, maxTargets(spellId)));
+        };
+    }
+
+    private static int clampTimelineValue(int value, int minimum, int maximum) {
+        int safeMaximum = Math.max(minimum, maximum);
+        return Math.max(minimum, Math.min(value, safeMaximum));
     }
 
     private static GenericValues generic(String spellId) {
@@ -411,6 +645,7 @@ public final class SpellConfig {
         eclipseCooldownSeconds = ECLIPSE_COOLDOWN.get();
         eclipseManaCost = ECLIPSE_MANA.get();
         eclipseCastTimeTicks = ECLIPSE_CAST_TIME.get();
+        eclipseCastRange = ECLIPSE_RANGE.get();
         eclipseDamage = ECLIPSE_DAMAGE.get();
         eclipseAttackRadius = ECLIPSE_RADIUS.get();
         eclipseAttackAngleDegrees = ECLIPSE_ANGLE.get();
@@ -428,6 +663,16 @@ public final class SpellConfig {
         funeralNovaCollapseDamageFraction = NOVA_COLLAPSE.get();
         funeralNovaHypernovaDamageFraction = NOVA_HYPERNOVA.get();
         funeralNovaLifetimeTicks = NOVA_LIFETIME.get();
+        funeralNovaBlackHoleStartTick = NOVA_BLACK_HOLE_TICK.get();
+        funeralNovaAccretionStartTick = NOVA_ACCRETION_TICK.get();
+        funeralNovaCollapseStartTick = NOVA_COLLAPSE_TICK.get();
+        funeralNovaVoidStartTick = NOVA_VOID_TICK.get();
+        funeralNovaFlashStartTick = NOVA_FLASH_TICK.get();
+        funeralNovaHypernovaStartTick = NOVA_HYPERNOVA_TICK.get();
+        funeralNovaAfterglowStartTick = NOVA_AFTERGLOW_TICK.get();
+        funeralNovaFadeOutStartTick = NOVA_FADE_TICK.get();
+        funeralNovaAccretionDamageTick = NOVA_ACCRETION_DAMAGE_TICK.get();
+        funeralNovaCollapseDamageTick = NOVA_COLLAPSE_DAMAGE_TICK.get();
 
         chromaticAccretionCooldownSeconds = ACCRETION_COOLDOWN.get();
         chromaticAccretionManaCost = ACCRETION_MANA.get();
@@ -441,6 +686,10 @@ public final class SpellConfig {
         chromaticAccretionLifetimeTicks = ACCRETION_LIFETIME.get();
         chromaticAccretionFormationEndTick = ACCRETION_FORMATION.get();
         chromaticAccretionCollapseTick = ACCRETION_COLLAPSE_TICK.get();
+        chromaticAccretionPulseOneTick = ACCRETION_PULSE_ONE.get();
+        chromaticAccretionPulseTwoTick = ACCRETION_PULSE_TWO.get();
+        chromaticAccretionPulseThreeTick = ACCRETION_PULSE_THREE.get();
+        chromaticAccretionPulseFourTick = ACCRETION_PULSE_FOUR.get();
 
         worldTreeCooldownSeconds = WORLD_TREE_COOLDOWN.get();
         worldTreeManaCost = WORLD_TREE_MANA.get();
@@ -454,8 +703,12 @@ public final class SpellConfig {
         worldTreeProtectMagic = WORLD_TREE_PROTECT_MAGIC.get();
         worldTreeProtectProjectile = WORLD_TREE_PROTECT_PROJECTILE.get();
         worldTreeProtectFire = WORLD_TREE_PROTECT_FIRE.get();
+        serverMaxActiveEntities = SERVER_MAX_ACTIVE_ENTITIES.get();
+        serverMaxEntitiesPerSpell = SERVER_MAX_ENTITIES_PER_SPELL.get();
+        serverTargetScanLimit = SERVER_TARGET_SCAN_LIMIT.get();
 
         validateTimelines();
+        validateGenericTimelines();
     }
 
     /**
@@ -468,11 +721,35 @@ public final class SpellConfig {
             return;
         }
         try {
-            if (config.getConfigData().contains(List.of("spells", "spells"))) {
+            if (!config.getConfigData().contains(List.of("spells", "spells"))) {
+                legacyPathWarningShown = true;
+                return;
+            }
+            Path backupPath = null;
+            try {
+                Path configPath = config.getFullPath();
+                if (configPath != null) {
+                    backupPath = configPath.resolveSibling(
+                            configPath.getFileName() + ".legacy-spells.bak");
+                    if (!Files.exists(backupPath)) {
+                        Files.copy(configPath, backupPath);
+                    }
+                }
+            } catch (java.io.IOException exception) {
+                ExampleMod.LOGGER.warn("Found legacy nested spell config entries, but could not create a backup", exception);
+            }
+            if (backupPath == null) {
                 ExampleMod.LOGGER.warn(
                         "Found legacy nested spell config entries under [spells.spells]. "
                                 + "Generic spell settings now belong under [spells.<spellId>]; "
-                                + "copy your values to the new sections before removing the old entries.");
+                                + "the config file path is unavailable, so copy your values to the "
+                                + "new sections before removing the old entries.");
+            } else {
+                ExampleMod.LOGGER.warn(
+                        "Found legacy nested spell config entries under [spells.spells]. "
+                                + "Generic spell settings now belong under [spells.<spellId>]; "
+                                + "the original file was preserved at {}. Copy your values to the "
+                                + "new sections before removing the old entries.", backupPath);
             }
         } catch (RuntimeException exception) {
             ExampleMod.LOGGER.debug("Could not inspect the legacy spell config path", exception);
@@ -486,13 +763,13 @@ public final class SpellConfig {
                 "celestialJudgment.impactTick", celestialImpactTick, 0,
                 Math.max(0, celestialLifetimeTicks - 1));
         stargraveDamageTick = clampTimeline(
-                "stargraveSingularity.damageTick", stargraveDamageTick, 0,
-                Math.max(0, stargraveLifetimeTicks - 1));
+                "stargraveSingularity.damageTick", stargraveDamageTick, 1,
+                Math.max(1, stargraveLifetimeTicks - 1));
         eclipseDamageTick = clampTimeline(
                 "eclipseSeverance.damageTick", eclipseDamageTick, 0,
                 Math.max(0, eclipseLifetimeTicks - 1));
 
-        int lifetime = Math.max(3, chromaticAccretionLifetimeTicks);
+        int lifetime = Math.max(8, chromaticAccretionLifetimeTicks);
         if (lifetime != chromaticAccretionLifetimeTicks) {
             ExampleMod.LOGGER.warn(
                     "chromaticAccretion.lifetimeTicks={} is too short for its phases; using {} ticks.",
@@ -505,6 +782,54 @@ public final class SpellConfig {
         chromaticAccretionCollapseTick = clampTimeline(
                 "chromaticAccretion.collapseTick", chromaticAccretionCollapseTick,
                 chromaticAccretionFormationEndTick + 1, lifetime - 1);
+        int previousPulse = chromaticAccretionFormationEndTick;
+        chromaticAccretionPulseOneTick = clampTimeline(
+                "chromaticAccretion.pulseOneTick", chromaticAccretionPulseOneTick,
+                previousPulse + 1, chromaticAccretionCollapseTick - 4);
+        previousPulse = chromaticAccretionPulseOneTick;
+        chromaticAccretionPulseTwoTick = clampTimeline(
+                "chromaticAccretion.pulseTwoTick", chromaticAccretionPulseTwoTick,
+                previousPulse + 1, chromaticAccretionCollapseTick - 3);
+        previousPulse = chromaticAccretionPulseTwoTick;
+        chromaticAccretionPulseThreeTick = clampTimeline(
+                "chromaticAccretion.pulseThreeTick", chromaticAccretionPulseThreeTick,
+                previousPulse + 1, chromaticAccretionCollapseTick - 2);
+        previousPulse = chromaticAccretionPulseThreeTick;
+        chromaticAccretionPulseFourTick = clampTimeline(
+                "chromaticAccretion.pulseFourTick", chromaticAccretionPulseFourTick,
+                previousPulse + 1, chromaticAccretionCollapseTick - 1);
+
+        int novaLifetime = Math.max(8, funeralNovaLifetimeTicks);
+        funeralNovaLifetimeTicks = novaLifetime;
+        funeralNovaBlackHoleStartTick = clampTimeline(
+                "funeralNova.blackHoleStartTick", funeralNovaBlackHoleStartTick, 0, novaLifetime - 8);
+        funeralNovaAccretionStartTick = clampTimeline(
+                "funeralNova.accretionStartTick", funeralNovaAccretionStartTick,
+                funeralNovaBlackHoleStartTick + 1, novaLifetime - 7);
+        funeralNovaCollapseStartTick = clampTimeline(
+                "funeralNova.collapseStartTick", funeralNovaCollapseStartTick,
+                funeralNovaAccretionStartTick + 1, novaLifetime - 6);
+        funeralNovaVoidStartTick = clampTimeline(
+                "funeralNova.voidStartTick", funeralNovaVoidStartTick,
+                funeralNovaCollapseStartTick + 1, novaLifetime - 5);
+        funeralNovaFlashStartTick = clampTimeline(
+                "funeralNova.flashStartTick", funeralNovaFlashStartTick,
+                funeralNovaVoidStartTick + 1, novaLifetime - 4);
+        funeralNovaHypernovaStartTick = clampTimeline(
+                "funeralNova.hypernovaStartTick", funeralNovaHypernovaStartTick,
+                funeralNovaFlashStartTick + 1, novaLifetime - 3);
+        funeralNovaAfterglowStartTick = clampTimeline(
+                "funeralNova.afterglowStartTick", funeralNovaAfterglowStartTick,
+                funeralNovaHypernovaStartTick + 1, novaLifetime - 2);
+        funeralNovaFadeOutStartTick = clampTimeline(
+                "funeralNova.fadeOutStartTick", funeralNovaFadeOutStartTick,
+                funeralNovaAfterglowStartTick + 1, novaLifetime - 1);
+        funeralNovaAccretionDamageTick = clampTimeline(
+                "funeralNova.accretionDamageTick", funeralNovaAccretionDamageTick,
+                0, novaLifetime - 1);
+        funeralNovaCollapseDamageTick = clampTimeline(
+                "funeralNova.collapseDamageTick", funeralNovaCollapseDamageTick,
+                0, novaLifetime - 1);
     }
 
     private static int clampTimeline(String path, int value, int minimum, int maximum) {
@@ -517,10 +842,49 @@ public final class SpellConfig {
         }
         return clamped;
     }
+
+    private static void validateGenericTimelines() {
+        for (Map.Entry<String, GenericValues> entry : GENERIC_SPELLS.entrySet()) {
+            String id = entry.getKey();
+            GenericValues values = entry.getValue();
+            int lifetime = Math.max(1, values.lifetimeTicks().get());
+            int phaseOne = values.phaseOneTick().get();
+            int phaseTwo = values.phaseTwoTick().get();
+            int phaseThree = values.phaseThreeTick().get();
+            if (phaseOne >= lifetime || phaseTwo <= phaseOne || phaseThree <= phaseTwo
+                    || phaseThree >= lifetime) {
+                ExampleMod.LOGGER.warn(
+                        "{} phase ticks ({}, {}, {}) do not fit lifetime {}; "
+                                + "runtime accessors will clamp them to a safe order.",
+                        id, phaseOne, phaseTwo, phaseThree, lifetime);
+            }
+        }
+    }
     private record GenericValues(
             ForgeConfigSpec.IntValue cooldown,
             ForgeConfigSpec.IntValue mana,
             ForgeConfigSpec.IntValue castTime,
-            ForgeConfigSpec.IntValue range) {
+            ForgeConfigSpec.IntValue range,
+            ForgeConfigSpec.IntValue lifetimeTicks,
+            ForgeConfigSpec.DoubleValue effectRadius,
+            ForgeConfigSpec.DoubleValue damageFraction,
+            ForgeConfigSpec.DoubleValue secondaryDamageFraction,
+            ForgeConfigSpec.IntValue damageIntervalTicks,
+            ForgeConfigSpec.IntValue phaseOneTick,
+            ForgeConfigSpec.IntValue phaseTwoTick,
+            ForgeConfigSpec.IntValue phaseThreeTick,
+            ForgeConfigSpec.IntValue maxTargets) {
+    }
+
+    private record GenericDefaults(
+            int lifetimeTicks,
+            double effectRadius,
+            double damageFraction,
+            double secondaryDamageFraction,
+            int damageIntervalTicks,
+            int phaseOneTick,
+            int phaseTwoTick,
+            int phaseThreeTick,
+            int maxTargets) {
     }
 }

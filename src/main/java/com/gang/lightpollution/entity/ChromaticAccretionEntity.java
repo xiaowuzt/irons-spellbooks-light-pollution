@@ -212,7 +212,8 @@ public final class ChromaticAccretionEntity extends Entity {
     private void resolvePendingPulses(ServerLevel level, int age) {
         for (int index = 0; index < PULSE_TICKS.length; index++) {
             int bit = 1 << index;
-            if ((this.resolvedPulseMask & bit) == 0 && age >= PULSE_TICKS[index]) {
+            if ((this.resolvedPulseMask & bit) == 0
+                    && age >= SpellConfig.chromaticAccretionPulseTick(index)) {
                 this.resolvedPulseMask |= bit;
                 resolveDamagePulse(level, (float) SpellConfig.chromaticAccretionPulseDamageFraction);
             }
@@ -434,10 +435,10 @@ public final class ChromaticAccretionEntity extends Entity {
     }
 
     private List<LivingEntity> currentTargets(ServerLevel level, LivingEntity caster) {
-        return level.getEntitiesOfClass(
+        return SpellConfig.limitTargets("chromaticAccretion", level.getEntitiesOfClass(
                 LivingEntity.class,
                 effectBounds(),
-                target -> canAffect(caster, target) && isInsideEffect(target));
+                target -> canAffect(caster, target) && isInsideEffect(target)));
     }
 
     private boolean canAffect(LivingEntity caster, LivingEntity target) {

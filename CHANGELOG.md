@@ -4,6 +4,18 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.7.0
+
+### Complete spell tuning and performance controls
+
+All 24 spells now expose server-side lifetime, effect radius, damage, pulse interval,
+phase and target-budget settings. Generic spells keep their existing cooldown, mana,
+cast-time and range keys under `spells.<spellId>`.
+
+Servers can cap active spell entities and target scans. Clients can choose a lighting
+quality preset and cap the number of screen-space light sources uploaded each frame;
+the renderer keeps the strongest sources when a scene exceeds that budget.
+
 ## 1.6.1
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.PinwheelParams;
 import com.gang.lightpollution.fx.PinwheelShape;
 import com.gang.lightpollution.fx.PinwheelSource;
@@ -52,6 +54,39 @@ import java.util.UUID;
  * this file.</p>
  */
 public final class PinwheelEntity extends Entity implements PinwheelSource {
+    private static final String CONFIG_ID = "pinwheel";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in PinwheelShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = PinwheelParams.SPELL_LIFETIME_TICKS;
@@ -137,9 +172,9 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
     public int getTimelineAgeTicks() {
         long start = this.entityData.get(DATA_START_GAME_TICK);
         if (start < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
-        return (int) Math.min(LIFETIME_TICKS,
+        return (int) Math.min(configuredLifetime(),
                 Math.max(0L, this.level().getGameTime() - start));
     }
 
@@ -154,11 +189,11 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
             // window is 1.4 turns, and wrapping there would send the phase from 2.8*pi back
             // to zero, which is a different angle — the pattern would visibly jump. Same
             // trap the microquasar's precession fell into.
-            float ticksPerTurn = (PinwheelShape.SPIN_END_TICK - PinwheelShape.SPIN_UP_END_TICK)
+            float ticksPerTurn = (configuredPhaseTwo() - configuredPhaseOne())
                     / (float) PinwheelShape.ROTATION_TURNS;
-            return PinwheelShape.SPIN_UP_END_TICK + (age % ticksPerTurn);
+            return configuredPhaseOne() + (age % ticksPerTurn);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the binary. */
@@ -192,19 +227,19 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= PinwheelShape.SPIN_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 0.0F;
         }
-        return Mth.clamp((age - PinwheelShape.SPIN_END_TICK)
-                / (float) (LIFETIME_TICKS - PinwheelShape.SPIN_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredPhaseTwo())
+                / (float) (configuredLifetime() - configuredPhaseTwo()), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= PinwheelShape.SPIN_UP_END_TICK) {
+        if (age <= configuredPhaseOne()) {
             return spunUp(partialTick);
         }
-        if (age <= PinwheelShape.SPIN_END_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -244,15 +279,15 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > PinwheelShape.SPIN_UP_END_TICK && timelineTick < PinwheelShape.SPIN_END_TICK
-                    && timelineTick % ARM_INTERVAL_TICKS == 0) {
+            if (timelineTick > configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveArms(serverLevel, timelineTick);
             }
-            if (!this.flareResolved && timelineTick >= PinwheelShape.SPIN_END_TICK) {
+            if (!this.flareResolved && timelineTick >= configuredPhaseTwo()) {
                 this.flareResolved = true;
                 resolveFlare(serverLevel);
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -271,10 +306,10 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
         double rotation = rotation(ageTicks);
 
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(centre.x - EFFECT_RADIUS, centre.y - EFFECT_RADIUS,
-                        centre.z - EFFECT_RADIUS, centre.x + EFFECT_RADIUS,
-                        centre.y + EFFECT_RADIUS, centre.z + EFFECT_RADIUS));
+        List<LivingEntity> targets = SpellConfig.limitTargets("pinwheel", level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius())));
         if (targets.isEmpty()) {
             return;
         }
@@ -298,7 +333,7 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
                 }
             }
             if (caught) {
-                SpellDamage.apply(this, target, source, ARM_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }
     }
@@ -309,15 +344,15 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
         DamageSource source = PinwheelDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("pinwheel", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - PinwheelShape.SPIRAL_REACH, centre.y - PinwheelShape.SPIRAL_REACH,
                         centre.z - PinwheelShape.SPIRAL_REACH, centre.x + PinwheelShape.SPIRAL_REACH,
-                        centre.y + PinwheelShape.SPIRAL_REACH, centre.z + PinwheelShape.SPIRAL_REACH))) {
+                        centre.y + PinwheelShape.SPIRAL_REACH, centre.z + PinwheelShape.SPIRAL_REACH)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= PinwheelShape.SPIRAL_REACH) {
-                SpellDamage.apply(this, target, source, FLARE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             }
         }
     }

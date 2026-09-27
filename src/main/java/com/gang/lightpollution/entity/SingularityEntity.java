@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.registry.ModSounds;
 import com.gang.lightpollution.api.SingularityParams;
 import com.gang.lightpollution.fx.FxHash;
@@ -47,6 +49,39 @@ import java.util.UUID;
  * alone reads as a countdown; all three read as something about to fail.</p>
  */
 public final class SingularityEntity extends Entity implements SingularitySource {
+    private static final String CONFIG_ID = "singularity";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in SingularityShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = SingularityParams.SPELL_LIFETIME_TICKS;
@@ -123,10 +158,10 @@ public final class SingularityEntity extends Entity implements SingularitySource
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -134,7 +169,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Centre of the core, interpolated for smooth rendering. */
@@ -238,7 +273,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
         java.util.List<Lens> lenses = new java.util.ArrayList<>(4);
         float age = getVisualAgeTicks(partialTick);
 
-        if (age > SingularityShape.OPEN_END_TICK && age < SingularityShape.COLLAPSE_TICK) {
+        if (age > configuredPhaseOne() && age < configuredPhaseTwo()) {
             float charge = charge(partialTick);
             // Life is held mid-profile rather than swept: this one is not
             // travelling anywhere, it is a standing lens that grows.
@@ -284,9 +319,9 @@ public final class SingularityEntity extends Entity implements SingularitySource
             if (timelineTick == 1) {
                 playCharge(serverLevel);
             }
-            if (timelineTick > SingularityShape.OPEN_END_TICK && timelineTick < SingularityShape.COLLAPSE_TICK) {
+            if (timelineTick > configuredPhaseOne() && timelineTick < configuredPhaseTwo()) {
                 applyPull(serverLevel);
-                if (timelineTick % CRUSH_INTERVAL_TICKS == 0) {
+                if (timelineTick % configuredInterval() == 0) {
                     resolveCrush(serverLevel);
                 }
                 // Throttled rather than one per bolt. By the end of the charge a
@@ -296,14 +331,14 @@ public final class SingularityEntity extends Entity implements SingularitySource
                     playArc(serverLevel, timelineTick);
                 }
             }
-            if (!this.blastResolved && timelineTick >= SingularityShape.COLLAPSE_TICK) {
+            if (!this.blastResolved && timelineTick >= configuredPhaseTwo()) {
                 this.blastResolved = true;
                 resolveBlast(serverLevel);
                 playCollapse(serverLevel);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -352,7 +387,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
             double distance = centre.distanceTo(target.getBoundingBox().getCenter());
             double closeness = 1.0D - Mth.clamp(distance / PULL_RADIUS, 0.0D, 1.0D);
             float fraction = (float) Mth.lerp(closeness * closeness,
-                    CRUSH_MIN_FRACTION, CRUSH_MAX_FRACTION);
+                    configuredPrimaryDamage(), CRUSH_MAX_FRACTION);
             SpellDamage.apply(this, target, source, fraction);
         }
     }
@@ -366,7 +401,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
         }
         DamageSource source = SingularityDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, BLAST_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             // Thrown outward by what is left of it.
             Vec3 away = target.getBoundingBox().getCenter().subtract(centre);
             double distance = away.length();
@@ -432,13 +467,13 @@ public final class SingularityEntity extends Entity implements SingularitySource
 
     private List<LivingEntity> gather(ServerLevel level, LivingEntity caster,
                                       Vec3 centre, double radius) {
-        return level.getEntitiesOfClass(
+        return SpellConfig.limitTargets("singularity", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
                         centre.x + radius, centre.y + radius, centre.z + radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= radius * radius);
+                                <= radius * radius));
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {

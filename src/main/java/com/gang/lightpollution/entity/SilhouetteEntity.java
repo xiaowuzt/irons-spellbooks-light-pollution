@@ -1,5 +1,6 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.ExampleMod;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
@@ -40,6 +41,24 @@ import java.util.UUID;
  * legible, "in a traced shadow volume" is not.</p>
  */
 public final class SilhouetteEntity extends Entity {
+    private static final String CONFIG_ID = "silhouette";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
     /** Radius of the inverted field, in blocks. */
     public static final float FIELD_RADIUS = 32.0F;
     /** Ticks the field takes to flip in, and to settle back afterwards. */
@@ -106,10 +125,10 @@ public final class SilhouetteEntity extends Entity {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(MAX_LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(MAX_LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -117,7 +136,7 @@ public final class SilhouetteEntity extends Entity {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(MAX_LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Centre of the field, interpolated so it tracks the caster smoothly. */
@@ -165,7 +184,7 @@ public final class SilhouetteEntity extends Entity {
                 release();
             }
             if (isChannelling() && timelineTick > 0
-                    && timelineTick % DAMAGE_INTERVAL_TICKS == 0) {
+                    && timelineTick % configuredInterval() == 0) {
                 resolveShadowDamage(serverLevel, caster);
             }
         }
@@ -174,7 +193,7 @@ public final class SilhouetteEntity extends Entity {
         boolean finished = !isChannelling()
                 && this.releasedAtTick >= 0
                 && timelineTick - this.releasedAtTick >= FLIP_TICKS;
-        if (finished || timelineTick >= MAX_LIFETIME_TICKS) {
+        if (finished || timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -187,14 +206,14 @@ public final class SilhouetteEntity extends Entity {
     private void resolveShadowDamage(ServerLevel level, LivingEntity caster) {
         List<Vec3> lightSources = collectCasterLightPositions(level, caster);
         Vec3 centre = this.position().add(0.0D, 1.0D, 0.0D);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("silhouette", level.getEntitiesOfClass(
                 LivingEntity.class,
-                new AABB(centre.x - FIELD_RADIUS, centre.y - FIELD_RADIUS,
-                        centre.z - FIELD_RADIUS, centre.x + FIELD_RADIUS,
-                        centre.y + FIELD_RADIUS, centre.z + FIELD_RADIUS),
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius()),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= FIELD_RADIUS * FIELD_RADIUS);
+                                <= configuredRadius() * configuredRadius()));
         if (targets.isEmpty()) {
             return;
         }
@@ -204,7 +223,7 @@ public final class SilhouetteEntity extends Entity {
             if (isLit(target, lightSources)) {
                 continue;
             }
-            SpellDamage.apply(this, target, source, SHADOW_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredDamage());
         }
     }
 
@@ -223,7 +242,7 @@ public final class SilhouetteEntity extends Entity {
         java.util.List<Vec3> positions = new java.util.ArrayList<>();
         // A light further away than this cannot make anything inside the field
         // count as lit, so there is no reason to gather it.
-        double search = FIELD_RADIUS + LIT_RADIUS;
+        double search = configuredRadius() + LIT_RADIUS;
         for (Entity nearby : level.getEntities(this,
                 new AABB(this.getX() - search, this.getY() - search, this.getZ() - search,
                         this.getX() + search, this.getY() + search, this.getZ() + search))) {

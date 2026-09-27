@@ -32,6 +32,38 @@ import java.util.UUID;
  * one synchronized damage pulse. No death-event hook is involved.</p>
  */
 public final class FuneralNovaEntity extends Entity {
+    private static int blackHoleStart() {
+        return SpellConfig.funeralNovaBlackHoleStartTick;
+    }
+
+    private static int accretionStart() {
+        return SpellConfig.funeralNovaAccretionStartTick;
+    }
+
+    private static int collapseStart() {
+        return SpellConfig.funeralNovaCollapseStartTick;
+    }
+
+    private static int voidStart() {
+        return SpellConfig.funeralNovaVoidStartTick;
+    }
+
+    private static int flashStart() {
+        return SpellConfig.funeralNovaFlashStartTick;
+    }
+
+    private static int hypernovaStart() {
+        return SpellConfig.funeralNovaHypernovaStartTick;
+    }
+
+    private static int afterglowStart() {
+        return SpellConfig.funeralNovaAfterglowStartTick;
+    }
+
+    private static int fadeOutStart() {
+        return SpellConfig.funeralNovaFadeOutStartTick;
+    }
+
     public static final int LIFETIME_TICKS = 344;
     public static final int BLACK_HOLE_START_TICK = 48;
     public static final int ACCRETION_START_TICK = 68;
@@ -120,19 +152,21 @@ public final class FuneralNovaEntity extends Entity {
         if (this.level() instanceof ServerLevel serverLevel) {
             this.entityData.set(DATA_STAGE, stageForTick(timelineTick));
 
-            if (timelineTick >= BLACK_HOLE_START_TICK && timelineTick < VOID_START_TICK) {
+            if (timelineTick >= blackHoleStart() && timelineTick < voidStart()) {
                 pullNearby(serverLevel, timelineTick);
             }
 
-            if (!this.accretionDamageResolved && timelineTick >= ACCRETION_DAMAGE_TICK) {
+            if (!this.accretionDamageResolved
+                    && timelineTick >= SpellConfig.funeralNovaAccretionDamageTick) {
                 this.accretionDamageResolved = true;
                 resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaAccretionDamageFraction, 7.0D, false);
             }
-            if (!this.collapseDamageResolved && timelineTick >= COLLAPSE_DAMAGE_TICK) {
+            if (!this.collapseDamageResolved
+                    && timelineTick >= SpellConfig.funeralNovaCollapseDamageTick) {
                 this.collapseDamageResolved = true;
                 resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaCollapseDamageFraction, 9.5D, false);
             }
-            if (!this.hypernovaDamageResolved && timelineTick >= HYPERNOVA_DAMAGE_TICK) {
+            if (!this.hypernovaDamageResolved && timelineTick >= hypernovaStart()) {
                 this.hypernovaDamageResolved = true;
                 resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaHypernovaDamageFraction, SpellConfig.funeralNovaEffectRadius, true);
             }
@@ -147,10 +181,10 @@ public final class FuneralNovaEntity extends Entity {
         LivingEntity caster = resolveCaster(level);
         Vec3 core = this.position().add(0.0D, 1.5D, 0.0D);
         float stageProgress = Math.min(1.0F,
-                (timelineTick - BLACK_HOLE_START_TICK)
-                        / (float) Math.max(1, VOID_START_TICK - BLACK_HOLE_START_TICK));
-        for (LivingEntity target : level.getEntitiesOfClass(
-                LivingEntity.class, effectBounds(SpellConfig.funeralNovaEffectRadius), entity -> canAffect(caster, entity))) {
+                (timelineTick - blackHoleStart())
+                        / (float) Math.max(1, voidStart() - blackHoleStart()));
+        for (LivingEntity target : SpellConfig.limitTargets("funeralNova", level.getEntitiesOfClass(
+                LivingEntity.class, effectBounds(SpellConfig.funeralNovaEffectRadius), entity -> canAffect(caster, entity)))) {
             Vec3 targetCenter = target.getBoundingBox().getCenter();
             Vec3 toCore = core.subtract(targetCenter);
             double distance = toCore.length();
@@ -174,12 +208,12 @@ public final class FuneralNovaEntity extends Entity {
     private void resolveDamagePulse(ServerLevel level, float fraction, double radius,
                                     boolean knockback) {
         LivingEntity caster = resolveCaster(level);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("funeralNova", level.getEntitiesOfClass(
                 LivingEntity.class,
                 effectBounds(radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(
-                                this.position().add(0.0D, 1.5D, 0.0D)) <= radius * radius);
+                                this.position().add(0.0D, 1.5D, 0.0D)) <= radius * radius));
         DamageSource source = FuneralNovaDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
             SpellDamage.apply(this, target, source, fraction);
@@ -252,28 +286,28 @@ public final class FuneralNovaEntity extends Entity {
         if (tick < 16) {
             return 1;
         }
-        if (tick < BLACK_HOLE_START_TICK) {
+        if (tick < blackHoleStart()) {
             return 2;
         }
-        if (tick < ACCRETION_START_TICK) {
+        if (tick < accretionStart()) {
             return 3;
         }
-        if (tick < COLLAPSE_START_TICK) {
+        if (tick < collapseStart()) {
             return 4;
         }
-        if (tick < VOID_START_TICK) {
+        if (tick < voidStart()) {
             return 5;
         }
-        if (tick < FLASH_START_TICK) {
+        if (tick < flashStart()) {
             return 6;
         }
-        if (tick < HYPERNOVA_START_TICK) {
+        if (tick < hypernovaStart()) {
             return 7;
         }
-        if (tick < AFTERGLOW_START_TICK) {
+        if (tick < afterglowStart()) {
             return 8;
         }
-        if (tick < FADE_OUT_START_TICK) {
+        if (tick < fadeOutStart()) {
             return 9;
         }
         return 10;

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.client.renderer;
 
+import com.gang.lightpollution.SpellConfig;
+import com.gang.lightpollution.SpellLightConfig;
 import com.gang.lightpollution.entity.GargantuaEntity;
 import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.MicroquasarEntity;
@@ -37,6 +39,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
@@ -287,11 +290,11 @@ public final class SpellLightEmitter {
         }
         for (FuneralNovaEntity entity : FUNERAL_NOVA) {
             float age = entity.getVisualAgeTicks(partialTick);
-            float formation = Mth.clamp(age / (float) FuneralNovaEntity.ACCRETION_START_TICK, 0.0F, 1.0F);
-            float collapse = bell(age - FuneralNovaEntity.COLLAPSE_DAMAGE_TICK, 18.0F);
-            float hypernova = bell(age - FuneralNovaEntity.HYPERNOVA_START_TICK, 26.0F);
+            float formation = Mth.clamp(age / (float) Math.max(1, SpellConfig.funeralNovaAccretionStartTick), 0.0F, 1.0F);
+            float collapse = bell(age - SpellConfig.funeralNovaCollapseDamageTick, 18.0F);
+            float hypernova = bell(age - SpellConfig.funeralNovaHypernovaStartTick, 26.0F);
             float fade = 1.0F - Mth.clamp(
-                    (age - FuneralNovaEntity.FADE_OUT_START_TICK) / 44.0F, 0.0F, 1.0F);
+                    (age - SpellConfig.funeralNovaFadeOutStartTick) / 44.0F, 0.0F, 1.0F);
             result.add(new Light(
                     interpolated(entity, partialTick).add(0.0D, 1.5D, 0.0D),
                     18.0F + hypernova * 10.0F,
@@ -517,7 +520,18 @@ public final class SpellLightEmitter {
                         1.0F, Math.min(1.0F, green + 0.1F), Math.min(1.0F, blue + 0.1F)));
             }
         }
-        return drainByGargantuas(drainByVoids(result, partialTick), partialTick);
+        return limitLights(drainByGargantuas(drainByVoids(result, partialTick), partialTick));
+    }
+
+    /** Keep the brightest sources when a crowded scene exceeds the configured GPU budget. */
+    private static List<Light> limitLights(List<Light> lights) {
+        int cap = Math.max(1, SpellLightConfig.maxLights);
+        if (lights.size() <= cap) {
+            return lights;
+        }
+        List<Light> strongest = new ArrayList<>(lights);
+        strongest.sort(Comparator.comparingDouble(Light::intensity).reversed());
+        return new ArrayList<>(strongest.subList(0, cap));
     }
 
     /**

@@ -133,8 +133,8 @@ public class StargraveSingularityEntity extends Entity {
     }
 
     private void pullNearby(ServerLevel level) {
-        for (LivingEntity target : level.getEntitiesOfClass(
-                LivingEntity.class, effectBounds(), this::canAffect)) {
+        for (LivingEntity target : SpellConfig.limitTargets("stargraveSingularity", level.getEntitiesOfClass(
+                LivingEntity.class, effectBounds(), this::canAffect))) {
             Vec3 targetCenter = new Vec3(
                     target.getX(),
                     target.getY() + target.getBbHeight() * 0.5D,
@@ -295,8 +295,8 @@ public class StargraveSingularityEntity extends Entity {
 
     private void collapse(ServerLevel level) {
         Map<UUID, CollapseTarget> targets = new LinkedHashMap<>();
-        for (LivingEntity target : List.copyOf(level.getEntitiesOfClass(
-                LivingEntity.class, effectBounds(), this::canAffect))) {
+        for (LivingEntity target : List.copyOf(SpellConfig.limitTargets("stargraveSingularity", level.getEntitiesOfClass(
+                LivingEntity.class, effectBounds(), this::canAffect)))) {
             targets.putIfAbsent(target.getUUID(), CollapseTarget.capture(target));
         }
 

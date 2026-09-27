@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
@@ -36,6 +38,39 @@ import java.util.UUID;
  * the damage pulse read the same number rather than each estimating it.</p>
  */
 public final class StarlessEntity extends Entity {
+    private static final String CONFIG_ID = "starless";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
+
+    private static int configuredCollapse() {
+        return configuredPhaseTwo() + (configuredPhaseThree() - configuredPhaseTwo()) / 2;
+    }
     public static final int LIFETIME_TICKS = 260;
     /** The seed is a point of darkness before the void starts to open. */
     public static final int SEED_END_TICK = 20;
@@ -106,10 +141,10 @@ public final class StarlessEntity extends Entity {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -117,7 +152,7 @@ public final class StarlessEntity extends Entity {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Centre of the void, a little above the anchor so it reads as a sphere in air. */
@@ -135,20 +170,20 @@ public final class StarlessEntity extends Entity {
      */
     public float getVoidRadius(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age < SEED_END_TICK) {
-            return 0.6F * (age / SEED_END_TICK);
+        if (age < configuredPhaseOne()) {
+            return 0.6F * (age / configuredPhaseOne());
         }
-        if (age < NADIR_START_TICK) {
-            float t = (age - SEED_END_TICK)
-                    / (float) (NADIR_START_TICK - SEED_END_TICK);
+        if (age < configuredPhaseTwo()) {
+            float t = (age - configuredPhaseOne())
+                    / (float) (configuredPhaseTwo() - configuredPhaseOne());
             return 0.6F + smoothstep(t) * (MAX_VOID_RADIUS - 0.6F);
         }
-        if (age < COLLAPSE_START_TICK) {
+        if (age < configuredCollapse()) {
             return MAX_VOID_RADIUS;
         }
-        if (age < RELEASE_TICK) {
-            float t = (age - COLLAPSE_START_TICK)
-                    / (float) (RELEASE_TICK - COLLAPSE_START_TICK);
+        if (age < configuredPhaseThree()) {
+            float t = (age - configuredCollapse())
+                    / (float) (configuredPhaseThree() - configuredCollapse());
             return MAX_VOID_RADIUS * (1.0F - t * t);
         }
         return 0.0F;
@@ -161,20 +196,20 @@ public final class StarlessEntity extends Entity {
      */
     public float getDrainStrength(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age < SEED_END_TICK) {
+        if (age < configuredPhaseOne()) {
             return 0.0F;
         }
-        if (age < NADIR_START_TICK) {
-            float t = (age - SEED_END_TICK)
-                    / (float) (NADIR_START_TICK - SEED_END_TICK);
+        if (age < configuredPhaseTwo()) {
+            float t = (age - configuredPhaseOne())
+                    / (float) (configuredPhaseTwo() - configuredPhaseOne());
             return smoothstep(t) * MAX_DRAIN;
         }
-        if (age < COLLAPSE_START_TICK) {
+        if (age < configuredCollapse()) {
             return MAX_DRAIN;
         }
-        if (age < RELEASE_TICK) {
-            float t = (age - COLLAPSE_START_TICK)
-                    / (float) (RELEASE_TICK - COLLAPSE_START_TICK);
+        if (age < configuredPhaseThree()) {
+            float t = (age - configuredCollapse())
+                    / (float) (configuredPhaseThree() - configuredCollapse());
             return MAX_DRAIN + (1.0F - MAX_DRAIN) * t;
         }
         return 0.0F;
@@ -187,25 +222,25 @@ public final class StarlessEntity extends Entity {
      */
     public float getIngestProgress(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age < SEED_END_TICK) {
+        if (age < configuredPhaseOne()) {
             return 0.0F;
         }
-        if (age >= RELEASE_TICK) {
+        if (age >= configuredPhaseThree()) {
             return 0.0F;
         }
-        if (age >= NADIR_START_TICK) {
+        if (age >= configuredPhaseTwo()) {
             return 1.0F;
         }
-        return smoothstep((age - SEED_END_TICK)
-                / (float) (NADIR_START_TICK - SEED_END_TICK));
+        return smoothstep((age - configuredPhaseOne())
+                / (float) (configuredPhaseTwo() - configuredPhaseOne()));
     }
 
     /** Release flash, 0 to 1: instant attack at the release, exponential decay. */    public float getReleaseFlash(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age < RELEASE_TICK) {
+        if (age < configuredPhaseThree()) {
             return 0.0F;
         }
-        float t = (age - RELEASE_TICK) / FLASH_DECAY_TICKS;
+        float t = (age - configuredPhaseThree()) / FLASH_DECAY_TICKS;
         return (float) Math.exp(-t * t * 3.0D);
     }
 
@@ -234,12 +269,12 @@ public final class StarlessEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick >= SEED_END_TICK && timelineTick <= RELEASE_TICK) {
+            if (timelineTick >= configuredPhaseOne() && timelineTick <= configuredPhaseThree()) {
                 countSwallowedLights(serverLevel);
             }
             if (!this.starvationDamageResolved && timelineTick >= STARVATION_DAMAGE_TICK) {
                 this.starvationDamageResolved = true;
-                resolveDamagePulse(serverLevel, STARVATION_DAMAGE_FRACTION,
+                resolveDamagePulse(serverLevel, configuredPrimaryDamage(),
                         MAX_VOID_RADIUS, false);
             }
             if (!this.releaseDamageResolved && timelineTick >= RELEASE_DAMAGE_TICK) {
@@ -247,11 +282,11 @@ public final class StarlessEntity extends Entity {
                 float bonus = Math.min(getSwallowedCount(), SWALLOWED_DAMAGE_CAP)
                         * SWALLOWED_DAMAGE_STEP;
                 resolveDamagePulse(serverLevel,
-                        RELEASE_DAMAGE_FRACTION + bonus, EFFECT_RADIUS, true);
+                        configuredSecondaryDamage() + bonus, configuredRadius(), true);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -264,12 +299,12 @@ public final class StarlessEntity extends Entity {
      */
     private void countSwallowedLights(ServerLevel level) {
         int seen = 0;
-        for (Entity nearby : level.getEntities(this, effectBounds(EFFECT_RADIUS))) {
+        for (Entity nearby : level.getEntities(this, effectBounds(configuredRadius()))) {
             if (nearby == this || !isSpellLightSource(nearby)) {
                 continue;
             }
             if (nearby.position().distanceToSqr(this.position())
-                    <= EFFECT_RADIUS * EFFECT_RADIUS) {
+                    <= configuredRadius() * configuredRadius()) {
                 seen++;
             }
         }
@@ -292,12 +327,12 @@ public final class StarlessEntity extends Entity {
                                     boolean knockback) {
         LivingEntity caster = resolveCaster(level);
         Vec3 core = this.position().add(0.0D, 1.5D, 0.0D);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("starless", level.getEntitiesOfClass(
                 LivingEntity.class,
                 effectBounds(radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(core)
-                                <= radius * radius);
+                                <= radius * radius));
         DamageSource source = StarlessDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
             SpellDamage.apply(this, target, source, fraction);

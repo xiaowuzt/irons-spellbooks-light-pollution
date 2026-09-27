@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.MagnetarParams;
 import com.gang.lightpollution.fx.MagnetarShape;
 import com.gang.lightpollution.fx.MagnetarSource;
@@ -42,6 +44,39 @@ import java.util.UUID;
  * in this set, where you stand inside the radius matters.</p>
  */
 public final class MagnetarEntity extends Entity implements MagnetarSource {
+    private static final String CONFIG_ID = "magnetar";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form of the magnetar lives in MagnetarShape, which the renderer and the public API both
     // read, so there is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = MagnetarParams.SPELL_LIFETIME_TICKS;
@@ -142,9 +177,9 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
     public int getTimelineAgeTicks() {
         long start = this.entityData.get(DATA_START_GAME_TICK);
         if (start < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
-        return (int) Math.min(LIFETIME_TICKS,
+        return (int) Math.min(configuredLifetime(),
                 Math.max(0L, this.level().getGameTime() - start));
     }
 
@@ -159,10 +194,10 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
             // is always at the white-hot end of its ramp, so the violet it starts from is never
             // visible and the effect looks like it only has one colour. Stopping short of the
             // flare still avoids blanking the view every cycle.
-            float span = MagnetarShape.WIND_END_TICK - MagnetarShape.THREAD_END_TICK;
-            return MagnetarShape.THREAD_END_TICK + (age % span);
+            float span = MagnetarShape.WIND_END_TICK - configuredPhaseOne();
+            return configuredPhaseOne() + (age % span);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the star. */
@@ -186,7 +221,7 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
 
     /** How far the field has threaded out, 0 to 1. */
     public float threaded(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / MagnetarShape.THREAD_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / configuredPhaseOne());
     }
 
     /** How far the magnetosphere has wound up, 0 to 1. */
@@ -196,21 +231,21 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
 
     /** The flare itself, 1 at the instant it goes and decaying after. */
     public float flare(float partialTick) {
-        return MagnetarShape.flare(getVisualAgeTicks(partialTick), FLARE_TICK);
+        return MagnetarShape.flare(getVisualAgeTicks(partialTick), configuredPhaseTwo());
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= FLARE_TICK) {
+        if (age <= configuredPhaseTwo()) {
             return 0.0F;
         }
-        return Mth.clamp((age - FLARE_TICK)
-                / (float) (LIFETIME_TICKS - FLARE_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredPhaseTwo())
+                / (float) (configuredLifetime() - configuredPhaseTwo()), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= MagnetarShape.THREAD_END_TICK) {
+        if (age <= configuredPhaseOne()) {
             return threaded(partialTick);
         }
         if (age <= MagnetarShape.WIND_END_TICK) {
@@ -252,15 +287,15 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > MagnetarShape.THREAD_END_TICK && timelineTick < FLARE_TICK
-                    && timelineTick % FIELD_INTERVAL_TICKS == 0) {
+            if (timelineTick > configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveField(serverLevel, timelineTick);
             }
-            if (!this.flareResolved && timelineTick >= FLARE_TICK) {
+            if (!this.flareResolved && timelineTick >= configuredPhaseTwo()) {
                 this.flareResolved = true;
                 resolveFlare(serverLevel);
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -279,10 +314,10 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
         float woundFraction = wound(0.0F);
 
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(centre.x - EFFECT_RADIUS, centre.y - EFFECT_RADIUS,
-                        centre.z - EFFECT_RADIUS, centre.x + EFFECT_RADIUS,
-                        centre.y + EFFECT_RADIUS, centre.z + EFFECT_RADIUS));
+        List<LivingEntity> targets = SpellConfig.limitTargets("magnetar", level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius())));
         if (targets.isEmpty()) {
             return;
         }
@@ -305,7 +340,7 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
                 }
             }
             if (touching) {
-                SpellDamage.apply(this, target, source, FIELD_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }
     }
@@ -322,15 +357,15 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
         DamageSource source = MagnetarDamage.field(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("magnetar", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - FLARE_RADIUS, centre.y - FLARE_RADIUS,
                         centre.z - FLARE_RADIUS, centre.x + FLARE_RADIUS,
-                        centre.y + FLARE_RADIUS, centre.z + FLARE_RADIUS))) {
+                        centre.y + FLARE_RADIUS, centre.z + FLARE_RADIUS)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= FLARE_RADIUS) {
-                SpellDamage.apply(this, target, source, FLARE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             }
         }
     }

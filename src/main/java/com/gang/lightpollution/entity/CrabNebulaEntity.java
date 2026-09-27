@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.CrabNebulaParams;
 import com.gang.lightpollution.fx.CrabNebulaShape;
 import com.gang.lightpollution.fx.CrabNebulaSource;
@@ -49,6 +51,35 @@ import java.util.UUID;
  * this file.</p>
  */
 public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
+    private static final String CONFIG_ID = "crabNebula";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredFormEnd() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredWindEnd() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
     public static final int LIFETIME_TICKS = CrabNebulaParams.SPELL_LIFETIME_TICKS;
 
     /** How close to a filament counts as touching it, in blocks. */
@@ -128,9 +159,9 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
     public int getTimelineAgeTicks() {
         long start = this.entityData.get(DATA_START_GAME_TICK);
         if (start < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
-        return (int) Math.min(LIFETIME_TICKS,
+        return (int) Math.min(configuredLifetime(),
                 Math.max(0L, this.level().getGameTime() - start));
     }
 
@@ -141,9 +172,9 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
                 : (float) (this.level().getGameTime() - start) + partialTick;
         age = Math.max(0.0F, age);
         if (isDisplay()) {
-            return Math.min(age, CrabNebulaShape.WIND_END_TICK - 1.0F);
+            return Math.min(age, configuredWindEnd() - 1.0F);
         }
-        return Math.min(LIFETIME_TICKS, age);
+        return Math.min(configuredLifetime(), age);
     }
 
     /** Centre of the remnant, where the pulsar is. */
@@ -167,24 +198,24 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
 
     /** How far the remnant has unfolded, 0 to 1. */
     public float formed(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / CrabNebulaShape.FORM_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / configuredFormEnd());
     }
 
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= CrabNebulaShape.WIND_END_TICK) {
+        if (age <= configuredWindEnd()) {
             return 0.0F;
         }
-        return Mth.clamp((age - CrabNebulaShape.WIND_END_TICK)
-                / (float) (LIFETIME_TICKS - CrabNebulaShape.WIND_END_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredWindEnd())
+                / (float) (configuredLifetime() - configuredWindEnd()), 0.0F, 1.0F);
     }
 
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= CrabNebulaShape.FORM_END_TICK) {
+        if (age <= configuredFormEnd()) {
             return formed(partialTick);
         }
-        if (age <= CrabNebulaShape.WIND_END_TICK) {
+        if (age <= configuredWindEnd()) {
             return 1.0F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -235,19 +266,19 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > CrabNebulaShape.FORM_END_TICK && timelineTick < CrabNebulaShape.WIND_END_TICK) {
-                if (timelineTick % FILAMENT_INTERVAL_TICKS == 0) {
+            if (timelineTick > configuredFormEnd() && timelineTick < configuredWindEnd()) {
+                if (timelineTick % configuredInterval() == 0) {
                     resolveFilaments(serverLevel, timelineTick);
                 }
                 if (timelineTick % CrabNebulaShape.WIND_INTERVAL_TICKS == 0) {
                     resolveWind(serverLevel, timelineTick);
                 }
             }
-            if (!this.collapseResolved && timelineTick >= CrabNebulaShape.WIND_END_TICK) {
+            if (!this.collapseResolved && timelineTick >= configuredWindEnd()) {
                 this.collapseResolved = true;
                 resolveCollapse(serverLevel);
             }
-            if (timelineTick >= LIFETIME_TICKS) {
+            if (timelineTick >= configuredLifetime()) {
                 this.discard();
             }
         }
@@ -259,10 +290,10 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
         DamageSource source = CrabNebulaDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
 
-        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class,
-                new AABB(centre.x - EFFECT_RADIUS, centre.y - EFFECT_RADIUS,
-                        centre.z - EFFECT_RADIUS, centre.x + EFFECT_RADIUS,
-                        centre.y + EFFECT_RADIUS, centre.z + EFFECT_RADIUS));
+        List<LivingEntity> targets = SpellConfig.limitTargets("crabNebula", level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(centre.x - configuredRadius(), centre.y - configuredRadius(),
+                        centre.z - configuredRadius(), centre.x + configuredRadius(),
+                        centre.y + configuredRadius(), centre.z + configuredRadius())));
         if (targets.isEmpty()) {
             return;
         }
@@ -290,7 +321,7 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
                 }
             }
             if (touching) {
-                SpellDamage.apply(this, target, source, FILAMENT_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }
     }
@@ -302,9 +333,9 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
         double reach = shellRadius(ageTicks) * CrabNebulaShape.WIND_FRACTION;
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("crabNebula", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,
-                        centre.x + reach, centre.y + reach, centre.z + reach))) {
+                        centre.x + reach, centre.y + reach, centre.z + reach)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
@@ -325,16 +356,16 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
         LivingEntity caster = resolveCaster(level);
         DamageSource source = CrabNebulaDamage.source(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
-        double reach = shellRadius(CrabNebulaShape.WIND_END_TICK);
+        double reach = shellRadius(configuredWindEnd());
 
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity target : SpellConfig.limitTargets("crabNebula", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,
-                        centre.x + reach, centre.y + reach, centre.z + reach))) {
+                        centre.x + reach, centre.y + reach, centre.z + reach)))) {
             if (!canAffect(caster, target)) {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= reach) {
-                SpellDamage.apply(this, target, source, COLLAPSE_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source, configuredSecondaryDamage());
             }
         }
     }

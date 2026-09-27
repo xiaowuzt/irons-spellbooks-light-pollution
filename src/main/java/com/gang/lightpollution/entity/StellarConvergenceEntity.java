@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.api.StellarConvergenceParams;
 import com.gang.lightpollution.fx.FxHash;
 import com.gang.lightpollution.fx.StellarConvergenceShape;
@@ -42,6 +44,39 @@ import java.util.UUID;
  */
 public final class StellarConvergenceEntity extends Entity
         implements StellarConvergenceSource {
+    private static final String CONFIG_ID = "stellarConvergence";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static int configuredInterval() {
+        return SpellConfig.damageIntervalTicks(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
+
+    private static int configuredPhaseOne() {
+        return SpellConfig.phaseTick(CONFIG_ID, 1);
+    }
+
+    private static int configuredPhaseTwo() {
+        return SpellConfig.phaseTick(CONFIG_ID, 2);
+    }
+
+    private static int configuredPhaseThree() {
+        return SpellConfig.phaseTick(CONFIG_ID, 3);
+    }
     // The form lives in StellarConvergenceShape, which the renderer and the public API both read,
     // so there is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = StellarConvergenceParams.SPELL_LIFETIME_TICKS;
@@ -100,10 +135,10 @@ public final class StellarConvergenceEntity extends Entity
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -111,7 +146,7 @@ public final class StellarConvergenceEntity extends Entity
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     /** Centre of the constellation, and the point the beams converge on. */
@@ -190,17 +225,17 @@ public final class StellarConvergenceEntity extends Entity
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick >= StellarConvergenceShape.BEAM_START_TICK && timelineTick < StellarConvergenceShape.BURST_TICK
-                    && timelineTick % BEAM_INTERVAL_TICKS == 0) {
+            if (timelineTick >= configuredPhaseOne() && timelineTick < configuredPhaseTwo()
+                    && timelineTick % configuredInterval() == 0) {
                 resolveColumn(serverLevel);
             }
-            if (!this.burstResolved && timelineTick >= StellarConvergenceShape.BURST_TICK) {
+            if (!this.burstResolved && timelineTick >= configuredPhaseTwo()) {
                 this.burstResolved = true;
                 resolveBurst(serverLevel);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -214,15 +249,15 @@ public final class StellarConvergenceEntity extends Entity
         AABB bounds = new AABB(
                 ground.x - StellarConvergenceShape.COLUMN_RADIUS, ground.y - 2.0D, ground.z - StellarConvergenceShape.COLUMN_RADIUS,
                 ground.x + StellarConvergenceShape.COLUMN_RADIUS, ground.y + StellarConvergenceShape.SHELL_HEIGHT, ground.z + StellarConvergenceShape.COLUMN_RADIUS);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("stellarConvergence", level.getEntitiesOfClass(
                 LivingEntity.class, bounds,
-                target -> canAffect(caster, target) && withinColumn(target, ground));
+                target -> canAffect(caster, target) && withinColumn(target, ground)));
         if (targets.isEmpty()) {
             return;
         }
         DamageSource source = StellarConvergenceDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, BEAM_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredPrimaryDamage());
         }
     }
 
@@ -236,20 +271,20 @@ public final class StellarConvergenceEntity extends Entity
     private void resolveBurst(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 ground = groundCentre(1.0F);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("stellarConvergence", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(ground.x - BURST_RADIUS, ground.y - BURST_RADIUS,
                         ground.z - BURST_RADIUS, ground.x + BURST_RADIUS,
                         ground.y + BURST_RADIUS, ground.z + BURST_RADIUS),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(ground)
-                                <= BURST_RADIUS * BURST_RADIUS);
+                                <= BURST_RADIUS * BURST_RADIUS));
         if (targets.isEmpty()) {
             return;
         }
         DamageSource source = StellarConvergenceDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, BURST_DAMAGE_FRACTION);
+            SpellDamage.apply(this, target, source, configuredSecondaryDamage());
         }
     }
 

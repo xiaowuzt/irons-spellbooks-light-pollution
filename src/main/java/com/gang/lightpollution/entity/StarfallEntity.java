@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.api.StarfallParams;
 import com.gang.lightpollution.fx.FxHash;
@@ -46,6 +48,23 @@ import java.util.UUID;
  * colossal body falling on the aimed point.</p>
  */
 public final class StarfallEntity extends Entity implements StarfallSource {
+    private static final String CONFIG_ID = "starfall";
+
+    private static int configuredLifetime() {
+        return SpellConfig.lifetimeTicks(CONFIG_ID);
+    }
+
+    private static double configuredRadius() {
+        return SpellConfig.effectRadius(CONFIG_ID);
+    }
+
+    private static float configuredPrimaryDamage() {
+        return (float) SpellConfig.damageFraction(CONFIG_ID);
+    }
+
+    private static float configuredSecondaryDamage() {
+        return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
+    }
     // The form lives in StarfallShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = StarfallParams.SPELL_LIFETIME_TICKS;
@@ -104,10 +123,10 @@ public final class StarfallEntity extends Entity implements StarfallSource {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(configuredLifetime(), Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(configuredLifetime(), Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -115,7 +134,7 @@ public final class StarfallEntity extends Entity implements StarfallSource {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(configuredLifetime(), Math.max(0.0F, age));
     }
 
     public static boolean isFinaleMeteor(int meteor) {
@@ -175,7 +194,7 @@ public final class StarfallEntity extends Entity implements StarfallSource {
         float unitRadius = hashUnit(meteor, 0x85EBCA6BL);
         // sqrt distributes the points evenly across the disc instead of
         // clustering them at the centre.
-        double radius = Math.sqrt(unitRadius) * EFFECT_RADIUS;
+        double radius = Math.sqrt(unitRadius) * configuredRadius();
         double angle = unitAngle * Mth.TWO_PI;
         double x = this.getX() + Math.cos(angle) * radius;
         double z = this.getZ() + Math.sin(angle) * radius;
@@ -253,7 +272,7 @@ public final class StarfallEntity extends Entity implements StarfallSource {
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= configuredLifetime()) {
             this.discard();
         }
     }
@@ -262,20 +281,20 @@ public final class StarfallEntity extends Entity implements StarfallSource {
         LivingEntity caster = resolveCaster(level);
         Vec3 impact = meteorLanding(meteor);
         double radius = blastRadius(meteor);
-        List<LivingEntity> targets = level.getEntitiesOfClass(
+        List<LivingEntity> targets = SpellConfig.limitTargets("starfall", level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(impact.x - radius, impact.y - radius, impact.z - radius,
                         impact.x + radius, impact.y + radius, impact.z + radius),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(impact)
-                                <= radius * radius);
+                                <= radius * radius));
         if (targets.isEmpty()) {
             return;
         }
 
         DamageSource source = StarfallDamage.source(level, this, caster);
         float fraction = isFinaleMeteor(meteor)
-                ? FINALE_DAMAGE_FRACTION : RAIN_DAMAGE_FRACTION;
+                ? configuredSecondaryDamage() : configuredPrimaryDamage();
         for (LivingEntity target : targets) {
             SpellDamage.apply(this, target, source, fraction);
             target.setSecondsOnFire(isFinaleMeteor(meteor) ? 6 : 3);
