@@ -4,6 +4,22 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.7.1
+
+### More server-side spell tuning
+
+The remaining special damage values are now configurable in the server TOML:
+
+- Crab Nebula wind damage (`spells.crabNebula.windDamageFraction`)
+- Gargantua blast damage (`spells.gargantua.blastDamageFraction`)
+- Chromatic Accretion stored caster-damage share and cap
+  (`chromaticAccretion.storedDamageShare`, `chromaticAccretion.storedDamageCapFraction`)
+- Starless swallowed-light bonus step and cap
+  (`spells.starless.swallowedDamageStep`, `spells.starless.swallowedDamageCap`)
+
+The defaults match 1.7.0, so existing worlds keep their balance while server
+owners can tune these interactions without replacing the jar.
+
 ## 1.7.0
 
 ### Complete spell tuning and performance controls

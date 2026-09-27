@@ -97,10 +97,6 @@ public final class StarlessEntity extends Entity {
 
     private static final float STARVATION_DAMAGE_FRACTION = 0.16F;
     private static final float RELEASE_DAMAGE_FRACTION = 0.26F;
-    /** Extra maximum-health fraction per swallowed light, and its cap. */
-    private static final float SWALLOWED_DAMAGE_STEP = 0.05F;
-    private static final int SWALLOWED_DAMAGE_CAP = 4;
-
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             StarlessEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Long> DATA_START_GAME_TICK = SynchedEntityData.defineId(
@@ -249,7 +245,7 @@ public final class StarlessEntity extends Entity {
      * damage pulse and the flash so a bigger detonation always means a bigger hit.
      */
     public float getReleaseScale() {
-        return 1.0F + Math.min(getSwallowedCount(), SWALLOWED_DAMAGE_CAP) * 0.35F;
+        return 1.0F + Math.min(getSwallowedCount(), SpellConfig.starlessSwallowedDamageCap) * 0.35F;
     }
 
     public boolean isCastBy(LivingEntity caster) {
@@ -279,8 +275,8 @@ public final class StarlessEntity extends Entity {
             }
             if (!this.releaseDamageResolved && timelineTick >= RELEASE_DAMAGE_TICK) {
                 this.releaseDamageResolved = true;
-                float bonus = Math.min(getSwallowedCount(), SWALLOWED_DAMAGE_CAP)
-                        * SWALLOWED_DAMAGE_STEP;
+                float bonus = Math.min(getSwallowedCount(), SpellConfig.starlessSwallowedDamageCap)
+                        * (float) SpellConfig.starlessSwallowedDamageStep;
                 resolveDamagePulse(serverLevel,
                         configuredSecondaryDamage() + bonus, configuredRadius(), true);
             }

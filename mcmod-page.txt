@@ -115,10 +115,12 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 · `stargraveSingularity.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`damageFraction`、`lifetimeTicks`、`damageTick`
 · `eclipseSeverance.cooldownSeconds`、`manaCost`、`castTimeTicks`、`damage`、`attackRadius`、`attackAngleDegrees`、`verticalTolerance`、`maxTargets`、`lifetimeTicks`、`damageTick`
 · `funeralNova.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`accretionDamageFraction`、`collapseDamageFraction`、`hypernovaDamageFraction`、`accretionDamageTick`、`collapseDamageTick`、`lifetimeTicks` 以及八个阶段 tick 键
-· `chromaticAccretion.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`pulseDamageFraction`、`collapseDamageFraction`、`projectileDamageFraction`、`maxProjectileCharge`、`lifetimeTicks`、`formationEndTick`、`collapseTick`、`pulseOneTick`–`pulseFourTick`
+· `chromaticAccretion.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`pulseDamageFraction`、`collapseDamageFraction`、`projectileDamageFraction`、`storedDamageShare`、`storedDamageCapFraction`、`maxProjectileCharge`、`lifetimeTicks`、`formationEndTick`、`collapseTick`、`pulseOneTick`–`pulseFourTick`
 · `worldTree.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`lifetimeTicks`、`healingFraction`、`healingIntervalTicks`、`absorptionHearts`、`protectMagic`、`protectProjectile`、`protectFire`
 
 其余法术的通用键为 `spells.<id>.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`lifetimeTicks`、`effectRadius`、`damageFraction`、`secondaryDamageFraction`、`damageIntervalTicks`、`phaseOneTick`、`phaseTwoTick`、`phaseThreeTick` 和 `maxTargets`；例如 `spells.gargantua.effectRadius`。通用小节的 `<id>` 使用驼峰式（如 `skyCollapse`、`cosmicHorseshoe`）。
+
+其中 `spells.starless` 还提供 `swallowedDamageStep`、`swallowedDamageCap`，`spells.gargantua` 提供 `blastDamageFraction`，`spells.crabNebula` 提供 `windDamageFraction`。
 
 服务器还可以在 `[server]` 小节设置 `maxActiveSpellEntities`、`maxEntitiesPerSpell` 和 `targetScanLimit`，避免多人同时施法造成过多实体和目标扫描。
 

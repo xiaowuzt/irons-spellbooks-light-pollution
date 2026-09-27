@@ -160,8 +160,6 @@ public final class GargantuaEntity extends Entity {
     private static final float TIDAL_MIN_FRACTION = 0.013F;
     /** Max-health fraction of a tidal application against the horizon. */
     private static final float TIDAL_MAX_FRACTION = 0.046F;
-    /** Max-health fraction of the detonation before swallowed light is counted. */
-    private static final float BLAST_DAMAGE_FRACTION = 0.72F;
     /** Extra max-health fraction per swallowed spell light. */
     private static final float BLAST_BONUS_PER_LIGHT = 0.038F;
     /** Ceiling on that bonus. */
@@ -505,7 +503,8 @@ public final class GargantuaEntity extends Entity {
                 getSwallowedCount() * BLAST_BONUS_PER_LIGHT);
         DamageSource source = GargantuaDamage.source(level, this, caster);
         for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, BLAST_DAMAGE_FRACTION + bonus);
+            SpellDamage.apply(this, target, source,
+                    (float) SpellConfig.gargantuaBlastDamageFraction + bonus);
             // Thrown outward: the disk is being flung off, and so is everything else.
             Vec3 outward = target.getBoundingBox().getCenter().subtract(centre);
             double distance = outward.length();

@@ -58,10 +58,19 @@ The first five spells and World Tree use dedicated sections such as `celestialJu
 Funeral Nova also exposes `accretionDamageTick` and `collapseDamageTick`; these control
 when its first two damage pulses resolve and stay synchronized with the client timeline.
 
+The generic sections also expose the special interaction values used by three spells:
+
+- `spells.starless.swallowedDamageStep` (default `0.05`) and `spells.starless.swallowedDamageCap` (default `4`)
+- `spells.gargantua.blastDamageFraction` (default `0.72`)
+- `spells.crabNebula.windDamageFraction` (default `0.026`)
+
+Chromatic Accretion additionally exposes `chromaticAccretion.storedDamageShare` (default `0.30`)
+and `chromaticAccretion.storedDamageCapFraction` (default `0.20`) for damage recorded before its collapse.
+
 Damage and healing fractions use decimal values (`0.08` means 8%). Forge validates numeric ranges and falls back to defaults for invalid values. Restart the server or reload the Forge config after editing.
 
 If a server was created with an early development build, its generic spell values may still be
-nested under `spells.spells`. Version 1.7.0 reports this legacy path at load time; copy those
+nested under `spells.spells`. Version 1.7.1 reports this legacy path at load time; copy those
 values into the matching `spells.<spellId>` sections before removing the old entries.
 
 Client lighting and presentation options are in:

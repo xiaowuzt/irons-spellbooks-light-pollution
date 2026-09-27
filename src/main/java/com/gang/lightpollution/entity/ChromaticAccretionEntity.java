@@ -52,8 +52,6 @@ public final class ChromaticAccretionEntity extends Entity {
     public static final float MAX_VISUAL_RADIUS = 6.75F;
 
     private static final int[] PULSE_TICKS = {36, 64, 92, 120};
-    private static final float STORED_DAMAGE_SHARE = 0.30F;
-    private static final float STORED_DAMAGE_CAP_FRACTION = 0.20F;
     private static final double PROJECTILE_CORE_RADIUS = 1.35D;
     private static final double PROJECTILE_QUERY_PADDING = 6.0D;
 
@@ -278,8 +276,10 @@ public final class ChromaticAccretionEntity extends Entity {
         }
 
         float creditedDamage = Math.min(actualDamage, Math.max(0.0F, target.getHealth()));
-        float cap = target.getMaxHealth() * STORED_DAMAGE_CAP_FRACTION;
-        float addedDamage = Math.min(cap, creditedDamage * STORED_DAMAGE_SHARE);
+        float cap = target.getMaxHealth()
+                * (float) SpellConfig.chromaticAccretionStoredDamageCapFraction;
+        float addedDamage = Math.min(cap, creditedDamage
+                * (float) SpellConfig.chromaticAccretionStoredDamageShare);
         this.storedCasterDamage.merge(
                 target.getUUID(),
                 addedDamage,

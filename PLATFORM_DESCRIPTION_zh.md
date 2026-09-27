@@ -60,7 +60,7 @@
 
 服务端法术属性写入 `config/irons_spellbooks_light_pollution-server.toml`。首次启动后即可修改，重启服务器或重载 Forge 配置后生效。前五个法术和世界树使用驼峰式顶层小节（如 `worldTree`）；其余法术使用 `spells.<id>` 小节（`skyCollapse`、`cosmicHorseshoe` 等），提供冷却秒数、法力消耗、施法时间（tick）和施法范围等通用键。
 
-世界树还提供 `worldTree.healingFraction`（默认 0.08）、`healingIntervalTicks`（默认 20）、`absorptionHearts`（默认 4.0）以及 `protectMagic`、`protectProjectile`、`protectFire` 三个开关。比例使用 0–1 小数，20 tick 等于 1 秒。
+世界树还提供 `worldTree.healingFraction`（默认 0.08）、`healingIntervalTicks`（默认 20）、`absorptionHearts`（默认 4.0）以及 `protectMagic`、`protectProjectile`、`protectFire` 三个开关。通用的 `spells.starless` 小节新增 `swallowedDamageStep`、`swallowedDamageCap`，`spells.gargantua` 新增 `blastDamageFraction`，`spells.crabNebula` 新增 `windDamageFraction`；虹蚀吸积新增 `storedDamageShare` 和 `storedDamageCapFraction`。比例使用 0–1 小数，20 tick 等于 1 秒。
 
 ## 供其他模组调用
 
@@ -69,7 +69,7 @@
 ```gradle
 repositories { maven { url = "https://api.modrinth.com/maven" } }
 dependencies {
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.0")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.1")
 }
 ```
 

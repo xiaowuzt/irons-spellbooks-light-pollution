@@ -74,7 +74,7 @@ Real-time coloured point lights and ray-traced shadows, without a shader pack.
 
 Server gameplay values are written to `config/irons_spellbooks_light_pollution-server.toml`. Edit it after the first launch, then restart the server or reload the Forge config. The first five spells and World Tree use dedicated camel-case sections such as `worldTree`; the other spells use `spells.<id>` sections (`skyCollapse`, `cosmicHorseshoe`, and so on) with common cooldown, mana, cast-time and cast-range keys.
 
-World Tree additionally exposes `worldTree.healingFraction` (default `0.08`), `healingIntervalTicks` (default `20`), `absorptionHearts` (default `4.0`) and the independent `protectMagic`, `protectProjectile` and `protectFire` switches. Fractions use decimal values; 20 ticks equal one second.
+World Tree additionally exposes `worldTree.healingFraction` (default `0.08`), `healingIntervalTicks` (default `20`), `absorptionHearts` (default `4.0`) and the independent `protectMagic`, `protectProjectile` and `protectFire` switches. The generic `spells.starless` section adds `swallowedDamageStep` and `swallowedDamageCap`; `spells.gargantua` adds `blastDamageFraction`; `spells.crabNebula` adds `windDamageFraction`. Chromatic Accretion adds `storedDamageShare` and `storedDamageCapFraction`. Fractions use decimal values; 20 ticks equal one second.
 
 ## For other mods
 
@@ -84,7 +84,7 @@ mod. Visuals only — no damage, no entity, no spell.
 ```gradle
 repositories { maven { url = "https://api.modrinth.com/maven" } }
 dependencies {
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.0")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.1")
 }
 ```
 

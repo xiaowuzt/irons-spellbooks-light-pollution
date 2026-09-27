@@ -213,6 +213,26 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.IntValue ACCRETION_PULSE_FOUR = intValue(
             "chromaticAccretion.pulseFourTick", 120, 1, 20 * 60 * 10,
             "Chromatic Accretion fourth pulse tick.");
+    private static final ForgeConfigSpec.DoubleValue ACCRETION_STORED_SHARE = doubleValue(
+            "chromaticAccretion.storedDamageShare", 0.30D, 0.0D, 1.0D,
+            "Fraction of caster damage stored for Chromatic Accretion's collapse.");
+    private static final ForgeConfigSpec.DoubleValue ACCRETION_STORED_CAP_FRACTION = doubleValue(
+            "chromaticAccretion.storedDamageCapFraction", 0.20D, 0.0D, 1.0D,
+            "Maximum stored Chromatic Accretion damage as a fraction of target maximum health.");
+
+    private static final ForgeConfigSpec.DoubleValue STARLESS_SWALLOWED_DAMAGE_STEP = doubleValue(
+            "spells.starless.swallowedDamageStep", 0.05D, 0.0D, 1.0D,
+            "Additional Starless release damage fraction per swallowed spell light.");
+    private static final ForgeConfigSpec.IntValue STARLESS_SWALLOWED_DAMAGE_CAP = intValue(
+            "spells.starless.swallowedDamageCap", 4, 0, 10_000,
+            "Maximum swallowed-light count contributing bonus Starless release damage.");
+
+    private static final ForgeConfigSpec.DoubleValue GARGANTUA_BLAST_DAMAGE = doubleValue(
+            "spells.gargantua.blastDamageFraction", 0.72D, 0.0D, 1.0D,
+            "Gargantua detonation damage as a fraction of target maximum health.");
+    private static final ForgeConfigSpec.DoubleValue CRAB_WIND_DAMAGE = doubleValue(
+            "spells.crabNebula.windDamageFraction", 0.026D, 0.0D, 1.0D,
+            "Crab Nebula pulsar-wind damage as a fraction of target maximum health.");
 
     private static final ForgeConfigSpec.IntValue WORLD_TREE_COOLDOWN = intValue(
             "worldTree.cooldownSeconds", 460, 0, 86_400,
@@ -419,6 +439,14 @@ public final class SpellConfig {
     public static volatile int chromaticAccretionPulseTwoTick = 64;
     public static volatile int chromaticAccretionPulseThreeTick = 92;
     public static volatile int chromaticAccretionPulseFourTick = 120;
+    public static volatile double chromaticAccretionStoredDamageShare = 0.30D;
+    public static volatile double chromaticAccretionStoredDamageCapFraction = 0.20D;
+
+    public static volatile double starlessSwallowedDamageStep = 0.05D;
+    public static volatile int starlessSwallowedDamageCap = 4;
+
+    public static volatile double gargantuaBlastDamageFraction = 0.72D;
+    public static volatile double crabNebulaWindDamageFraction = 0.026D;
 
     public static volatile int worldTreeCooldownSeconds = 460;
     public static volatile int worldTreeManaCost = 1750;
@@ -690,6 +718,14 @@ public final class SpellConfig {
         chromaticAccretionPulseTwoTick = ACCRETION_PULSE_TWO.get();
         chromaticAccretionPulseThreeTick = ACCRETION_PULSE_THREE.get();
         chromaticAccretionPulseFourTick = ACCRETION_PULSE_FOUR.get();
+        chromaticAccretionStoredDamageShare = ACCRETION_STORED_SHARE.get();
+        chromaticAccretionStoredDamageCapFraction = ACCRETION_STORED_CAP_FRACTION.get();
+
+        starlessSwallowedDamageStep = STARLESS_SWALLOWED_DAMAGE_STEP.get();
+        starlessSwallowedDamageCap = STARLESS_SWALLOWED_DAMAGE_CAP.get();
+
+        gargantuaBlastDamageFraction = GARGANTUA_BLAST_DAMAGE.get();
+        crabNebulaWindDamageFraction = CRAB_WIND_DAMAGE.get();
 
         worldTreeCooldownSeconds = WORLD_TREE_COOLDOWN.get();
         worldTreeManaCost = WORLD_TREE_MANA.get();

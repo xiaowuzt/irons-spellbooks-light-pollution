@@ -92,8 +92,6 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
     /** Brushing a filament, as a fraction of max health. */
     private static final float FILAMENT_DAMAGE_FRACTION = 0.016F;
     private static final int FILAMENT_INTERVAL_TICKS = 7;
-    /** A wind pulse, for anything inside the cage, as a fraction of max health. */
-    private static final float WIND_DAMAGE_FRACTION = 0.026F;
     /** The remnant letting go at the end, as a fraction of max health. */
     private static final float COLLAPSE_DAMAGE_FRACTION = 0.30F;
 
@@ -340,7 +338,8 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
                 continue;
             }
             if (target.getBoundingBox().getCenter().distanceTo(centre) <= reach) {
-                SpellDamage.apply(this, target, source, WIND_DAMAGE_FRACTION);
+                SpellDamage.apply(this, target, source,
+                        (float) SpellConfig.crabNebulaWindDamageFraction);
             }
         }
     }

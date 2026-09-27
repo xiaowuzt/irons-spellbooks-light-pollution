@@ -16,7 +16,7 @@ repositories {
 dependencies {
     // compileOnly, not implementation: this is a soft dependency, and the jar should not be
     // bundled into yours.
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.0")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.1")
 }
 ```
 
@@ -30,13 +30,13 @@ Also declare it in `mods.toml`, so Forge tells the player what is missing rather
 [[dependencies.yourmodid]]
     modId = "irons_spellbooks_light_pollution"
     mandatory = false
-    versionRange = "[1.7.0,)"
+    versionRange = "[1.7.1,)"
     ordering = "NONE"
     side = "CLIENT"
 ```
 
 If Modrinth's Maven is unavailable to you, the release jar works as a plain file dependency:
-`compileOnly fg.deobf(files("libs/irons_spellbooks_light_pollution-1.7.0.jar"))`.
+`compileOnly fg.deobf(files("libs/irons_spellbooks_light_pollution-1.7.1.jar"))`.
 
 ## Guarding the calls
 
