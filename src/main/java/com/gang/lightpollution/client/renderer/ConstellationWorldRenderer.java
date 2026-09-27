@@ -114,8 +114,11 @@ public final class ConstellationWorldRenderer {
         // A slow swell and a slow rise in temperature across the star's life, so
         // it reads as something building rather than a fixed prop, and shrinks
         // back as it burns out.
-        float lifetime = Mth.clamp(age / entity.shapeParams().lifetimeTicks(), 0.0F, 1.0F);
-        float radius = ConstellationShape.STAR_BODY_RADIUS
+        int lifetimeTicks = entity.shapeParams().lifetimeTicks();
+        float lifetime = lifetimeTicks <= 0
+                ? 0.0F
+                : Mth.clamp(age / (float) lifetimeTicks, 0.0F, 1.0F);
+        float radius = ConstellationShape.bodyRadius(entity.shapeParams())
                 * (1.0F + lifetime * 0.18F) * Mth.clamp(brightness, 0.35F, 1.0F);
         float heat = Mth.clamp(0.7F + lifetime * 0.25F, 0.0F, 1.0F);
 

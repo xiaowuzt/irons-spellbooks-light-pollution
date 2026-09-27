@@ -32,6 +32,8 @@ public final class WorldTreeShape {
     public static final int HARDEN_TICK = 168;
     /** Ticks at which the tail fade begins. */
     public static final int FADE_START_TICK = 250;
+    /** Length of the normal tail fade. */
+    private static final int FADE_DURATION_TICKS = 50;
 
     /** Roots gripping the ground. */
     public static final int ROOT_COUNT = 7;
@@ -165,15 +167,21 @@ public final class WorldTreeShape {
 
     /** Overall visibility, 1 until the tail fade. */
     public static float fade(float ageTicks, int lifetimeTicks) {
-        if (ageTicks <= FADE_START_TICK) {
+        // A zero lifetime is the public API's "until removed by hand" mode.
+        if (lifetimeTicks <= 0) {
             return 1.0F;
         }
-        // Configurable lifetimes may be shorter than the default tree's hardening
-        // phase. Keep the denominator valid so a lifetime of exactly the fade
-        // start tick cannot produce NaN in the client renderer.
-        int fadeEnd = Math.max(FADE_START_TICK + 1, lifetimeTicks);
-        return Math.max(0.0F, 1.0F - (ageTicks - FADE_START_TICK)
-                / (float) (fadeEnd - FADE_START_TICK));
+        // Configurable lifetimes may be shorter than the default tree's fade
+        // phase. Move the start back while retaining the normal 50-tick tail,
+        // and keep the denominator positive at the boundary.
+        int fadeEnd = Math.max(1, lifetimeTicks);
+        int fadeStart = Math.min(FADE_START_TICK,
+                Math.max(0, fadeEnd - FADE_DURATION_TICKS));
+        if (ageTicks <= fadeStart) {
+            return 1.0F;
+        }
+        return Math.max(0.0F, 1.0F - (ageTicks - fadeStart)
+                / (float) Math.max(1, fadeEnd - fadeStart));
     }
 
     /**

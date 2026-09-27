@@ -4,6 +4,19 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.7.2
+
+### Rendering and lifecycle polish
+
+- Spell light timelines now follow the server-configured impact and lifetime ticks.
+- Cleans up all client spell-light anchors when effects die or change dimensions.
+- Constellation body size now respects API scale, including short and unbounded lifetimes.
+- Short configurable lifetimes keep valid fade windows for Constellation, World Tree, Second Sun and Leviathan.
+- Eclipse Severance API effects share the screen post-process path and safely fall back when a shader is unavailable.
+- The 2048² voxel occupancy and LOD passes reuse stable cache contents between refreshes, reducing GPU work without changing lighting output.
+
+The server configuration remains backward compatible with 1.7.1; this patch release only adds safety and renderer correctness fixes.
+
 ## 1.7.1
 
 ### More server-side spell tuning

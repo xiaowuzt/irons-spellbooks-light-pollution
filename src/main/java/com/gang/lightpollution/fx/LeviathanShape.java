@@ -115,8 +115,13 @@ public final class LeviathanShape {
         if (ageTicks <= UNRAVEL_START_TICK) {
             return 0.0F;
         }
+        // A zero lifetime is the API's manual-removal mode; it should not
+        // divide by a negative timeline or begin unraveling by itself.
+        if (lifetimeTicks <= 0) {
+            return 0.0F;
+        }
         return Mth.clamp((ageTicks - UNRAVEL_START_TICK)
-                / (float) (lifetimeTicks - UNRAVEL_START_TICK), 0.0F, 1.0F);
+                / (float) Math.max(1, lifetimeTicks - UNRAVEL_START_TICK), 0.0F, 1.0F);
     }
 
     /** How bright it is. Above 1 on the bite, deliberately. */

@@ -70,7 +70,7 @@ and `chromaticAccretion.storedDamageCapFraction` (default `0.20`) for damage rec
 Damage and healing fractions use decimal values (`0.08` means 8%). Forge validates numeric ranges and falls back to defaults for invalid values. Restart the server or reload the Forge config after editing.
 
 If a server was created with an early development build, its generic spell values may still be
-nested under `spells.spells`. Version 1.7.1 reports this legacy path at load time; copy those
+nested under `spells.spells`. Version 1.7.2 reports this legacy path at load time; copy those
 values into the matching `spells.<spellId>` sections before removing the old entries.
 
 Client lighting and presentation options are in:

@@ -95,11 +95,13 @@ final class SpellLightStateVolume {
     /**
      * Refreshes the volume for this frame's camera anchor and uploads changes.
      * The anchor deliberately matches {@link SpellLightVoxelGrid}'s so the
-     * voxelizer can index this volume from its own cell coordinates.
+     * voxelizer can index this volume from its own cell coordinates. Returns
+     * whether its GPU texture changed, allowing the renderer to keep the
+     * expensive voxel reduction pass asleep between updates.
      */
-    void update(@Nullable ClientLevel level, @Nullable Vec3 cameraPosition) {
+    boolean update(@Nullable ClientLevel level, @Nullable Vec3 cameraPosition) {
         if (level == null || cameraPosition == null) {
-            return;
+            return false;
         }
         ensureTexture();
 
@@ -136,6 +138,7 @@ final class SpellLightStateVolume {
         if (idsChanged) {
             uploadIds();
         }
+        return idsChanged;
     }
 
     void release() {

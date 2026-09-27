@@ -328,7 +328,7 @@ public final class SpellLightPostProcessor {
             // Block occupancy comes from the blocks' own baked models, which is
             // exact and identical from every camera angle. The depth path below
             // still runs, but only for cells this volume has no mask for.
-            stateVolume.update(minecraft.level, cameraPosition);
+            boolean stateVolumeChanged = stateVolume.update(minecraft.level, cameraPosition);
             // A newly selected anchor is usable for the current frame, but its
             // rolling volume is only partially repopulated from visible depth.
             // Keep the shader in its conservative transition mode for this
@@ -345,17 +345,25 @@ public final class SpellLightPostProcessor {
                     || !voxelHistoryValid
                     || anchorChanged
                     || !cacheWasReady
+                    || stateVolumeChanged
                     || voxelFrame % VOXEL_SKIP_FRAMES == 0;
-            runVoxelizePass(voxelGrid, mainTarget.getDepthTextureId(),
-                    normalTarget.getColorTextureId(), voxelHistory.getColorTextureId(),
-                    projection, viewRotation, inverseProjection, inverseView,
-                    cameraPosition, collectThisFrame, voxelHistoryValid);
-            // The baked-model path rewrites voxelGrid every frame regardless of
-            // the depth-collection cadence, so the reduction has to follow it.
-            runBuildLodPass(voxelLod, voxelGrid.getColorTextureId());
-            voxelLodValid = true;
-            copyColor(voxelGrid, voxelHistory);
-            voxelHistoryValid = true;
+            // The baked-model and depth paths are immutable between collection
+            // frames. Keep their 2048² targets intact until a camera roll,
+            // block-state update, resource reload, or scheduled collection
+            // frame requires new data; the lighting pass can sample the cache
+            // without rebuilding it every render frame.
+            boolean rebuildVoxelCache = collectThisFrame || stateVolumeChanged
+                    || !voxelLodValid;
+            if (rebuildVoxelCache) {
+                runVoxelizePass(voxelGrid, mainTarget.getDepthTextureId(),
+                        normalTarget.getColorTextureId(), voxelHistory.getColorTextureId(),
+                        projection, viewRotation, inverseProjection, inverseView,
+                        cameraPosition, collectThisFrame, voxelHistoryValid);
+                runBuildLodPass(voxelLod, voxelGrid.getColorTextureId());
+                voxelLodValid = true;
+                copyColor(voxelGrid, voxelHistory);
+                voxelHistoryValid = true;
+            }
             voxelFrame++;
             shadowFrame = (shadowFrame + 1.0F) % 1024.0F;
             if (worldChangeRefresh) {

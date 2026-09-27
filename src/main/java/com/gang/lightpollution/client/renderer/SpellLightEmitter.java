@@ -256,6 +256,21 @@ public final class SpellLightEmitter {
         CONSTELLATION.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         SILHOUETTE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         STARFALL.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        SKY_COLLAPSE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        CONVERGENCE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        SECOND_SUN.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        SINGULARITY.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        GARGANTUA.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        COSMIC_HORSESHOE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        MICROQUASAR.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        HELIX_NEBULA.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        MAGNETAR.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        TIDAL_DISRUPTION.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        QUASAR_JET.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        PINWHEEL.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        CRAB_NEBULA.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        LEVIATHAN.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        WORLD_TREE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
 
         List<Light> result = new ArrayList<>();
         Light currentTestLight = testLight;
@@ -265,16 +280,21 @@ public final class SpellLightEmitter {
         for (CelestialJudgmentEntity entity : CELESTIAL) {
             float age = entity.tickCount + partialTick;
             float formation = Mth.clamp(age / 36.0F, 0.0F, 1.0F);
-            float impact = bell(age - CelestialJudgmentEntity.IMPACT_TICK, 7.0F);
+            float impact = bell(age - SpellConfig.celestialImpactTick, 7.0F);
             result.add(new Light(interpolated(entity, partialTick).add(0.0D, 2.2D, 0.0D),
                     20.0F, 0.35F + formation * 0.75F + impact * 2.5F,
                     0.36F, 0.82F, 1.0F));
         }
         for (ChromaticAccretionEntity entity : CHROMATIC) {
             float age = entity.getVisualAgeTicks(partialTick);
-            float formation = Mth.clamp(age / ChromaticAccretionEntity.FORMATION_END_TICK, 0.0F, 1.0F);
-            float collapse = bell(age - ChromaticAccretionEntity.COLLAPSE_TICK, 16.0F);
-            float fade = 1.0F - Mth.clamp((age - 136.0F) / 34.0F, 0.0F, 1.0F);
+            float formation = Mth.clamp(age
+                    / (float) Math.max(1, SpellConfig.chromaticAccretionFormationEndTick),
+                    0.0F, 1.0F);
+            float collapse = bell(age - SpellConfig.chromaticAccretionCollapseTick, 16.0F);
+            int collapseTick = SpellConfig.chromaticAccretionCollapseTick;
+            int lifetime = Math.max(collapseTick + 1, SpellConfig.chromaticAccretionLifetimeTicks);
+            float fade = 1.0F - Mth.clamp((age - collapseTick)
+                    / (float) (lifetime - collapseTick), 0.0F, 1.0F);
             result.add(new Light(interpolated(entity, partialTick).add(0.0D, 0.8D, 0.0D),
                     10.0F + entity.getVisualRadius() * 3.5F,
                     (0.25F + formation * 0.75F + collapse * 2.2F) * Math.max(fade, 0.15F),
@@ -282,8 +302,11 @@ public final class SpellLightEmitter {
         }
         for (EclipseSeveranceEntity entity : ECLIPSE) {
             float age = entity.tickCount + partialTick;
-            float active = 1.0F - Mth.clamp((age - 16.0F) / 14.0F, 0.0F, 1.0F);
-            float impact = bell(age - EclipseSeveranceEntity.DAMAGE_TICK, 3.0F);
+            int lifetime = Math.max(1, SpellConfig.eclipseLifetimeTicks);
+            int activeFadeStart = Math.max(0, lifetime - 14);
+            float active = 1.0F - Mth.clamp((age - activeFadeStart)
+                    / (float) Math.max(1, lifetime - activeFadeStart), 0.0F, 1.0F);
+            float impact = bell(age - SpellConfig.eclipseDamageTick, 3.0F);
             result.add(new Light(interpolated(entity, partialTick).add(0.0D, 1.05D, 0.0D),
                     18.0F, (0.35F + active * 0.85F + impact * 1.35F),
                     0.28F, 0.72F, 1.0F));
@@ -304,8 +327,12 @@ public final class SpellLightEmitter {
         }
         for (StargraveSingularityEntity entity : STARGRAVE) {
             float age = entity.tickCount + partialTick;
-            float collapse = bell(age - StargraveSingularityEntity.DAMAGE_TICK, 12.0F);
-            float fade = 1.0F - Mth.clamp((age - 170.0F) / 30.0F, 0.0F, 1.0F);
+            int damageTick = SpellConfig.stargraveDamageTick;
+            int lifetime = Math.max(damageTick + 1, SpellConfig.stargraveLifetimeTicks);
+            float collapse = bell(age - damageTick, 12.0F);
+            int fadeStart = Math.max(0, lifetime - 30);
+            float fade = 1.0F - Mth.clamp((age - fadeStart)
+                    / (float) Math.max(1, lifetime - fadeStart), 0.0F, 1.0F);
             result.add(new Light(interpolated(entity, partialTick).add(0.0D, 1.5D, 0.0D),
                     18.0F + entity.getVisualRadius() * 3.0F,
                     (0.45F + collapse * 3.0F) * Math.max(fade, 0.1F),

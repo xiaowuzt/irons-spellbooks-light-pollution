@@ -95,8 +95,15 @@ public final class SecondSunShape {
             // A hard flare, then a long decline.
             return Math.max(0.0F, 4.5F - (ageTicks - NOVA_TICK) * 0.09F);
         }
+        // A zero lifetime means manual removal through the API, so the tail
+        // does not fade on its own. For a short finite lifetime, keep the
+        // denominator valid even when the effect ends at the nova boundary.
+        if (lifetimeTicks <= 0) {
+            return 1.0F;
+        }
+        int fadeEnd = Math.max(NOVA_END_TICK + 1, lifetimeTicks);
         return Math.max(0.0F, 1.0F - (ageTicks - NOVA_END_TICK)
-                / (float) (lifetimeTicks - NOVA_END_TICK));
+                / (float) (fadeEnd - NOVA_END_TICK));
     }
 
     /**

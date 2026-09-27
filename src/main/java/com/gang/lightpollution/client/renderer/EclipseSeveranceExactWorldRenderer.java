@@ -122,7 +122,9 @@ public final class EclipseSeveranceExactWorldRenderer {
 
     private static void renderScreenPost() {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || ACTIVE.isEmpty()) {
+        if (minecraft.level == null
+                || (ACTIVE.isEmpty()
+                && com.gang.lightpollution.fx.FxRegistry.eclipseSeverances().isEmpty())) {
             postAppliedThisFrame = false;
             FRAME.clear();
             return;
@@ -580,6 +582,24 @@ public final class EclipseSeveranceExactWorldRenderer {
                     * visual.burstAlpha(age) * EclipseSeveranceShaders.CELESTIAL_INTENSITY);
             vignette = Math.max(vignette, EclipseSeveranceShaders.CELESTIAL_VIGNETTE * visual.ringAlpha(age));
         }
+        // API-created sweeps have no anchor entity in ACTIVE, but they share
+        // the same visual state machine and must contribute to the exact same
+        // full-screen pass. Keep this snapshot local so a caller can remove a
+        // handle from another thread without mutating the render iteration.
+        for (com.gang.lightpollution.fx.EclipseSeveranceSource source
+                : com.gang.lightpollution.fx.FxRegistry.eclipseSeverances()) {
+            EclipseSeveranceVisualInstance visual = source.visual();
+            float age = visual.ageSeconds();
+            if (!visual.isAlive(age)) {
+                continue;
+            }
+            float arc = visual.arcAlpha(age) * EclipseSeveranceShaders.CELESTIAL_INTENSITY;
+            distortion = Math.max(distortion, EclipseSeveranceShaders.CELESTIAL_DISTORTION * arc);
+            chromatic = Math.max(chromatic, EclipseSeveranceShaders.CELESTIAL_CHROMATIC * arc);
+            flash = Math.max(flash, EclipseSeveranceShaders.CELESTIAL_FLASH
+                    * visual.burstAlpha(age) * EclipseSeveranceShaders.CELESTIAL_INTENSITY);
+            vignette = Math.max(vignette, EclipseSeveranceShaders.CELESTIAL_VIGNETTE * visual.ringAlpha(age));
+        }
         return EclipseSeverancePostProcessor.render(
                 new EclipseSeverancePostProcessor.EffectParameters(
                         distortion, chromatic, flash, vignette,
@@ -598,7 +618,9 @@ public final class EclipseSeveranceExactWorldRenderer {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || ACTIVE.isEmpty()) {
+        if (minecraft.level == null
+                || (ACTIVE.isEmpty()
+                && com.gang.lightpollution.fx.FxRegistry.eclipseSeverances().isEmpty())) {
             return;
         }
         Vec3 camera = minecraft.gameRenderer.getMainCamera().getPosition();
@@ -610,6 +632,19 @@ public final class EclipseSeveranceExactWorldRenderer {
                 continue;
             }
             float age = visual.ageSeconds();
+            flash = Math.max(flash, EclipseSeveranceShaders.CELESTIAL_FLASH
+                    * visual.burstAlpha(age) * EclipseSeveranceShaders.CELESTIAL_INTENSITY);
+            vignette = Math.max(vignette, EclipseSeveranceShaders.CELESTIAL_VIGNETTE * visual.ringAlpha(age));
+        }
+        for (com.gang.lightpollution.fx.EclipseSeveranceSource source
+                : com.gang.lightpollution.fx.FxRegistry.eclipseSeverances()) {
+            EclipseSeveranceVisualInstance visual = source.visual();
+            float age = visual.ageSeconds();
+            if (!visual.isAlive(age)
+                    || camera.distanceToSqr(new Vec3(visual.originX(), visual.originY(), visual.originZ()))
+                    > RENDER_DISTANCE_SQR) {
+                continue;
+            }
             flash = Math.max(flash, EclipseSeveranceShaders.CELESTIAL_FLASH
                     * visual.burstAlpha(age) * EclipseSeveranceShaders.CELESTIAL_INTENSITY);
             vignette = Math.max(vignette, EclipseSeveranceShaders.CELESTIAL_VIGNETTE * visual.ringAlpha(age));
