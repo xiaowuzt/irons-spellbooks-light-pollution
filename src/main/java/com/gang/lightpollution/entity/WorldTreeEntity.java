@@ -29,7 +29,10 @@ import net.minecraft.tags.DamageTypeTags;
 import net.minecraftforge.fluids.FluidType;
 import net.minecraftforge.network.NetworkHooks;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -78,7 +81,7 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
      * enough branches to hang them on.</p>
      */
 
-    /** Radius the roots cover, in blocks. */
+    /** Fallback radius retained for callers that need a conservative search bound. */
     public static final double EFFECT_RADIUS = WorldTreeShape.ROOT_REACH + 3.0D;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
@@ -88,7 +91,18 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     private static final EntityDataAccessor<Integer> DATA_SEED = SynchedEntityData.defineId(
             WorldTreeEntity.class, EntityDataSerializers.INT);
 
+    /** UUID is kept when the caster dies, logs out, or changes dimension. */
     private UUID casterUuid;
+    /** Team at cast time, used while the caster is not present in this level. */
+    private String casterTeamName;
+    /** Amount of absorption currently supplied by this tree, per target UUID. */
+    private final Map<UUID, AbsorptionState> sanctuaryAbsorption = new HashMap<>();
+    /** Object references let cleanup reach a target that changed dimension before lookup. */
+    private final Map<UUID, LivingEntity> sanctuaryTargets = new HashMap<>();
+
+    /** Own shield and the last total, used to distinguish damage from other grants. */
+    private record AbsorptionState(float own, float lastTotal) {
+    }
 
     public WorldTreeEntity(EntityType<? extends WorldTreeEntity> entityType, Level level) {
         super(entityType, level);
@@ -98,6 +112,7 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
 
     public void configure(LivingEntity caster, Vec3 center, int seed) {
         this.casterUuid = caster.getUUID();
+        this.casterTeamName = caster.getTeam() == null ? null : caster.getTeam().getName();
         this.entityData.set(DATA_CASTER_ID, caster.getId());
         this.entityData.set(DATA_START_GAME_TICK, this.level().getGameTime());
         this.entityData.set(DATA_SEED, seed);
@@ -116,6 +131,16 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         return caster != null
                 && this.casterUuid != null
                 && this.casterUuid.equals(caster.getUUID());
+    }
+
+    /** Radius shared by healing, protection, target cleanup, and visible roots. */
+    public static double sanctuaryRadius() {
+        return Math.max(0.1D, SpellConfig.worldTreeEffectRadius);
+    }
+
+    /** Radius used by this tree's server-side sanctuary. */
+    public double getSanctuaryRadius() {
+        return sanctuaryRadius();
     }
 
     public int getTimelineAgeTicks() {
@@ -227,13 +252,19 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     public Vec3 rootPoint(int root, float t, float partialTick) {
         WorldTreeParams params = shapeParams();
         Vec3 seed = seedPoint(partialTick);
-        double out = WorldTreeShape.rootDistance(params, root, t);
+        // Keep the visible roots inside the same radius that grants sanctuary.
+        // This prevents a player from seeing roots outside the actual protected area.
+        double rootScale = sanctuaryRadius() / WorldTreeShape.ROOT_REACH;
+        double out = WorldTreeShape.rootDistance(params, root, t) * rootScale;
         float angle = WorldTreeShape.rootAngle(params, root, t);
         double x = seed.x + Mth.cos(angle) * out;
         double z = seed.z + Mth.sin(angle) * out;
         int surface = this.level().getHeight(Heightmap.Types.MOTION_BLOCKING,
                 Mth.floor(x), Mth.floor(z));
-        return WorldTreeShape.rootPointAt(params, seed, root, t, surface);
+        float rootRadius = WorldTreeShape.rootRadius(params, root, t) * (float) rootScale;
+        return new Vec3(seed.x + Mth.cos(angle) * out,
+                surface + 0.12D - rootRadius * 0.42D,
+                seed.z + Mth.sin(angle) * out);
     }
 
     /**
@@ -245,7 +276,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
      * growing out of them.</p>
      */
     public float rootRadius(int root, float t) {
-        return WorldTreeShape.rootRadius(shapeParams(), root, t);
+        return WorldTreeShape.rootRadius(shapeParams(), root, t)
+                * (float) (sanctuaryRadius() / WorldTreeShape.ROOT_REACH);
     }
 
     /** The built tree, held rather than rebuilt per frame. */
@@ -286,6 +318,7 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
+            maintainSanctuary(serverLevel);
             int interval = Math.max(1, SpellConfig.worldTreeHealingIntervalTicks);
             if (timelineTick % interval == 0) {
                 applySanctuaryPulse(serverLevel);
@@ -301,7 +334,7 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     private void applySanctuaryPulse(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = seedPoint(1.0F);
-        double radius = SpellConfig.worldTreeEffectRadius;
+        double radius = sanctuaryRadius();
         List<LivingEntity> allies = level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
@@ -314,10 +347,95 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
             if (healFraction > 0.0F) {
                 target.heal(target.getMaxHealth() * healFraction);
             }
-            if (absorption > 0.0F) {
-                target.setAbsorptionAmount(Math.max(target.getAbsorptionAmount(), absorption));
+            applyTreeAbsorption(target, absorption);
+        }
+    }
+
+    /** Remove grants from targets that left this sanctuary or are no longer allies. */
+    private void maintainSanctuary(ServerLevel level) {
+        if (sanctuaryAbsorption.isEmpty()) {
+            return;
+        }
+        LivingEntity caster = resolveCaster(level);
+        Vec3 centre = seedPoint(1.0F);
+        Iterator<Map.Entry<UUID, AbsorptionState>> iterator = sanctuaryAbsorption.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, AbsorptionState> entry = iterator.next();
+            Entity entity = level.getEntity(entry.getKey());
+            LivingEntity target = entity instanceof LivingEntity living
+                    ? living : sanctuaryTargets.get(entry.getKey());
+            if (target == null || !isAlly(caster, target)
+                    || !insideSanctuary(target, centre)) {
+                if (target != null) {
+                    removeTreeAbsorption(target, entry.getValue().own());
+                }
+                sanctuaryTargets.remove(entry.getKey());
+                iterator.remove();
             }
         }
+    }
+
+    private boolean insideSanctuary(LivingEntity target, Vec3 centre) {
+        return target.getBoundingBox().getCenter().distanceToSqr(centre)
+                <= sanctuaryRadius() * sanctuaryRadius();
+    }
+
+    /** Grant only the missing portion, keeping other absorption sources intact. */
+    private void applyTreeAbsorption(LivingEntity target, float desired) {
+        UUID uuid = target.getUUID();
+        sanctuaryTargets.put(uuid, target);
+        AbsorptionState previous = sanctuaryAbsorption.get(uuid);
+        float previousGrant = previous == null ? 0.0F : previous.own();
+        float current = Math.max(0.0F, target.getAbsorptionAmount());
+        if (desired <= 0.0F) {
+            if (previousGrant > 0.0F) {
+                removeTreeAbsorption(target, previousGrant);
+            }
+            sanctuaryAbsorption.remove(uuid);
+            sanctuaryTargets.remove(uuid);
+            return;
+        }
+        // When the total dropped since the previous pulse, some of the tree's
+        // own grant may have been consumed. Keep the remaining own amount from
+        // being mistaken for an external shield, then calculate the external
+        // portion and fill only the missing tree amount. This also handles a
+        // different source adding absorption while the tree is active.
+        float consumed = previous == null ? 0.0F
+                : Math.max(0.0F, previous.lastTotal() - current);
+        float remainingOwn = previous == null
+                ? 0.0F
+                : Math.max(0.0F, previousGrant - consumed);
+        float external = Math.max(0.0F, current - remainingOwn);
+        float newOwn = Math.max(0.0F, desired - external);
+        float total = external + newOwn;
+        if (Math.abs(total - current) > 1.0E-4F) {
+            target.setAbsorptionAmount(total);
+        }
+        if (newOwn > 0.0F) {
+            sanctuaryAbsorption.put(uuid, new AbsorptionState(newOwn, total));
+        } else {
+            sanctuaryAbsorption.remove(uuid);
+            sanctuaryTargets.remove(uuid);
+        }
+    }
+
+    /** Remove this tree's contribution without touching unrelated absorption. */
+    private void removeTreeAbsorption(LivingEntity target, float grant) {
+        float current = Math.max(0.0F, target.getAbsorptionAmount());
+        target.setAbsorptionAmount(Math.max(0.0F, current - Math.max(0.0F, grant)));
+    }
+
+    private void cleanupSanctuary(ServerLevel level) {
+        for (Map.Entry<UUID, AbsorptionState> entry : sanctuaryAbsorption.entrySet()) {
+            Entity entity = level == null ? null : level.getEntity(entry.getKey());
+            LivingEntity target = entity instanceof LivingEntity living
+                    ? living : sanctuaryTargets.get(entry.getKey());
+            if (target != null) {
+                removeTreeAbsorption(target, entry.getValue().own());
+            }
+        }
+        sanctuaryAbsorption.clear();
+        sanctuaryTargets.clear();
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {
@@ -344,11 +462,20 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         if (target instanceof Player player && player.isSpectator()) {
             return false;
         }
-        if (caster != null && target instanceof TamableAnimal tamable && tamable.isOwnedBy(caster)) {
+        if (this.casterUuid != null && this.casterUuid.equals(target.getUUID())) {
+            return true;
+        }
+        if (this.casterUuid != null && target instanceof TamableAnimal tamable
+                && this.casterUuid.equals(tamable.getOwnerUUID())) {
+            return true;
+        }
+        if (this.casterTeamName != null && target.getTeam() != null
+                && this.casterTeamName.equals(target.getTeam().getName())) {
             return true;
         }
         return caster != null && (target == caster
-                || caster.isAlliedTo(target) || target.isAlliedTo(caster));
+                || caster.isAlliedTo(target) || target.isAlliedTo(caster)
+                || (target instanceof TamableAnimal tamable && tamable.isOwnedBy(caster)));
     }
 
     /** True when this active tree protects the entity from the selected damage kind. */
@@ -358,8 +485,7 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
             return false;
         }
         Vec3 centre = seedPoint(1.0F);
-        double radius = SpellConfig.worldTreeEffectRadius;
-        if (target.getBoundingBox().getCenter().distanceToSqr(centre) > radius * radius) {
+        if (!insideSanctuary(target, centre)) {
             return false;
         }
         // Minecraft has no generic MAGIC tag in 1.20.1. WITCH_RESISTANT_TO is
@@ -382,6 +508,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
         this.casterUuid = tag.hasUUID("Caster") ? tag.getUUID("Caster") : null;
+        String teamName = tag.getString("CasterTeam");
+        this.casterTeamName = teamName.isEmpty() ? null : teamName;
         this.entityData.set(DATA_CASTER_ID, tag.getInt("CasterId"));
         this.entityData.set(DATA_SEED, tag.getInt("Seed"));
         long startGameTick = tag.contains("StartGameTick")
@@ -395,6 +523,9 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         if (this.casterUuid != null) {
             tag.putUUID("Caster", this.casterUuid);
         }
+        if (this.casterTeamName != null) {
+            tag.putString("CasterTeam", this.casterTeamName);
+        }
         tag.putInt("CasterId", this.getCasterId());
         tag.putInt("Seed", this.getSeed());
         tag.putLong("StartGameTick", this.entityData.get(DATA_START_GAME_TICK));
@@ -404,6 +535,15 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     @Override
     public boolean shouldBeSaved() {
         return false;
+    }
+
+    /** Also clean grants when the entity is removed by /kill or another system. */
+    @Override
+    public void remove(RemovalReason reason) {
+        if (this.level() instanceof ServerLevel serverLevel) {
+            cleanupSanctuary(serverLevel);
+        }
+        super.remove(reason);
     }
 
     @Override

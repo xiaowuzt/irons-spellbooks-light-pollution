@@ -3,9 +3,11 @@ package com.gang.lightpollution;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -311,6 +313,8 @@ public final class SpellConfig {
     public static volatile boolean worldTreeProtectProjectile = true;
     public static volatile boolean worldTreeProtectFire = true;
 
+    private static boolean legacyPathWarningShown;
+
     public static int cooldownSeconds(String spellId) {
         return switch (spellId) {
             case "celestialJudgment" -> celestialCooldownSeconds;
@@ -385,6 +389,7 @@ public final class SpellConfig {
         if (event.getConfig().getSpec() != SPEC) {
             return;
         }
+        warnLegacyGenericPath(event.getConfig());
         celestialCooldownSeconds = CELESTIAL_COOLDOWN.get();
         celestialManaCost = CELESTIAL_MANA.get();
         celestialCastTimeTicks = CELESTIAL_CAST_TIME.get();
@@ -449,6 +454,68 @@ public final class SpellConfig {
         worldTreeProtectMagic = WORLD_TREE_PROTECT_MAGIC.get();
         worldTreeProtectProjectile = WORLD_TREE_PROTECT_PROJECTILE.get();
         worldTreeProtectFire = WORLD_TREE_PROTECT_FIRE.get();
+
+        validateTimelines();
+    }
+
+    /**
+     * Earlier development builds accidentally nested each generic spell below the previous
+     * {@code spells} section. Forge keeps those unknown values in the file, so call them out once
+     * instead of silently making a server owner believe their old tuning is still active.
+     */
+    private static void warnLegacyGenericPath(ModConfig config) {
+        if (legacyPathWarningShown || config.getConfigData() == null) {
+            return;
+        }
+        try {
+            if (config.getConfigData().contains(List.of("spells", "spells"))) {
+                ExampleMod.LOGGER.warn(
+                        "Found legacy nested spell config entries under [spells.spells]. "
+                                + "Generic spell settings now belong under [spells.<spellId>]; "
+                                + "copy your values to the new sections before removing the old entries.");
+            }
+        } catch (RuntimeException exception) {
+            ExampleMod.LOGGER.debug("Could not inspect the legacy spell config path", exception);
+        }
+        legacyPathWarningShown = true;
+    }
+
+    /** Keep configurable timelines ordered even when a hand-edited file has inconsistent values. */
+    private static void validateTimelines() {
+        celestialImpactTick = clampTimeline(
+                "celestialJudgment.impactTick", celestialImpactTick, 0,
+                Math.max(0, celestialLifetimeTicks - 1));
+        stargraveDamageTick = clampTimeline(
+                "stargraveSingularity.damageTick", stargraveDamageTick, 0,
+                Math.max(0, stargraveLifetimeTicks - 1));
+        eclipseDamageTick = clampTimeline(
+                "eclipseSeverance.damageTick", eclipseDamageTick, 0,
+                Math.max(0, eclipseLifetimeTicks - 1));
+
+        int lifetime = Math.max(3, chromaticAccretionLifetimeTicks);
+        if (lifetime != chromaticAccretionLifetimeTicks) {
+            ExampleMod.LOGGER.warn(
+                    "chromaticAccretion.lifetimeTicks={} is too short for its phases; using {} ticks.",
+                    chromaticAccretionLifetimeTicks, lifetime);
+            chromaticAccretionLifetimeTicks = lifetime;
+        }
+        chromaticAccretionFormationEndTick = clampTimeline(
+                "chromaticAccretion.formationEndTick", chromaticAccretionFormationEndTick,
+                1, lifetime - 2);
+        chromaticAccretionCollapseTick = clampTimeline(
+                "chromaticAccretion.collapseTick", chromaticAccretionCollapseTick,
+                chromaticAccretionFormationEndTick + 1, lifetime - 1);
+    }
+
+    private static int clampTimeline(String path, int value, int minimum, int maximum) {
+        int safeMaximum = Math.max(minimum, maximum);
+        int clamped = Math.max(minimum, Math.min(value, safeMaximum));
+        if (clamped != value) {
+            ExampleMod.LOGGER.warn(
+                    "{}={} is outside the valid timeline; using {} (allowed {}..{}).",
+                    path, value, clamped, minimum, safeMaximum);
+        }
+        return clamped;
     }
     private record GenericValues(
             ForgeConfigSpec.IntValue cooldown,

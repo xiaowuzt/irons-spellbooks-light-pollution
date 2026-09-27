@@ -4,6 +4,23 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.6.1
+
+Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### World Tree sanctuary fixes
+
+World Tree now keeps its owner and team snapshot for the full sanctuary lifetime, so a
+caster changing dimension, logging out or dying does not make the remaining sanctuary
+stop recognising allies. Absorption supplied by the tree is tracked per target and is
+removed when a target leaves, loses sanctuary access, or the tree is removed; absorption
+from other sources is preserved.
+
+The configured sanctuary radius now drives healing, protection, absorption cleanup and
+the visible roots together. Hand-edited timeline values are checked on config load so
+phase ticks are kept in a safe order. Servers with the old nested `spells.spells` config
+path receive a migration warning and can copy those values to `spells.<spellId>`.
+
 ## 1.6.0
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**

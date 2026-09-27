@@ -27,7 +27,10 @@ public final class WorldTreeProtectionEvents {
             return;
         }
 
-        double radius = Math.max(0.1D, SpellConfig.worldTreeEffectRadius);
+        // Use the same clamped radius as healing and absorption cleanup. Keeping
+        // this in the entity avoids protection being a few blocks wider/narrower
+        // than the visible root geometry when a server config is reloaded.
+        double radius = WorldTreeEntity.sanctuaryRadius();
         if (!level.getEntitiesOfClass(
                 WorldTreeEntity.class,
                 target.getBoundingBox().inflate(radius),
