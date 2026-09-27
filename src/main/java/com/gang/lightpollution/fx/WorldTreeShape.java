@@ -168,8 +168,12 @@ public final class WorldTreeShape {
         if (ageTicks <= FADE_START_TICK) {
             return 1.0F;
         }
+        // Configurable lifetimes may be shorter than the default tree's hardening
+        // phase. Keep the denominator valid so a lifetime of exactly the fade
+        // start tick cannot produce NaN in the client renderer.
+        int fadeEnd = Math.max(FADE_START_TICK + 1, lifetimeTicks);
         return Math.max(0.0F, 1.0F - (ageTicks - FADE_START_TICK)
-                / (float) (lifetimeTicks - FADE_START_TICK));
+                / (float) (fadeEnd - FADE_START_TICK));
     }
 
     /**

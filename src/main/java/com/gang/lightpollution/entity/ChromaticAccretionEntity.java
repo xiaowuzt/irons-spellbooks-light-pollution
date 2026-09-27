@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
@@ -50,12 +52,8 @@ public final class ChromaticAccretionEntity extends Entity {
     public static final float MAX_VISUAL_RADIUS = 6.75F;
 
     private static final int[] PULSE_TICKS = {36, 64, 92, 120};
-    private static final float PULSE_DAMAGE_FRACTION = 0.044F;
-    private static final float COLLAPSE_DAMAGE_FRACTION = 0.31F;
     private static final float STORED_DAMAGE_SHARE = 0.30F;
     private static final float STORED_DAMAGE_CAP_FRACTION = 0.20F;
-    private static final float PROJECTILE_DAMAGE_FRACTION = 0.01F;
-    private static final int MAX_PROJECTILE_CHARGE = 6;
     private static final double PROJECTILE_CORE_RADIUS = 1.35D;
     private static final double PROJECTILE_QUERY_PADDING = 6.0D;
 
@@ -140,7 +138,7 @@ public final class ChromaticAccretionEntity extends Entity {
     }
 
     public float getVisualAgeTicks(float partialTick) {
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, getEffectAge() + partialTick));
+        return Math.min(SpellConfig.chromaticAccretionLifetimeTicks, Math.max(0.0F, getEffectAge() + partialTick));
     }
 
     @Override
@@ -148,18 +146,18 @@ public final class ChromaticAccretionEntity extends Entity {
         super.tick();
 
         if (this.level() instanceof ServerLevel serverLevel) {
-            int age = Math.min(LIFETIME_TICKS, this.tickCount);
+            int age = Math.min(SpellConfig.chromaticAccretionLifetimeTicks, this.tickCount);
             this.entityData.set(DATA_AGE, age);
             followTarget(serverLevel);
             updateVisualState(age);
 
-            if (age >= FORMATION_END_TICK && age < COLLAPSE_TICK) {
+            if (age >= SpellConfig.chromaticAccretionFormationEndTick && age < SpellConfig.chromaticAccretionCollapseTick) {
                 orbitNearby(serverLevel);
                 pullNearbyProjectiles(serverLevel);
                 resolvePendingPulses(serverLevel, age);
             }
 
-            if (!this.collapsed && age >= COLLAPSE_TICK) {
+            if (!this.collapsed && age >= SpellConfig.chromaticAccretionCollapseTick) {
                 this.collapsed = true;
                 collapse(serverLevel);
             }
@@ -169,7 +167,7 @@ public final class ChromaticAccretionEntity extends Entity {
             }
         }
 
-        if (this.tickCount >= LIFETIME_TICKS) {
+        if (this.tickCount >= SpellConfig.chromaticAccretionLifetimeTicks) {
             this.discard();
         }
     }
@@ -194,15 +192,15 @@ public final class ChromaticAccretionEntity extends Entity {
     private void updateVisualState(int age) {
         float radius;
         int phase;
-        if (age < FORMATION_END_TICK) {
-            radius = lerp(age / (float) FORMATION_END_TICK, 0.35F, MAX_VISUAL_RADIUS);
+        if (age < SpellConfig.chromaticAccretionFormationEndTick) {
+            radius = lerp(age / (float) Math.max(1, SpellConfig.chromaticAccretionFormationEndTick), 0.35F, MAX_VISUAL_RADIUS);
             phase = 0;
-        } else if (age < COLLAPSE_TICK) {
+        } else if (age < SpellConfig.chromaticAccretionCollapseTick) {
             radius = MAX_VISUAL_RADIUS;
             phase = 1;
         } else {
             radius = lerp(
-                    (age - COLLAPSE_TICK) / (float) (LIFETIME_TICKS - COLLAPSE_TICK),
+                    (age - SpellConfig.chromaticAccretionCollapseTick) / (float) Math.max(1, SpellConfig.chromaticAccretionLifetimeTicks - SpellConfig.chromaticAccretionCollapseTick),
                     MAX_VISUAL_RADIUS,
                     0.0F);
             phase = 2;
@@ -216,7 +214,7 @@ public final class ChromaticAccretionEntity extends Entity {
             int bit = 1 << index;
             if ((this.resolvedPulseMask & bit) == 0 && age >= PULSE_TICKS[index]) {
                 this.resolvedPulseMask |= bit;
-                resolveDamagePulse(level, PULSE_DAMAGE_FRACTION);
+                resolveDamagePulse(level, (float) SpellConfig.chromaticAccretionPulseDamageFraction);
             }
         }
     }
@@ -232,12 +230,12 @@ public final class ChromaticAccretionEntity extends Entity {
     private void collapse(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         DamageSource source = ChromaticAccretionDamage.source(level, this, caster);
-        float projectileFraction = getProjectileCharge() * PROJECTILE_DAMAGE_FRACTION;
+        float projectileFraction = getProjectileCharge() * (float) SpellConfig.chromaticAccretionProjectileDamageFraction;
         int applied = 0;
         for (LivingEntity target : currentTargets(level, caster)) {
             float storedDamage = this.storedCasterDamage.getOrDefault(target.getUUID(), 0.0F);
             float damage = target.getMaxHealth()
-                    * (COLLAPSE_DAMAGE_FRACTION + projectileFraction)
+                    * ((float) SpellConfig.chromaticAccretionCollapseDamageFraction + projectileFraction)
                     + storedDamage;
             if (applyRespectfulTrueDamage(target, source, damage)) {
                 applied++;
@@ -263,8 +261,8 @@ public final class ChromaticAccretionEntity extends Entity {
     /** Records final post-mitigation damage dealt by this effect's caster. */
     public void recordCasterDamage(LivingEntity target, DamageSource source, float actualDamage) {
         if (!(this.level() instanceof ServerLevel level)
-                || getEffectAge() < FORMATION_END_TICK
-                || getEffectAge() >= COLLAPSE_TICK
+                || getEffectAge() < SpellConfig.chromaticAccretionFormationEndTick
+                || getEffectAge() >= SpellConfig.chromaticAccretionCollapseTick
                 || actualDamage <= 0.0F
                 || source.getDirectEntity() instanceof ChromaticAccretionEntity
                 || source.getEntity() == this) {
@@ -317,7 +315,7 @@ public final class ChromaticAccretionEntity extends Entity {
             double desiredRadius = Math.min(6.5D, 3.5D + target.getBbWidth() * 0.65D);
             double radialCorrection = (desiredRadius - horizontalDistance) * 0.035D;
             double tangentSpeed = 0.10D + 0.08D * (1.0D - Math.min(1.0D,
-                    horizontalDistance / EFFECT_RADIUS));
+                    horizontalDistance / SpellConfig.chromaticAccretionEffectRadius));
             double verticalCorrection = (core.y - targetCenter.y) * 0.025D;
             double displacementScale = isBossLike(target) ? 0.28D : 1.0D;
 
@@ -345,7 +343,7 @@ public final class ChromaticAccretionEntity extends Entity {
                 absorbProjectile(level, projectile, center);
                 continue;
             }
-            if (distance > EFFECT_RADIUS) {
+            if (distance > SpellConfig.chromaticAccretionEffectRadius) {
                 continue;
             }
 
@@ -354,7 +352,7 @@ public final class ChromaticAccretionEntity extends Entity {
             if (tangent.lengthSqr() > 1.0E-6D) {
                 tangent = tangent.normalize();
             }
-            double proximity = 1.0D - distance / EFFECT_RADIUS;
+            double proximity = 1.0D - distance / SpellConfig.chromaticAccretionEffectRadius;
             Vec3 desiredVelocity = direction.scale(0.40D + proximity * 1.2D)
                     .add(tangent.scale(0.10D + (1.0D - proximity) * 0.18D));
             Vec3 velocity = projectile.getDeltaMovement().scale(0.28D)
@@ -374,8 +372,8 @@ public final class ChromaticAccretionEntity extends Entity {
             ServerLevel level,
             Entity projectile,
             Vec3 impactLocation) {
-        if (getEffectAge() < FORMATION_END_TICK
-                || getEffectAge() >= COLLAPSE_TICK
+        if (getEffectAge() < SpellConfig.chromaticAccretionFormationEndTick
+                || getEffectAge() >= SpellConfig.chromaticAccretionCollapseTick
                 || !canAbsorbProjectile(projectile)) {
             return false;
         }
@@ -416,7 +414,7 @@ public final class ChromaticAccretionEntity extends Entity {
 
     private void absorbProjectile(ServerLevel level, Entity projectile, Vec3 center) {
         projectile.discard();
-        if (getProjectileCharge() < MAX_PROJECTILE_CHARGE) {
+        if (getProjectileCharge() < SpellConfig.chromaticAccretionMaxProjectileCharge) {
             this.entityData.set(DATA_PROJECTILE_CHARGE, getProjectileCharge() + 1);
         }
         level.sendParticles(
@@ -459,7 +457,7 @@ public final class ChromaticAccretionEntity extends Entity {
 
     private boolean isInsideEffect(LivingEntity target) {
         return target.getBoundingBox().getCenter().distanceToSqr(this.position())
-                <= EFFECT_RADIUS * EFFECT_RADIUS;
+                <= SpellConfig.chromaticAccretionEffectRadius * SpellConfig.chromaticAccretionEffectRadius;
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {
@@ -504,12 +502,12 @@ public final class ChromaticAccretionEntity extends Entity {
 
     private AABB effectBounds() {
         return new AABB(
-                this.getX() - EFFECT_RADIUS,
-                this.getY() - EFFECT_RADIUS,
-                this.getZ() - EFFECT_RADIUS,
-                this.getX() + EFFECT_RADIUS,
-                this.getY() + EFFECT_RADIUS,
-                this.getZ() + EFFECT_RADIUS);
+                this.getX() - SpellConfig.chromaticAccretionEffectRadius,
+                this.getY() - SpellConfig.chromaticAccretionEffectRadius,
+                this.getZ() - SpellConfig.chromaticAccretionEffectRadius,
+                this.getX() + SpellConfig.chromaticAccretionEffectRadius,
+                this.getY() + SpellConfig.chromaticAccretionEffectRadius,
+                this.getZ() + SpellConfig.chromaticAccretionEffectRadius);
     }
 
     private static double projectileCaptureRadius(Entity projectile) {
@@ -529,7 +527,7 @@ public final class ChromaticAccretionEntity extends Entity {
     }
 
     private void spawnAmbientParticles(ServerLevel level, int age) {
-        if (age >= COLLAPSE_TICK) {
+        if (age >= SpellConfig.chromaticAccretionCollapseTick) {
             level.sendParticles(
                     ParticleTypes.END_ROD,
                     this.getX(), this.getY(), this.getZ(),
@@ -539,7 +537,7 @@ public final class ChromaticAccretionEntity extends Entity {
         level.sendParticles(
                 ParticleTypes.REVERSE_PORTAL,
                 this.getX(), this.getY(), this.getZ(),
-                age < FORMATION_END_TICK ? 4 : 8,
+                age < SpellConfig.chromaticAccretionFormationEndTick ? 4 : 8,
                 0.8D, 0.8D, 0.8D, 0.05D);
     }
 

@@ -197,6 +197,19 @@ dependencies {
             runtimeOnly fg.deobf('local:embeddium:0.3.31+mc1.20.1')
             runtimeOnly fg.deobf('local:oculus-mc1.20.1:1.8.0')
         }
+
+        // ModernUI, to compile the mixin that routes its glyph submission through our effect
+        // pipeline. compileOnly, so it stays a soft dependency: that mixin is @Pseudo with
+        // require = 0 and skips itself when ModernUI is absent.
+        if (file('libs/ModernUI-Forge-1.20.1-3.12.0.1.jar').exists()) {
+            compileOnly fg.deobf('local:ModernUI-Forge-1.20.1:3.12.0.1')
+            // At runtime only when asked for, because it replaces text rendering wholesale and every
+            // unrelated text bug would otherwise be debugged against a non-standard path.
+            //   ./gradlew runClient -PwithModernUI
+            if (project.hasProperty('withModernUI')) {
+                runtimeOnly fg.deobf('local:ModernUI-Forge-1.20.1:3.12.0.1')
+            }
+        }
     } else {
         implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:4.8.4")
         implementation fg.deobf("top.theillusivec4.curios:curios-forge:5.14.1+1.20.1")

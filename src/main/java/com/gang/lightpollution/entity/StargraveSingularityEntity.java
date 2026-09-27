@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 
 import net.minecraft.core.particles.ParticleTypes;
@@ -86,7 +88,7 @@ public class StargraveSingularityEntity extends Entity {
     }
 
     public float getCollapseProgress() {
-        return Math.min(1.0F, this.tickCount / (float) DAMAGE_TICK);
+        return Math.min(1.0F, this.tickCount / (float) SpellConfig.stargraveDamageTick);
     }
 
     @Override
@@ -98,7 +100,7 @@ public class StargraveSingularityEntity extends Entity {
             pullNearby(serverLevel);
             pullNearbyProjectiles(serverLevel);
 
-            if (!this.collapsed && this.tickCount >= DAMAGE_TICK) {
+            if (!this.collapsed && this.tickCount >= SpellConfig.stargraveDamageTick) {
                 this.collapsed = true;
                 collapse(serverLevel);
             }
@@ -108,7 +110,7 @@ public class StargraveSingularityEntity extends Entity {
             }
         }
 
-        if (this.tickCount >= LIFETIME_TICKS) {
+        if (this.tickCount >= SpellConfig.stargraveLifetimeTicks) {
             this.discard();
         }
     }
@@ -119,11 +121,11 @@ public class StargraveSingularityEntity extends Entity {
         if (this.tickCount < 20) {
             radius = lerp(this.tickCount / 20.0F, 0.5F, MAX_VISUAL_RADIUS);
             phase = 0;
-        } else if (this.tickCount < DAMAGE_TICK) {
+        } else if (this.tickCount < SpellConfig.stargraveDamageTick) {
             radius = MAX_VISUAL_RADIUS;
             phase = 1;
         } else {
-            radius = lerp((this.tickCount - DAMAGE_TICK) / 40.0F, MAX_VISUAL_RADIUS, 0.0F);
+            radius = lerp((this.tickCount - SpellConfig.stargraveDamageTick) / 40.0F, MAX_VISUAL_RADIUS, 0.0F);
             phase = 2;
         }
         this.entityData.set(DATA_VISUAL_RADIUS, Math.max(0.0F, radius));
@@ -139,12 +141,12 @@ public class StargraveSingularityEntity extends Entity {
                     target.getZ());
             Vec3 toCenter = this.position().subtract(targetCenter);
             double distance = toCenter.length();
-            if (distance <= 0.001D || distance > EFFECT_RADIUS) {
+            if (distance <= 0.001D || distance > SpellConfig.stargraveEffectRadius) {
                 continue;
             }
 
             Vec3 direction = toCenter.scale(1.0D / distance);
-            double proximity = 1.0D - distance / EFFECT_RADIUS;
+            double proximity = 1.0D - distance / SpellConfig.stargraveEffectRadius;
             double pullStrength = 0.025D + proximity * 0.16D;
             Vec3 tangent = new Vec3(-direction.z, 0.0D, direction.x)
                     .scale(0.012D + proximity * 0.045D);
@@ -185,12 +187,12 @@ public class StargraveSingularityEntity extends Entity {
                 absorbProjectile(level, projectile, projectileCenter);
                 continue;
             }
-            if (distance > EFFECT_RADIUS) {
+            if (distance > SpellConfig.stargraveEffectRadius) {
                 continue;
             }
 
             Vec3 direction = toCenter.scale(1.0D / Math.max(distance, 0.001D));
-            double proximity = 1.0D - distance / EFFECT_RADIUS;
+            double proximity = 1.0D - distance / SpellConfig.stargraveEffectRadius;
             Vec3 tangent = new Vec3(-direction.z, 0.0D, direction.x);
             if (tangent.lengthSqr() < 1.0E-6D) {
                 tangent = new Vec3(1.0D, 0.0D, 0.0D);
@@ -232,7 +234,7 @@ public class StargraveSingularityEntity extends Entity {
         }
 
         Vec3 offset = target.position().subtract(this.position());
-        return offset.lengthSqr() <= EFFECT_RADIUS * EFFECT_RADIUS;
+        return offset.lengthSqr() <= SpellConfig.stargraveEffectRadius * SpellConfig.stargraveEffectRadius;
     }
 
     private boolean canAbsorbProjectile(Entity entity) {
@@ -355,12 +357,12 @@ public class StargraveSingularityEntity extends Entity {
 
     private AABB effectBounds() {
         return new AABB(
-                this.getX() - EFFECT_RADIUS,
-                this.getY() - EFFECT_RADIUS,
-                this.getZ() - EFFECT_RADIUS,
-                this.getX() + EFFECT_RADIUS,
-                this.getY() + EFFECT_RADIUS,
-                this.getZ() + EFFECT_RADIUS);
+                this.getX() - SpellConfig.stargraveEffectRadius,
+                this.getY() - SpellConfig.stargraveEffectRadius,
+                this.getZ() - SpellConfig.stargraveEffectRadius,
+                this.getX() + SpellConfig.stargraveEffectRadius,
+                this.getY() + SpellConfig.stargraveEffectRadius,
+                this.getZ() + SpellConfig.stargraveEffectRadius);
     }
 
     private static double distanceToSegmentSqr(Vec3 point, Vec3 start, Vec3 end) {
@@ -382,7 +384,7 @@ public class StargraveSingularityEntity extends Entity {
         private static CollapseTarget capture(LivingEntity target) {
             float maxHealth = target.getMaxHealth();
             float healthBefore = target.getHealth();
-            float damage = Math.max(0.0F, maxHealth * 0.93F);
+            float damage = Math.max(0.0F, (float) (maxHealth * SpellConfig.stargraveDamageFraction));
             float desiredHealth = Math.max(0.0F, healthBefore - damage);
             return new CollapseTarget(target, damage, desiredHealth);
         }

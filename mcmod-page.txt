@@ -12,7 +12,7 @@
 ========================================
 
 
-铁魔法：光污染 是 Iron's Spells 'n Spellbooks（铁魔法）的附属模组，为其加入 5 个高规格的传奇法术，并为这些法术配套了一套独立的实时动态彩色光照与光线追踪阴影渲染管线。
+铁魔法：光污染 是 Iron's Spells 'n Spellbooks（铁魔法）的附属模组，为其加入 24 个高规格的传奇法术，并为这些法术配套了一套独立的实时动态彩色光照与光线追踪阴影渲染管线。
 
 法术释放时不再只是贴图特效，而是会作为真实光源照亮周围的方块与生物，并投下随几何形状变化的彩色阴影。
 
@@ -40,7 +40,34 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 
 ── 法术列表 ──
 
-全部 5 个法术均为传奇（Legendary）稀有度，最大等级 1 级，长按施法。
+当前版本共 24 个法术。法术的稀有度、等级和施法方式以游戏内 Iron's Spells 'n Spellbooks 的法术信息为准；下面列出注册名称，方便在模组页面和配置文件中查找。
+
+【法术名单】
+
+苍穹裁决 Celestial Judgment (`celestial_judgment`)
+葬星奇点 Stargrave Singularity (`stargrave_singularity`)
+星蚀断界斩 Eclipse Severance (`eclipse_severance`)
+终焉葬星 Funeral Nova (`funeral_nova`)
+虹蚀吸积 Chromatic Accretion (`chromatic_accretion`)
+熄星 Starless (`starless`)
+焚星 Pyre Star / Constellation (`constellation`)
+逆光 Silhouette (`silhouette`)
+星坠 Starfall (`starfall`)
+天倾 Sky Collapse (`sky_collapse`)
+星链天顶 Stellar Convergence (`stellar_convergence`)
+第二个太阳 Second Sun (`second_sun`)
+奇点 Singularity (`singularity`)
+星界巨蛇 Leviathan (`leviathan`)
+世界树 World Tree (`world_tree`)
+卡冈图雅 Gargantua (`gargantua`)
+宇宙马蹄铁 Cosmic Horseshoe (`cosmic_horseshoe`)
+微类星体 Microquasar (`microquasar`)
+螺旋星云 Helix Nebula (`helix_nebula`)
+磁星 Magnetar (`magnetar`)
+潮汐撕裂 Tidal Disruption (`tidal_disruption`)
+类星体喷流 Quasar Jet (`quasar_jet`)
+沃夫-拉叶风车 Wolf-Rayet Pinwheel (`pinwheel`)
+蟹状星云 Crab Nebula (`crab_nebula`)
 
 【苍穹裁决】Celestial Judgment
 学派：神圣　施法时间：2.5 秒
@@ -67,15 +94,35 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 在准星指向处唤出持续 10 秒的黑洞，将 20 格内除施法者与旁观者外的所有生物卷向核心。黑洞坍缩时造成目标最大生命值 90% 的真实伤害，无视护甲、盾牌、抗性与无敌状态。
 范围：20 格　伤害：目标最大生命值 90%　冷却：600 秒
 
+【世界树】World Tree
+学派：自然守护　施法时间：可在配置文件中调整
+世界树用于守护而非攻击：树冠范围内的施法者与友方生物会按脉冲恢复生命，并获得可配置的吸收盾；法术持续期间可分别保护友方免受魔法、投射物和火焰伤害。范围、持续时间、治疗比例、治疗间隔、吸收量和三类伤害免疫均可由服务器配置调整。
+默认范围：20 格　治疗：每秒恢复最大生命值 8%　吸收：4 颗心　持续：15 秒　冷却：460 秒　蓝耗：1750
+
 
 ── 获取方式 ──
 
-5 个法术各自提供对应的法术卷轴，可在创造模式物品栏「铁魔法：光污染」中找到。
+每个法术都提供对应的法术卷轴，可在创造模式物品栏「铁魔法：光污染」中找到；生存模式的获取方式以当前战利品表和配方为准。
 
 
 ── 配置项 ──
 
-客户端配置文件提供光照渲染的质量开关：
+服务端法术属性配置文件为 `config/irons_spellbooks_light_pollution-server.toml`。首次启动后编辑该文件，重启服务器或重载配置即可应用；多人游戏以服务器配置为准。
+
+前五个法术和世界树使用顶层小节，键名采用驼峰式法术 ID；其余法术使用 `spells.<id>` 小节。例如：
+
+· `celestialJudgment.cooldownSeconds`、`manaCost`、`castTimeTicks`、`damageFraction`、`healFraction`、`targetRange`、`impactTick`、`lifetimeTicks`
+· `stargraveSingularity.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`damageFraction`、`lifetimeTicks`、`damageTick`
+· `eclipseSeverance.cooldownSeconds`、`manaCost`、`castTimeTicks`、`damage`、`attackRadius`、`attackAngleDegrees`、`verticalTolerance`、`maxTargets`、`lifetimeTicks`、`damageTick`
+· `funeralNova.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`accretionDamageFraction`、`collapseDamageFraction`、`hypernovaDamageFraction`、`lifetimeTicks`
+· `chromaticAccretion.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`pulseDamageFraction`、`collapseDamageFraction`、`projectileDamageFraction`、`maxProjectileCharge`、`lifetimeTicks`、`formationEndTick`、`collapseTick`
+· `worldTree.cooldownSeconds`、`manaCost`、`castTimeTicks`、`castRange`、`effectRadius`、`lifetimeTicks`、`healingFraction`、`healingIntervalTicks`、`absorptionHearts`、`protectMagic`、`protectProjectile`、`protectFire`
+
+其余法术的通用键为 `spells.<id>.cooldownSeconds`、`manaCost`、`castTimeTicks` 和 `castRange`；例如 `spells.gargantua.cooldownSeconds`。通用小节的 `<id>` 使用驼峰式（如 `skyCollapse`、`cosmicHorseshoe`）。
+
+其中伤害/治疗比例使用 0–1 的小数（例如 `0.08` 表示最大生命值的 8%），时间使用 tick（20 tick = 1 秒），范围使用方块数。Forge 会在超出允许范围时回退到默认值。
+
+客户端配置文件 `config/irons_spellbooks_light_pollution-client.toml` 提供光照渲染的质量开关：
 
 enabled　　　　是否启用法术的屏幕空间光照，默认开启
 shadowSteps　　每个光源的阴影采样数，默认 32，范围 8–256。数值越高接触阴影越精细，GPU 开销也越大

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.LeviathanEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -62,6 +64,16 @@ public final class LeviathanSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("leviathan");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("leviathan");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -78,7 +90,7 @@ public final class LeviathanSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("leviathan") * 20;
     }
 
     @Override
@@ -102,7 +114,7 @@ public final class LeviathanSpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + LeviathanEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("leviathan") + LeviathanEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 LeviathanEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -113,7 +125,7 @@ public final class LeviathanSpell extends AbstractSpell {
             return;
         }
 
-        HitResult hit = Utils.raycastForEntity(serverLevel, caster, MAX_RANGE, true);
+        HitResult hit = Utils.raycastForEntity(serverLevel, caster, SpellConfig.castRange("leviathan"), true);
         Vec3 aimed = resolveCenter(serverLevel, caster, hit);
         // If the caster picked out a creature, the head goes after that creature and
         // the bite follows it wherever it moves. A raycast alone is unforgiving over
@@ -168,7 +180,7 @@ public final class LeviathanSpell extends AbstractSpell {
             return blockHit.getLocation().add(surfaceNormal.scale(0.08D));
         }
         Vec3 end = caster.getEyePosition()
-                .add(caster.getViewVector(1.0F).scale(MAX_RANGE));
+                .add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("leviathan")));
         double y = Math.max(level.getMinBuildHeight() + 1.0D,
                 Math.min(level.getMaxBuildHeight() - 1.0D, end.y));
         return new Vec3(end.x, y, end.z);

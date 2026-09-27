@@ -1,6 +1,7 @@
 package com.gang.lightpollution.event;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.entity.ChromaticAccretionEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -30,7 +31,7 @@ public final class ChromaticAccretionEvents {
 
         for (ChromaticAccretionEntity effect : level.getEntitiesOfClass(
                 ChromaticAccretionEntity.class,
-                target.getBoundingBox().inflate(ChromaticAccretionEntity.EFFECT_RADIUS),
+                target.getBoundingBox().inflate(SpellConfig.chromaticAccretionEffectRadius),
                 entity -> entity.isAlive() && !entity.isRemoved())) {
             effect.recordCasterDamage(target, event.getSource(), event.getAmount());
         }
@@ -46,7 +47,7 @@ public final class ChromaticAccretionEvents {
         Vec3 start = projectile.getBoundingBox().getCenter();
         Vec3 end = event.getRayTraceResult().getLocation();
         AABB searchBounds = new AABB(start, end)
-                .inflate(ChromaticAccretionEntity.EFFECT_RADIUS);
+                .inflate(SpellConfig.chromaticAccretionEffectRadius);
         for (ChromaticAccretionEntity effect : level.getEntitiesOfClass(
                 ChromaticAccretionEntity.class,
                 searchBounds,

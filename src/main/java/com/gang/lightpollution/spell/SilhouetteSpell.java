@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.SilhouetteEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -52,6 +54,16 @@ public final class SilhouetteSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("silhouette");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("silhouette");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.CONTINUOUS;
     }
@@ -68,7 +80,7 @@ public final class SilhouetteSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("silhouette") * 20;
     }
 
     @Override

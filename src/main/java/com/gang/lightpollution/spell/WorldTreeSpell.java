@@ -1,6 +1,7 @@
 package com.gang.lightpollution.spell;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.entity.WorldTreeEntity;
 import com.gang.lightpollution.registry.ModEntities;
 import io.redspace.ironsspellbooks.api.config.DefaultConfig;
@@ -35,9 +36,9 @@ import java.util.List;
  * terrain: roots follow the surface, so on a slope they climb it and the shape
  * belongs to the ground it grew from.</p>
  *
- * <p>The threat is staged and positional. The roots only strike where their tips
- * currently are, so the spread is what has to be avoided; the trunk pins whatever
- * is at its foot; and the crown's pulse then lands on everything still held.</p>
+ * <p>The tree is protective rather than offensive: allied creatures in its area
+ * receive periodic healing and absorption, while selected damage categories can
+ * be warded by the server configuration.</p>
  */
 public final class WorldTreeSpell extends AbstractSpell {
     public static final ResourceLocation ID =
@@ -55,11 +56,21 @@ public final class WorldTreeSpell extends AbstractSpell {
             .build();
 
     public WorldTreeSpell() {
-        this.baseManaCost = 1750;
+        this.baseManaCost = SpellConfig.manaCost("worldTree");
         this.manaCostPerLevel = 0;
         this.baseSpellPower = 0;
         this.spellPowerPerLevel = 0;
-        this.castTime = 55;
+        this.castTime = SpellConfig.castTimeTicks("worldTree");
+    }
+
+    @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("worldTree");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("worldTree");
     }
 
     @Override
@@ -79,7 +90,7 @@ public final class WorldTreeSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("worldTree") * 20;
     }
 
     @Override
@@ -103,7 +114,8 @@ public final class WorldTreeSpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + WorldTreeEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("worldTree")
+                + SpellConfig.worldTreeEffectRadius + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 WorldTreeEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -128,8 +140,9 @@ public final class WorldTreeSpell extends AbstractSpell {
      */
     private static Vec3 rayTraceGround(ServerLevel level, LivingEntity caster) {
         Vec3 start = caster.getEyePosition();
-        Vec3 end = start.add(caster.getViewVector(1.0F).scale(MAX_RANGE));
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        double range = SpellConfig.castRange("worldTree");
+        Vec3 end = start.add(caster.getViewVector(1.0F).scale(range));
+        HitResult hit = Utils.raycastForEntity(level, caster, (float) range, true);
 
         double x;
         double z;

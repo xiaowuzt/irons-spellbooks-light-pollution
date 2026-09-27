@@ -13,6 +13,7 @@ import com.gang.lightpollution.text.anim.GlyphState;
 import net.minecraft.Util;
 import net.minecraft.util.Mth;
 import com.gang.lightpollution.mixin.FontInvoker;
+import com.gang.lightpollution.client.gpu.EffectGlyphEmitter;
 import com.gang.lightpollution.text.EffectStyle;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
@@ -91,6 +92,9 @@ public final class DynamicTextRenderer {
             float drawY = y;
             int primaryColor = normalizedColor;
             Style primaryStyle = baseStyle;
+            int fragmentEffect = 0;
+            int fragmentColour = 0;
+            float[] fragmentParams = new float[4];
 
             // The animated effects, which move and recolour the glyph rather than drawing extra
             // copies of it. Applied before the ten shading effects below, so those still decide the
@@ -135,6 +139,9 @@ public final class DynamicTextRenderer {
                     glyphPose = turned(pose, drawX + advance * 0.5F, drawY,
                             glyph.pendulum * ANIM_RAD_TO_DEG);
                 }
+                fragmentEffect = glyph.fragmentEffect;
+                fragmentColour = glyph.fragmentColour;
+                System.arraycopy(glyph.fragmentParams, 0, fragmentParams, 0, 4);
                 if (glyph.glowPasses > 0 && glyph.glowRadius > 0.0F) {
                     // Saturated, not the glyph's own colour: white text glowing white shows nothing.
                     int glowColour = multiplyAlpha(replaceRgb(primaryColor, saturate(primaryColor)),
@@ -373,10 +380,23 @@ public final class DynamicTextRenderer {
                 }
             }
 
-            drawGlyph(
-                    font, codePoint, primaryStyle, drawX, drawY, primaryColor, shadow,
-                    glyphPose, buffers, mode, backgroundColor, packedLight
-            );
+            // A fragment-stage effect needs the glyph as our own quad, so its parameters can ride along
+            // in vertex attributes the fixed text format has no room for.
+            boolean emitted = false;
+            if (fragmentEffect != 0) {
+                FontSet set = ((FontInvoker) font).dynamicTextEffects$getFontSet(
+                        EffectStyle.baseFont(primaryStyle.getFont()));
+                BakedGlyph baked = set.getGlyph(codePoint);
+                emitted = EffectGlyphEmitter.emit(baked, buffers, glyphPose, drawX, drawY,
+                        primaryColor, primaryStyle.isItalic(), packedLight,
+                        fragmentEffect, fragmentColour, fragmentParams);
+            }
+            if (!emitted) {
+                drawGlyph(
+                        font, codePoint, primaryStyle, drawX, drawY, primaryColor, shadow,
+                        glyphPose, buffers, mode, backgroundColor, packedLight
+                );
+            }
             // Advances by the unanimated width, deliberately: the cursor is what the next glyph and
             // every width measurement agree on, so letting an offset feed into it would make an
             // animated string measure differently each frame and shake its own container.

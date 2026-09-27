@@ -5,6 +5,14 @@ An addon for *Iron's Spells 'n Spellbooks* that adds many more legendary spells.
 Most are built from a real astronomical object, and each has its own rendering and its own
 means of avoidance: some by distance, some by timing, some by where you stand.
 
+## Spells
+
+The current release contains 24 spells (the registry ID is in parentheses):
+
+Celestial Judgment (`celestial_judgment`), Stargrave Singularity (`stargrave_singularity`), Eclipse Severance (`eclipse_severance`), Funeral Nova (`funeral_nova`), Chromatic Accretion (`chromatic_accretion`), Starless (`starless`), Pyre Star / Constellation (`constellation`), Silhouette (`silhouette`), Starfall (`starfall`), Sky Collapse (`sky_collapse`), Stellar Convergence (`stellar_convergence`), Second Sun (`second_sun`), Singularity (`singularity`), Leviathan (`leviathan`), World Tree (`world_tree`), Gargantua (`gargantua`), Cosmic Horseshoe (`cosmic_horseshoe`), Microquasar (`microquasar`), Helix Nebula (`helix_nebula`), Magnetar (`magnetar`), Tidal Disruption (`tidal_disruption`), Quasar Jet (`quasar_jet`), Wolf-Rayet Pinwheel (`pinwheel`) and Crab Nebula (`crab_nebula`).
+
+World Tree is a sanctuary spell: allies inside its area are healed over time and receive absorption. Magic, projectile and fire protection are independent server options; its roots and crown are visual guardians and do not attack.
+
 **Discord:** https://discord.gg/adKfbRDn6V
 
 ---
@@ -61,6 +69,12 @@ Real-time coloured point lights and ray-traced shadows, without a shader pack.
   config option.
 - **Spell captions.** Several spells display a prompt at their turning point.
 - **Languages.** English, Simplified Chinese, Literary Chinese.
+
+## Configuration
+
+Server gameplay values are written to `config/irons_spellbooks_light_pollution-server.toml`. Edit it after the first launch, then restart the server or reload the Forge config. The first five spells and World Tree use dedicated camel-case sections such as `worldTree`; the other spells use `spells.<id>` sections (`skyCollapse`, `cosmicHorseshoe`, and so on) with common cooldown, mana, cast-time and cast-range keys.
+
+World Tree additionally exposes `worldTree.healingFraction` (default `0.08`), `healingIntervalTicks` (default `20`), `absorptionHearts` (default `4.0`) and the independent `protectMagic`, `protectProjectile` and `protectFire` switches. Fractions use decimal values; 20 ticks equal one second.
 
 ## For other mods
 

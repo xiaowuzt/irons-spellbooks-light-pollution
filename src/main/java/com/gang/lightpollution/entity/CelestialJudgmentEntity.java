@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.spell.ModSpells;
 import io.redspace.ironsspellbooks.damage.DamageSources;
 import io.redspace.ironsspellbooks.damage.SpellDamageSource;
@@ -72,7 +74,7 @@ public class CelestialJudgmentEntity extends Entity {
                 this.entityData.set(DATA_TARGET_ID, target.getId());
                 this.setPos(target.getX(), target.getY(), target.getZ());
 
-                if (!this.impacted && this.tickCount >= IMPACT_TICK) {
+                if (!this.impacted && this.tickCount >= SpellConfig.celestialImpactTick) {
                     this.impacted = true;
                     applyImpact(serverLevel, target);
                 }
@@ -81,7 +83,7 @@ public class CelestialJudgmentEntity extends Entity {
             this.entityData.set(DATA_PHASE, phaseForTick(this.tickCount));
         }
 
-        if (this.tickCount >= LIFETIME_TICKS) {
+        if (this.tickCount >= SpellConfig.celestialLifetimeTicks) {
             this.discard();
         }
     }
@@ -100,13 +102,13 @@ public class CelestialJudgmentEntity extends Entity {
             return;
         }
 
-        float rawDamage = Math.max(1.0F, target.getMaxHealth() * 0.84F);
+        float rawDamage = Math.max(1.0F, (float) (target.getMaxHealth() * SpellConfig.celestialDamageFraction));
         // The spell entity is the direct source and the caster is the owner.
         // Passing the target as the owner makes Iron's Spells treat this as
         // friendly fire against the target itself and cancel the impact.
         SpellDamageSource source = ModSpells.CELESTIAL_JUDGMENT.get().getDamageSource(this, caster);
         if (DamageSources.applyDamage(target, rawDamage, source)) {
-            caster.heal(caster.getMaxHealth() * 0.64F);
+            caster.heal((float) (caster.getMaxHealth() * SpellConfig.celestialHealFraction));
         }
     }
 

@@ -49,6 +49,19 @@ public final class GlyphState {
     /** Alpha of each copy, as a fraction of the glyph's own. */
     public float glowAlpha;
 
+    /**
+     * Which fragment-stage effect to run, or 0 for none.
+     *
+     * <p>A request, like {@link #glowPasses}: the work happens in a shader, and this seam describes one
+     * glyph on the CPU. The emitter reads it to decide whether the glyph goes through the effect render
+     * type or the plain one.</p>
+     */
+    public int fragmentEffect;
+    /** That effect's own colour, packed ARGB. */
+    public int fragmentColour;
+    /** Its four parameters. Reused rather than allocated, and cleared on reset. */
+    public final float[] fragmentParams = new float[4];
+
     /** Ready this for one glyph, keeping nothing from the last one. */
     public void reset(int codepoint, int index, boolean shadow,
                       float r, float g, float b, float a) {
@@ -73,6 +86,12 @@ public final class GlyphState {
         this.glowPasses = 0;
         this.glowRadius = 0.0F;
         this.glowAlpha = 0.0F;
+        this.fragmentEffect = 0;
+        this.fragmentColour = 0;
+        this.fragmentParams[0] = 0.0F;
+        this.fragmentParams[1] = 0.0F;
+        this.fragmentParams[2] = 0.0F;
+        this.fragmentParams[3] = 0.0F;
     }
 
     /** True when nothing moved the glyph, so the caller can skip the transform entirely. */

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.SecondSunEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -58,6 +60,16 @@ public final class SecondSunSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("secondSun");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("secondSun");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -74,7 +86,7 @@ public final class SecondSunSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("secondSun") * 20;
     }
 
     @Override
@@ -98,7 +110,7 @@ public final class SecondSunSpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + SecondSunEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("secondSun") + SecondSunEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 SecondSunEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -121,8 +133,8 @@ public final class SecondSunSpell extends AbstractSpell {
 
     private static Vec3 rayTraceCenter(ServerLevel level, LivingEntity caster) {
         Vec3 start = caster.getEyePosition();
-        Vec3 end = start.add(caster.getViewVector(1.0F).scale(MAX_RANGE));
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        Vec3 end = start.add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("secondSun")));
+        HitResult hit = Utils.raycastForEntity(level, caster, SpellConfig.castRange("secondSun"), true);
         if (hit instanceof EntityHitResult entityHit) {
             return entityHit.getEntity().position();
         }

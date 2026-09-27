@@ -300,7 +300,131 @@ public enum TextAnim {
             glyph.g = (rgb >> 8 & 255) / 255.0F;
             glyph.b = (rgb & 255) / 255.0F;
         }
+    },
+    /**
+     * A border traced around the glyph's edge.
+     *
+     * <p>The first effect that cannot be done on the CPU. It reads the font atlas around each pixel to
+     * find where the glyph ends, so it runs in a fragment shader and this method only records what that
+     * shader will need. Ported from TheSalts' Text_Effects (MIT).</p>
+     */
+    OUTLINE("outline") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_OUTLINE;
+            glyph.fragmentColour = params.colourPacked("c", 0xFF000000);
+            glyph.fragmentParams[0] = params.number("t", 1.0F);
+        }
+    },
+    /**
+     * A real glow: the alpha around each pixel sampled at three radii and faded by distance.
+     *
+     * <p>Named {@code glow} rather than neon because {@link #NEON} already exists and fakes this by
+     * drawing the glyph eleven times. This one draws once and is the better-looking of the two, but it
+     * needs the fragment shader, so the multi-pass version stays for anyone without it.</p>
+     */
+    GLOW("glow") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_GLOW;
+            glyph.fragmentColour = params.colourPacked("c", 0xFF00E8FF);
+            glyph.fragmentParams[0] = params.number("i", 1.6F);
+            // Zero disables the flicker, which is what someone wanting a steady glow will reach for.
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+        }
+    },
+    /**
+     * Red and blue pulled apart horizontally and screen-blended back, for a colour fringe.
+     *
+     * <p>Ported from TheSalts' Text_Effects (MIT).</p>
+     */
+    FRINGE("fringe") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_FRINGE;
+            glyph.fragmentParams[0] = params.number("i", 1.2F);
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+        }
+    },
+    /**
+     * The glyph stacked behind itself, receding down and right.
+     *
+     * <p>{@code m=0} darkens each layer automatically; {@code m=1} runs from the glyph's own colour to
+     * {@code c}. The original's third mode interpolated across three colours, which is not ported — it
+     * would need two more vertex attributes for a look these two already cover.</p>
+     */
+    EXTRUDE("extrude") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_EXTRUDE;
+            glyph.fragmentColour = params.colourPacked("c", 0xFF303030);
+            glyph.fragmentParams[0] = params.number("d", 1.0F);
+            // Capped at sixteen because the shader's loop is bounded there; a higher number would
+            // silently stop at sixteen, which is worse than clamping it here.
+            glyph.fragmentParams[1] = Math.min(16.0F, Math.max(1.0F, params.number("l", 4.0F)));
+            glyph.fragmentParams[2] = params.number("m", 0.0F);
+        }
+    },
+    /** Diagonal stripes sweeping across the glyph. */
+    HATCH("hatch") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_HATCH;
+            glyph.fragmentColour = params.colourPacked("c", 0xFFFFFFFF);
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+            glyph.fragmentParams[2] = params.number("d", 6.0F);
+        }
+    },
+    /** Per-scanline jitter, quantised to frames for a television-static read. */
+    STATIC("static") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_NOISE;
+            glyph.fragmentParams[0] = params.number("i", 2.0F);
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+        }
+    },
+    /** Smooth turbulent displacement, from crossed sines at different rates. */
+    LIQUID("liquid") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_LIQUID;
+            glyph.fragmentParams[0] = params.number("i", 1.5F);
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+        }
+    },
+    /** The glyph filling with water to a level, with a rippling surface. */
+    WATER("water") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_WATER;
+            glyph.fragmentColour = params.colourPacked("c", 0xFF3FA9F5);
+            glyph.fragmentParams[0] = params.number("l", 0.6F);
+            glyph.fragmentParams[1] = params.number("a", 1.0F);
+            glyph.fragmentParams[2] = params.number("f", 1.0F);
+            glyph.fragmentParams[3] = params.number("w", 2.0F);
+        }
+    },
+    /** The top half of the glyph sliding sideways against the bottom. */
+    SPLIT("split") {
+        @Override
+        public void apply(GlyphState glyph, AnimParams params, long millis) {
+            glyph.fragmentEffect = FRAGMENT_SPLIT;
+            glyph.fragmentParams[0] = params.number("i", 1.0F);
+            glyph.fragmentParams[1] = params.number("f", 1.0F);
+        }
     };
+
+    /** Effect ids the fragment shader dispatches on. Must match effect_text.fsh. */
+    public static final int FRAGMENT_OUTLINE = 1;
+    public static final int FRAGMENT_GLOW = 2;
+    public static final int FRAGMENT_FRINGE = 3;
+    public static final int FRAGMENT_EXTRUDE = 4;
+    public static final int FRAGMENT_HATCH = 5;
+    public static final int FRAGMENT_NOISE = 6;
+    public static final int FRAGMENT_LIQUID = 7;
+    public static final int FRAGMENT_WATER = 8;
+    public static final int FRAGMENT_SPLIT = 9;
 
     /** TextAnimator's defaults, kept so a bare {@code grad} looks as it does there. */
     private static final float[] DEFAULT_FROM = {0x5B / 255.0F, 0xCE / 255.0F, 0xFA / 255.0F};

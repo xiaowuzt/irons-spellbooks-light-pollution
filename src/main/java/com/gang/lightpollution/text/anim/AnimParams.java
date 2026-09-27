@@ -57,6 +57,31 @@ public final class AnimParams {
         }
     }
 
+    /**
+     * A colour as packed ARGB, from six or eight hex digits.
+     *
+     * <p>Six digits means opaque, which is what someone writing {@code c=ff0000} means. Eight lets the
+     * alpha be given, for an outline meant to be faint.</p>
+     */
+    public int colourPacked(String key, int fallback) {
+        String raw = values.get(key);
+        if (raw == null) {
+            return fallback;
+        }
+        String hex = raw.startsWith("#") ? raw.substring(1) : raw;
+        try {
+            if (hex.length() == 6) {
+                return 0xFF000000 | Integer.parseInt(hex, 16);
+            }
+            if (hex.length() == 8) {
+                return (int) Long.parseLong(hex, 16);
+            }
+        } catch (NumberFormatException malformed) {
+            return fallback;
+        }
+        return fallback;
+    }
+
     public boolean flag(String key, boolean fallback) {
         String raw = values.get(key);
         return raw == null ? fallback : !"false".equalsIgnoreCase(raw);

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.PinwheelEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -61,6 +63,16 @@ public final class PinwheelSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("pinwheel");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("pinwheel");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -77,7 +89,7 @@ public final class PinwheelSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("pinwheel") * 20;
     }
 
     @Override
@@ -101,7 +113,7 @@ public final class PinwheelSpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + PinwheelEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("pinwheel") + PinwheelEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 PinwheelEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -123,7 +135,7 @@ public final class PinwheelSpell extends AbstractSpell {
     }
 
     private static Vec3 resolveCentre(ServerLevel level, LivingEntity caster) {
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        HitResult hit = Utils.raycastForEntity(level, caster, SpellConfig.castRange("pinwheel"), true);
         if (hit instanceof EntityHitResult entityHit) {
             return entityHit.getEntity().getBoundingBox().getCenter();
         }
@@ -132,7 +144,7 @@ public final class PinwheelSpell extends AbstractSpell {
             return blockHit.getLocation();
         }
         Vec3 end = caster.getEyePosition()
-                .add(caster.getViewVector(1.0F).scale(MAX_RANGE));
+                .add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("pinwheel")));
         double y = Math.max(level.getMinBuildHeight() + 1.0D,
                 Math.min(level.getMaxBuildHeight() - 1.0D, end.y));
         return new Vec3(end.x, y, end.z);

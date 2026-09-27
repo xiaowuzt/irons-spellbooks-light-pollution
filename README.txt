@@ -1,46 +1,74 @@
+# 铁魔法：光污染 / Iron's Spells: Light Pollution
 
-Source installation information for modders
--------------------------------------------
-This code follows the Minecraft Forge installation methodology. It will apply
-some small patches to the vanilla MCP source code, giving you and it access 
-to some of the data and functions you need to build a successful mod.
+Iron's Spells: Light Pollution is an Iron's Spells 'n Spellbooks addon for Minecraft 1.20.1 and Forge 47+. It adds 24 legendary-scale spells with animated astronomical scenes and dynamic coloured spell lighting.
 
-Note also that the patches are built against "un-renamed" MCP source code (aka
-SRG Names) - this means that you will not be able to read them directly against
-normal code.
+## Requirements
 
-Setup Process:
-==============================
+- Minecraft 1.20.1
+- Forge 47 or newer
+- Iron's Spells 'n Spellbooks 1.20.1-3.16.1 or newer
+- Iron's Lib 1.20.1-1.1.0 or newer
 
-Step 1: Open your command-line and browse to the folder where you extracted the zip file.
+## Spells
 
-Step 2: You're left with a choice.
-If you prefer to use Eclipse:
-1. Run the following command: `./gradlew genEclipseRuns`
-2. Open Eclipse, Import > Existing Gradle Project > Select Folder 
-   or run `gradlew eclipse` to generate the project.
+The registry IDs below are also the names used by the server gameplay configuration:
 
-If you prefer to use IntelliJ:
-1. Open IDEA, and import project.
-2. Select your build.gradle file and have it import.
-3. Run the following command: `./gradlew genIntellijRuns`
-4. Refresh the Gradle Project in IDEA if required.
+| Name | Registry ID |
+| --- | --- |
+| Celestial Judgment / 苍穹裁决 | `celestial_judgment` |
+| Stargrave Singularity / 葬星奇点 | `stargrave_singularity` |
+| Eclipse Severance / 星蚀断界斩 | `eclipse_severance` |
+| Funeral Nova / 终焉葬星 | `funeral_nova` |
+| Chromatic Accretion / 虹蚀吸积 | `chromatic_accretion` |
+| Starless / 熄星 | `starless` |
+| Pyre Star (Constellation) / 焚星 | `constellation` |
+| Silhouette / 逆光 | `silhouette` |
+| Starfall / 星坠 | `starfall` |
+| Sky Collapse / 天倾 | `sky_collapse` |
+| Stellar Convergence / 星链天顶 | `stellar_convergence` |
+| Second Sun / 第二个太阳 | `second_sun` |
+| Singularity / 奇点 | `singularity` |
+| Leviathan / 星界巨蛇 | `leviathan` |
+| World Tree / 世界树 | `world_tree` |
+| Gargantua / 卡冈图雅 | `gargantua` |
+| Cosmic Horseshoe / 宇宙马蹄铁 | `cosmic_horseshoe` |
+| Microquasar / 微类星体 | `microquasar` |
+| Helix Nebula / 螺旋星云 | `helix_nebula` |
+| Magnetar / 磁星 | `magnetar` |
+| Tidal Disruption / 潮汐撕裂 | `tidal_disruption` |
+| Quasar Jet / 类星体喷流 | `quasar_jet` |
+| Wolf-Rayet Pinwheel / 沃夫-拉叶风车 | `pinwheel` |
+| Crab Nebula / 蟹状星云 | `crab_nebula` |
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can 
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-(this does not affect your code) and then start the process again.
+World Tree is a sanctuary spell. Allies in its area are healed on a pulse and receive absorption; magic, projectile, and fire protection can each be enabled or disabled. Its roots and crown are visual guardians and do not attack.
 
-Mapping Names:
-=============================
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license, if you do not agree with it you can change your mapping names to other crowdsourced names in your 
-build.gradle. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
+## Configuration
 
-Additional Resources: 
-=========================
-Community Documentation: https://docs.minecraftforge.net/en/1.20.1/gettingstarted/
-LexManos' Install Video: https://youtu.be/8VEdtQLuLO0
-Forge Forums: https://forums.minecraftforge.net/
-Forge Discord: https://discord.minecraftforge.net/
+Gameplay values are server-authoritative. After the first launch, edit:
+
+`config/irons_spellbooks_light_pollution-server.toml`
+
+The first five spells and World Tree use dedicated sections such as `celestialJudgment`, `stargraveSingularity`, `funeralNova`, `chromaticAccretion`, and `worldTree`. The other spells use `spells.<id>` sections with the common keys `cooldownSeconds`, `manaCost`, `castTimeTicks`, and `castRange`; `<id>` is camel-case (`skyCollapse`, `cosmicHorseshoe`, and so on). Dedicated sections also expose effect, timeline, damage, and protection values. World Tree exposes:
+
+- `worldTree.healingFraction` (default `0.08`, maximum-health fraction per pulse)
+- `worldTree.healingIntervalTicks` (default `20`, where 20 ticks = 1 second)
+- `worldTree.absorptionHearts` (default `4.0`)
+- `worldTree.protectMagic`, `worldTree.protectProjectile`, `worldTree.protectFire` (default `true`)
+
+Damage and healing fractions use decimal values (`0.08` means 8%). Forge validates numeric ranges and falls back to defaults for invalid values. Restart the server or reload the Forge config after editing.
+
+Client lighting and presentation options are in:
+
+`config/irons_spellbooks_light_pollution-client.toml`
+
+The `enabled` switch controls screen-space spell lighting and `shadowSteps` controls shadow quality (8–256).
+
+## Building
+
+Use the Gradle wrapper from a Java 17 environment:
+
+```text
+./gradlew build
+```
+
+The resulting jar is written to `build/libs/`.

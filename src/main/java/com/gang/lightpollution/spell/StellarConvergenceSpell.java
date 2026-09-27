@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.StellarConvergenceEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -58,6 +60,16 @@ public final class StellarConvergenceSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("stellarConvergence");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("stellarConvergence");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -74,7 +86,7 @@ public final class StellarConvergenceSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("stellarConvergence") * 20;
     }
 
     @Override
@@ -99,7 +111,7 @@ public final class StellarConvergenceSpell extends AbstractSpell {
         }
 
         double duplicateSearchRadius =
-                MAX_RANGE + StellarConvergenceEntity.EFFECT_RADIUS + 2.0D;
+                SpellConfig.castRange("stellarConvergence") + StellarConvergenceEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 StellarConvergenceEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -119,8 +131,8 @@ public final class StellarConvergenceSpell extends AbstractSpell {
 
     private static Vec3 rayTraceCenter(ServerLevel level, LivingEntity caster) {
         Vec3 start = caster.getEyePosition();
-        Vec3 end = start.add(caster.getViewVector(1.0F).scale(MAX_RANGE));
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        Vec3 end = start.add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("stellarConvergence")));
+        HitResult hit = Utils.raycastForEntity(level, caster, SpellConfig.castRange("stellarConvergence"), true);
         if (hit instanceof EntityHitResult entityHit) {
             return entityHit.getEntity().position();
         }

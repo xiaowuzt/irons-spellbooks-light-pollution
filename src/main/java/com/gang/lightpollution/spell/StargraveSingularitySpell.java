@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.StargraveSingularityEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -52,6 +54,16 @@ public class StargraveSingularitySpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("stargraveSingularity");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("stargraveSingularity");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -69,7 +81,7 @@ public class StargraveSingularitySpell extends AbstractSpell {
     @Override
     public int getSpellCooldown() {
         // Deliberately fixed: this spell is not affected by cooldown reduction.
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("stargraveSingularity") * 20;
     }
 
     @Override
@@ -102,8 +114,8 @@ public class StargraveSingularitySpell extends AbstractSpell {
 
     private static Vec3 rayTraceCenter(ServerLevel level, LivingEntity caster) {
         Vec3 start = caster.getEyePosition();
-        Vec3 end = start.add(caster.getViewVector(1.0F).scale(MAX_RANGE));
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        Vec3 end = start.add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("stargraveSingularity")));
+        HitResult hit = Utils.raycastForEntity(level, caster, SpellConfig.castRange("stargraveSingularity"), true);
         if (hit instanceof EntityHitResult entityHit) {
             return entityHit.getEntity().getBoundingBox().getCenter();
         }

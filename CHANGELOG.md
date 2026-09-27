@@ -4,9 +4,21 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
-## 1.5.0
+## 1.6.0
 
 Questions, bug reports and suggestions: **https://discord.gg/adKfbRDn6V**
+
+### Configurable spell properties and a World Tree sanctuary
+
+All 24 spells now read their core cooldown, mana cost, cast time and range from the
+server config at `config/irons_spellbooks_light_pollution-server.toml`. Damage, area,
+duration and other spell-specific values are configurable where the spell supports
+them, so a server owner can tune the pack without changing the jar.
+
+World Tree is now a protective sanctuary rather than an attack. It heals nearby
+players and friendly units, grants configurable absorption, and can protect the
+sanctuary from magic, projectile and fire damage. It no longer damages or roots
+nearby enemies.
 
 ### Seventeen animated text effects
 

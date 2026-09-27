@@ -5,9 +5,13 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "irons_spellbooks_light_pollution.refmap.json",
   "client": [
+    "BakedGlyphAccess",
+    "BakedGlyphAtlasMixin",
     "FontInvoker",
     "FontMixin",
+    "FontSetMixin",
     "FontStringRenderOutputMixin",
+    "FontTextureMixin",
     "ItemStackMixin",
     "MutableComponentMixin"
   ],

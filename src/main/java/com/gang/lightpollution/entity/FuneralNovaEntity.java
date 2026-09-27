@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
@@ -45,9 +47,6 @@ public final class FuneralNovaEntity extends Entity {
     public static final int HYPERNOVA_DAMAGE_TICK = 164;
 
     public static final double EFFECT_RADIUS = 12.0D;
-    private static final float ACCRETION_DAMAGE_FRACTION = 0.13F;
-    private static final float COLLAPSE_DAMAGE_FRACTION = 0.19F;
-    private static final float HYPERNOVA_DAMAGE_FRACTION = 0.27F;
 
     private static final EntityDataAccessor<Integer> DATA_SEED = SynchedEntityData.defineId(
             FuneralNovaEntity.class, EntityDataSerializers.INT);
@@ -93,10 +92,10 @@ public final class FuneralNovaEntity extends Entity {
     public int getTimelineAgeTicks() {
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(SpellConfig.funeralNovaLifetimeTicks, Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(SpellConfig.funeralNovaLifetimeTicks, Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
@@ -104,7 +103,7 @@ public final class FuneralNovaEntity extends Entity {
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(SpellConfig.funeralNovaLifetimeTicks, Math.max(0.0F, age));
     }
 
     public boolean isCastBy(LivingEntity caster) {
@@ -127,19 +126,19 @@ public final class FuneralNovaEntity extends Entity {
 
             if (!this.accretionDamageResolved && timelineTick >= ACCRETION_DAMAGE_TICK) {
                 this.accretionDamageResolved = true;
-                resolveDamagePulse(serverLevel, ACCRETION_DAMAGE_FRACTION, 7.0D, false);
+                resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaAccretionDamageFraction, 7.0D, false);
             }
             if (!this.collapseDamageResolved && timelineTick >= COLLAPSE_DAMAGE_TICK) {
                 this.collapseDamageResolved = true;
-                resolveDamagePulse(serverLevel, COLLAPSE_DAMAGE_FRACTION, 9.5D, false);
+                resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaCollapseDamageFraction, 9.5D, false);
             }
             if (!this.hypernovaDamageResolved && timelineTick >= HYPERNOVA_DAMAGE_TICK) {
                 this.hypernovaDamageResolved = true;
-                resolveDamagePulse(serverLevel, HYPERNOVA_DAMAGE_FRACTION, EFFECT_RADIUS, true);
+                resolveDamagePulse(serverLevel, (float) SpellConfig.funeralNovaHypernovaDamageFraction, SpellConfig.funeralNovaEffectRadius, true);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= SpellConfig.funeralNovaLifetimeTicks) {
             this.discard();
         }
     }
@@ -151,16 +150,16 @@ public final class FuneralNovaEntity extends Entity {
                 (timelineTick - BLACK_HOLE_START_TICK)
                         / (float) Math.max(1, VOID_START_TICK - BLACK_HOLE_START_TICK));
         for (LivingEntity target : level.getEntitiesOfClass(
-                LivingEntity.class, effectBounds(EFFECT_RADIUS), entity -> canAffect(caster, entity))) {
+                LivingEntity.class, effectBounds(SpellConfig.funeralNovaEffectRadius), entity -> canAffect(caster, entity))) {
             Vec3 targetCenter = target.getBoundingBox().getCenter();
             Vec3 toCore = core.subtract(targetCenter);
             double distance = toCore.length();
-            if (distance <= 0.05D || distance > EFFECT_RADIUS) {
+            if (distance <= 0.05D || distance > SpellConfig.funeralNovaEffectRadius) {
                 continue;
             }
 
             Vec3 direction = toCore.scale(1.0D / distance);
-            double proximity = 1.0D - distance / EFFECT_RADIUS;
+            double proximity = 1.0D - distance / SpellConfig.funeralNovaEffectRadius;
             double pull = 0.025D + proximity * (0.10D + stageProgress * 0.10D);
             Vec3 tangent = new Vec3(-direction.z, 0.0D, direction.x)
                     .scale(0.018D + proximity * 0.035D);

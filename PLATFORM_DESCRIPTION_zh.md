@@ -5,6 +5,14 @@
 法术多以真实天体为原型，各自拥有独立的渲染实现与判定方式：部分依距离规避，部分依时机规避，另有
 部分取决于站位。
 
+## 法术列表
+
+当前版本包含以下 24 个法术（括号内为注册 ID）：
+
+苍穹裁决 (`celestial_judgment`)、葬星奇点 (`stargrave_singularity`)、星蚀断界斩 (`eclipse_severance`)、终焉葬星 (`funeral_nova`)、虹蚀吸积 (`chromatic_accretion`)、熄星 (`starless`)、焚星 (`constellation`)、逆光 (`silhouette`)、星坠 (`starfall`)、天倾 (`sky_collapse`)、星链天顶 (`stellar_convergence`)、第二个太阳 (`second_sun`)、奇点 (`singularity`)、星界巨蛇 (`leviathan`)、世界树 (`world_tree`)、卡冈图雅 (`gargantua`)、宇宙马蹄铁 (`cosmic_horseshoe`)、微类星体 (`microquasar`)、螺旋星云 (`helix_nebula`)、磁星 (`magnetar`)、潮汐撕裂 (`tidal_disruption`)、类星体喷流 (`quasar_jet`)、沃夫-拉叶风车 (`pinwheel`)、蟹状星云 (`crab_nebula`）。
+
+世界树是守护型法术：守护范围内的施法者与友方生物会持续回血并获得吸收盾，魔法、投射物和火焰伤害可分别设置为免疫；树根和树冠只负责视觉表现，不会攻击敌人。
+
 **官方 Discord：** https://discord.gg/adKfbRDn6V
 
 ---
@@ -47,6 +55,12 @@
   经短暂累积后合并显示。指令 `/lightpollution damage on`，或配置项 `floatingDamage`。
 - **法术字幕**：部分法术在关键节点显示提示。
 - **语言**：英文、简体中文、文言文。
+
+## 配置
+
+服务端法术属性写入 `config/irons_spellbooks_light_pollution-server.toml`。首次启动后即可修改，重启服务器或重载 Forge 配置后生效。前五个法术和世界树使用驼峰式顶层小节（如 `worldTree`）；其余法术使用 `spells.<id>` 小节（`skyCollapse`、`cosmicHorseshoe` 等），提供冷却秒数、法力消耗、施法时间（tick）和施法范围等通用键。
+
+世界树还提供 `worldTree.healingFraction`（默认 0.08）、`healingIntervalTicks`（默认 20）、`absorptionHearts`（默认 4.0）以及 `protectMagic`、`protectProjectile`、`protectFire` 三个开关。比例使用 0–1 小数，20 tick 等于 1 秒。
 
 ## 供其他模组调用
 

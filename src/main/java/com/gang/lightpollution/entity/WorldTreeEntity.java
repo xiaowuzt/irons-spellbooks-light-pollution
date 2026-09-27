@@ -1,9 +1,11 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.api.WorldTreeParams;
 import com.gang.lightpollution.fx.FxHash;
 import com.gang.lightpollution.fx.WorldTreeShape;
 import com.gang.lightpollution.fx.WorldTreeSource;
+import io.redspace.ironsspellbooks.damage.SpellDamageSource;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -12,19 +14,18 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraftforge.fluids.FluidType;
 import net.minecraftforge.network.NetworkHooks;
 
@@ -36,12 +37,14 @@ import java.util.UUID;
  *
  * <p>The one spell in this set that grows out of the ground rather than arriving
  * at it. Roots race outward across the terrain, spear up into a trunk, and the
- * crown unfolds — a tall vertical silhouette, which nothing else here has.</p>
+ * crown unfolds — a tall vertical silhouette, which nothing else here has. While
+ * it stands, the tree is a sanctuary: it heals the caster and allied creatures
+ * and wards the configured damage categories.</p>
  *
  * <p>Root paths, branch angles and leaf placement are pure functions of the
- * synchronized seed, so the renderer and the server-side root strikes read the
- * same structure without extra syncing. Root tips follow the real terrain height,
- * so on a slope the roots climb it.</p>
+ * synchronized seed, so the renderer and the server-side sanctuary read the same
+ * structure without extra syncing. Root tips follow the real terrain height, so
+ * on a slope the roots climb it.</p>
  */
 public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     // The form lives in WorldTreeShape, which the renderer and the public API both read, so there is
@@ -77,23 +80,6 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
 
     /** Radius the roots cover, in blocks. */
     public static final double EFFECT_RADIUS = WorldTreeShape.ROOT_REACH + 3.0D;
-    /** How close to a root a target must be to be struck, in blocks. */
-    private static final double ROOT_STRIKE_RADIUS = 3.2D;
-    /** Radius of the trunk's eruption, in blocks. */
-    private static final double TRUNK_BURST_RADIUS = 7.0D;
-    /** Radius of the crown's final pulse, in blocks. */
-    private static final double CROWN_RADIUS = 20.0D;
-
-    /** Max-health fraction per root strike. */
-    private static final float ROOT_DAMAGE_FRACTION = 0.040F;
-    /** Ticks between root strikes while they spread. */
-    private static final int ROOT_INTERVAL_TICKS = 6;
-    /** Max-health fraction when the trunk spears up. */
-    private static final float TRUNK_DAMAGE_FRACTION = 0.25F;
-    /** Max-health fraction of the crown's pulse. */
-    private static final float CROWN_DAMAGE_FRACTION = 0.39F;
-    /** Ticks of rooting applied while the trunk holds. */
-    private static final int ROOTED_TICKS = 60;
 
     private static final EntityDataAccessor<Integer> DATA_CASTER_ID = SynchedEntityData.defineId(
             WorldTreeEntity.class, EntityDataSerializers.INT);
@@ -103,8 +89,6 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
             WorldTreeEntity.class, EntityDataSerializers.INT);
 
     private UUID casterUuid;
-    private boolean trunkResolved;
-    private boolean crownResolved;
 
     public WorldTreeEntity(EntityType<? extends WorldTreeEntity> entityType, Level level) {
         super(entityType, level);
@@ -135,20 +119,22 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     }
 
     public int getTimelineAgeTicks() {
+        int lifetime = Math.max(1, SpellConfig.worldTreeLifetimeTicks);
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         if (startGameTick < 0L) {
-            return Math.min(LIFETIME_TICKS, Math.max(0, this.tickCount));
+            return Math.min(lifetime, Math.max(0, this.tickCount));
         }
         long age = this.level().getGameTime() - startGameTick;
-        return (int) Math.min(LIFETIME_TICKS, Math.max(0L, age));
+        return (int) Math.min(lifetime, Math.max(0L, age));
     }
 
     public float getVisualAgeTicks(float partialTick) {
+        int lifetime = Math.max(1, SpellConfig.worldTreeLifetimeTicks);
         long startGameTick = this.entityData.get(DATA_START_GAME_TICK);
         float age = startGameTick < 0L
                 ? this.tickCount + partialTick
                 : (float) (this.level().getGameTime() - startGameTick) + partialTick;
-        return Math.min(LIFETIME_TICKS, Math.max(0.0F, age));
+        return Math.min(lifetime, Math.max(0.0F, age));
     }
 
     /** The seed point on the ground. */
@@ -169,7 +155,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     @Override
     public WorldTreeParams shapeParams() {
         // groundY is unused on this side: the roots follow the terrain instead.
-        return WorldTreeParams.of(getSeed(), this.getY());
+        return WorldTreeParams.of(getSeed(), this.getY())
+                .lifetime(Math.max(1, SpellConfig.worldTreeLifetimeTicks));
     }
 
     public float trunkProgress(float partialTick) {
@@ -197,7 +184,8 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
 
     /** Overall fade, 1 while it stands and falling to 0 at the end. */
     public float fade(float partialTick) {
-        return WorldTreeShape.fade(getVisualAgeTicks(partialTick), LIFETIME_TICKS);
+        return WorldTreeShape.fade(getVisualAgeTicks(partialTick),
+                Math.max(1, SpellConfig.worldTreeLifetimeTicks));
     }
 
     /** Bearing a root runs along, in radians. */
@@ -298,115 +286,38 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (!this.trunkResolved && timelineTick >= WorldTreeShape.TRUNK_END_TICK) {
-                this.trunkResolved = true;
-                resolveTrunk(serverLevel);
-            }
-            if (timelineTick >= WorldTreeShape.ROOT_START_TICK && timelineTick <= WorldTreeShape.ROOT_END_TICK
-                    && timelineTick % ROOT_INTERVAL_TICKS == 0) {
-                resolveRoots(serverLevel);
-            }
-            if (!this.crownResolved && timelineTick >= WorldTreeShape.CROWN_END_TICK) {
-                this.crownResolved = true;
-                resolveCrown(serverLevel);
+            int interval = Math.max(1, SpellConfig.worldTreeHealingIntervalTicks);
+            if (timelineTick % interval == 0) {
+                applySanctuaryPulse(serverLevel);
             }
         }
 
-        if (timelineTick >= LIFETIME_TICKS) {
+        if (timelineTick >= SpellConfig.worldTreeLifetimeTicks) {
             this.discard();
         }
     }
 
-    /**
-     * Anything a root has reached. Only the leading portion of each root strikes,
-     * so standing where a root has already passed is safe and the spread itself is
-     * the threat.
-     */
-    private void resolveRoots(ServerLevel level) {
+    /** Heal allied entities in the tree's sanctuary; the tree no longer attacks. */
+    private void applySanctuaryPulse(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
-        float progress = rootProgress(1.0F);
-        if (progress <= 0.02F) {
-            return;
-        }
-        DamageSource source = null;
-        for (int root = 0; root < WorldTreeShape.ROOT_COUNT; root++) {
-            // The advancing tip, plus a short stretch behind it.
-            for (int sample = 0; sample < 2; sample++) {
-                float t = Math.max(0.0F, progress - sample * 0.12F);
-                Vec3 point = rootPoint(root, t, 1.0F);
-                List<LivingEntity> touched = level.getEntitiesOfClass(
-                        LivingEntity.class,
-                        new AABB(point.x - ROOT_STRIKE_RADIUS, point.y - 2.0D,
-                                point.z - ROOT_STRIKE_RADIUS,
-                                point.x + ROOT_STRIKE_RADIUS, point.y + 4.0D,
-                                point.z + ROOT_STRIKE_RADIUS),
-                        target -> canAffect(caster, target)
-                                && horizontalWithin(target, point, ROOT_STRIKE_RADIUS));
-                if (touched.isEmpty()) {
-                    continue;
-                }
-                if (source == null) {
-                    source = WorldTreeDamage.source(level, this, caster);
-                }
-                for (LivingEntity target : touched) {
-                    SpellDamage.apply(this, target, source, ROOT_DAMAGE_FRACTION);
-                }
-            }
-        }
-    }
-
-    /** The trunk spearing up: everything at its foot is thrown and rooted. */
-    private void resolveTrunk(ServerLevel level) {
-        LivingEntity caster = resolveCaster(level);
-        Vec3 seed = seedPoint(1.0F);
-        List<LivingEntity> targets = gather(level, caster, seed, TRUNK_BURST_RADIUS);
-        if (targets.isEmpty()) {
-            return;
-        }
-        DamageSource source = WorldTreeDamage.source(level, this, caster);
-        for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, TRUNK_DAMAGE_FRACTION);
-            // Held in place rather than knocked away: the tree is a wall now, and
-            // pinning is what makes the crown's pulse land.
-            target.addEffect(new MobEffectInstance(
-                    MobEffects.MOVEMENT_SLOWDOWN, ROOTED_TICKS, 3, false, true));
-        }
-    }
-
-    /** The crown's pulse, once it has fully opened. */
-    private void resolveCrown(ServerLevel level) {
-        LivingEntity caster = resolveCaster(level);
-        Vec3 seed = seedPoint(1.0F);
-        List<LivingEntity> targets = gather(level, caster, seed, CROWN_RADIUS);
-        if (targets.isEmpty()) {
-            return;
-        }
-        DamageSource source = WorldTreeDamage.source(level, this, caster);
-        for (LivingEntity target : targets) {
-            SpellDamage.apply(this, target, source, CROWN_DAMAGE_FRACTION);
-        }
-    }
-
-    /**
-     * Horizontal-only distance. Roots run along the ground, so a target's height
-     * above them should not exempt it while it is standing on one.
-     */
-    private static boolean horizontalWithin(LivingEntity target, Vec3 point, double radius) {
-        Vec3 centre = target.getBoundingBox().getCenter();
-        double dx = centre.x - point.x;
-        double dz = centre.z - point.z;
-        return dx * dx + dz * dz <= radius * radius;
-    }
-
-    private List<LivingEntity> gather(ServerLevel level, LivingEntity caster,
-                                      Vec3 centre, double radius) {
-        return level.getEntitiesOfClass(
+        Vec3 centre = seedPoint(1.0F);
+        double radius = SpellConfig.worldTreeEffectRadius;
+        List<LivingEntity> allies = level.getEntitiesOfClass(
                 LivingEntity.class,
                 new AABB(centre.x - radius, centre.y - radius, centre.z - radius,
                         centre.x + radius, centre.y + radius, centre.z + radius),
-                target -> canAffect(caster, target)
-                        && target.getBoundingBox().getCenter().distanceToSqr(centre)
-                                <= radius * radius);
+                target -> isAlly(caster, target) && target.getBoundingBox().getCenter()
+                        .distanceToSqr(centre) <= radius * radius);
+        float healFraction = (float) Math.max(0.0D, SpellConfig.worldTreeHealingFraction);
+        float absorption = (float) Math.max(0.0D, SpellConfig.worldTreeAbsorptionHearts * 2.0D);
+        for (LivingEntity target : allies) {
+            if (healFraction > 0.0F) {
+                target.heal(target.getMaxHealth() * healFraction);
+            }
+            if (absorption > 0.0F) {
+                target.setAbsorptionAmount(Math.max(target.getAbsorptionAmount(), absorption));
+            }
+        }
     }
 
     private LivingEntity resolveCaster(ServerLevel level) {
@@ -426,16 +337,39 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         return null;
     }
 
-    private boolean canAffect(LivingEntity caster, LivingEntity target) {
-        if ((this.casterUuid != null && target.getUUID().equals(this.casterUuid))
-                || target == caster || !target.isAlive() || target.isRemoved()) {
+    private boolean isAlly(LivingEntity caster, LivingEntity target) {
+        if (!target.isAlive() || target.isRemoved()) {
             return false;
         }
         if (target instanceof Player player && player.isSpectator()) {
             return false;
         }
-        return caster == null
-                || (!caster.isAlliedTo(target) && !target.isAlliedTo(caster));
+        if (caster != null && target instanceof TamableAnimal tamable && tamable.isOwnedBy(caster)) {
+            return true;
+        }
+        return caster != null && (target == caster
+                || caster.isAlliedTo(target) || target.isAlliedTo(caster));
+    }
+
+    /** True when this active tree protects the entity from the selected damage kind. */
+    public boolean protects(LivingEntity target, net.minecraft.world.damagesource.DamageSource source) {
+        LivingEntity caster = level() instanceof ServerLevel server ? resolveCaster(server) : null;
+        if (!isAlly(caster, target)) {
+            return false;
+        }
+        Vec3 centre = seedPoint(1.0F);
+        double radius = SpellConfig.worldTreeEffectRadius;
+        if (target.getBoundingBox().getCenter().distanceToSqr(centre) > radius * radius) {
+            return false;
+        }
+        // Minecraft has no generic MAGIC tag in 1.20.1. WITCH_RESISTANT_TO is
+        // the vanilla tag used for potion and magic-like damage, so it is the
+        // closest stable category for a configurable sanctuary ward.
+        return (SpellConfig.worldTreeProtectMagic
+                && (source instanceof SpellDamageSource
+                || source.is(DamageTypeTags.WITCH_RESISTANT_TO)))
+                || (SpellConfig.worldTreeProtectProjectile && source.is(DamageTypeTags.IS_PROJECTILE))
+                || (SpellConfig.worldTreeProtectFire && source.is(DamageTypeTags.IS_FIRE));
     }
 
     @Override
@@ -448,8 +382,6 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
         this.casterUuid = tag.hasUUID("Caster") ? tag.getUUID("Caster") : null;
-        this.trunkResolved = tag.getBoolean("TrunkResolved");
-        this.crownResolved = tag.getBoolean("CrownResolved");
         this.entityData.set(DATA_CASTER_ID, tag.getInt("CasterId"));
         this.entityData.set(DATA_SEED, tag.getInt("Seed"));
         long startGameTick = tag.contains("StartGameTick")
@@ -463,8 +395,6 @@ public final class WorldTreeEntity extends Entity implements WorldTreeSource {
         if (this.casterUuid != null) {
             tag.putUUID("Caster", this.casterUuid);
         }
-        tag.putBoolean("TrunkResolved", this.trunkResolved);
-        tag.putBoolean("CrownResolved", this.crownResolved);
         tag.putInt("CasterId", this.getCasterId());
         tag.putInt("Seed", this.getSeed());
         tag.putLong("StartGameTick", this.entityData.get(DATA_START_GAME_TICK));

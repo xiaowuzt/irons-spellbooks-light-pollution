@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.SingularityEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -58,6 +60,16 @@ public final class SingularitySpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("singularity");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("singularity");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -74,7 +86,7 @@ public final class SingularitySpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("singularity") * 20;
     }
 
     @Override
@@ -98,7 +110,7 @@ public final class SingularitySpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + SingularityEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("singularity") + SingularityEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 SingularityEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -118,8 +130,8 @@ public final class SingularitySpell extends AbstractSpell {
 
     private static Vec3 rayTraceCenter(ServerLevel level, LivingEntity caster) {
         Vec3 start = caster.getEyePosition();
-        Vec3 end = start.add(caster.getViewVector(1.0F).scale(MAX_RANGE));
-        HitResult hit = Utils.raycastForEntity(level, caster, MAX_RANGE, true);
+        Vec3 end = start.add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("singularity")));
+        HitResult hit = Utils.raycastForEntity(level, caster, SpellConfig.castRange("singularity"), true);
         if (hit instanceof EntityHitResult entityHit) {
             // Centred on the target rather than at its feet: the core is a body
             // hanging in the air, and the pull comes from it.

@@ -68,6 +68,15 @@ public final class AnimCodes {
             case "sp", "e" -> TextAnim.SPECTRUM;
             case "ne" -> TextAnim.NEON;
             case "ty" -> TextAnim.TYPEWRITER;
+            case "ol" -> TextAnim.OUTLINE;
+            case "gw" -> TextAnim.GLOW;
+            case "fr" -> TextAnim.FRINGE;
+            case "ex" -> TextAnim.EXTRUDE;
+            case "ha" -> TextAnim.HATCH;
+            case "st" -> TextAnim.STATIC;
+            case "li" -> TextAnim.LIQUID;
+            case "wt" -> TextAnim.WATER;
+            case "sl" -> TextAnim.SPLIT;
             default -> null;
         };
     }

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.ConstellationEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -59,6 +61,16 @@ public final class ConstellationSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("constellation");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("constellation");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -75,7 +87,7 @@ public final class ConstellationSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("constellation") * 20;
     }
 
     @Override
@@ -99,7 +111,7 @@ public final class ConstellationSpell extends AbstractSpell {
             return;
         }
 
-        double duplicateSearchRadius = MAX_RANGE + ConstellationEntity.EFFECT_RADIUS + 2.0D;
+        double duplicateSearchRadius = SpellConfig.castRange("constellation") + ConstellationEntity.EFFECT_RADIUS + 2.0D;
         boolean duplicateCast = !serverLevel.getEntitiesOfClass(
                 ConstellationEntity.class,
                 caster.getBoundingBox().inflate(duplicateSearchRadius),
@@ -110,7 +122,7 @@ public final class ConstellationSpell extends AbstractSpell {
             return;
         }
 
-        HitResult hit = Utils.raycastForEntity(serverLevel, caster, MAX_RANGE, true);
+        HitResult hit = Utils.raycastForEntity(serverLevel, caster, SpellConfig.castRange("constellation"), true);
         LivingEntity target = hit instanceof EntityHitResult entityHit
                 && entityHit.getEntity() instanceof LivingEntity living ? living : null;
         ConstellationEntity effect =
@@ -133,7 +145,7 @@ public final class ConstellationSpell extends AbstractSpell {
         // point. Leaving it at eye height left the star's plunge ending in open
         // air, which read as the spell flashing out halfway down.
         Vec3 end = caster.getEyePosition()
-                .add(caster.getViewVector(1.0F).scale(MAX_RANGE));
+                .add(caster.getViewVector(1.0F).scale(SpellConfig.castRange("constellation")));
         int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING,
                 Mth.floor(end.x), Mth.floor(end.z));
         return new Vec3(end.x, surface, end.z);

@@ -35,6 +35,7 @@ public final class ExampleMod {
         // The mod's first network channel. Everything else here is drawn from synced entity
         // data, but damage is resolved in a server-only tick, so the floating text needs telling.
         com.gang.lightpollution.net.ModNetwork.register();
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, SpellConfig.SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SpellLightConfig.SPEC);
         // The ported text effects, under an explicit file name. Two CLIENT specs would
         // otherwise both want <modid>-client.toml and collide. Its own accessors fall back

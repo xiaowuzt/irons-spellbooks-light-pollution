@@ -1,5 +1,7 @@
 package com.gang.lightpollution.entity;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.spell.ModSpells;
 import io.redspace.ironsspellbooks.damage.DamageSources;
 import io.redspace.ironsspellbooks.damage.SpellDamageSource;
@@ -87,12 +89,12 @@ public final class EclipseSeveranceEntity extends Entity {
 
         if (this.level() instanceof ServerLevel serverLevel
                 && !this.damageResolved
-                && this.tickCount >= DAMAGE_TICK) {
+                && this.tickCount >= SpellConfig.eclipseDamageTick) {
             this.damageResolved = true;
             resolveDamage(serverLevel);
         }
 
-        if (this.tickCount >= LIFETIME_TICKS) {
+        if (this.tickCount >= SpellConfig.eclipseLifetimeTicks) {
             this.discard();
         }
     }
@@ -113,7 +115,7 @@ public final class EclipseSeveranceEntity extends Entity {
         SpellDamageSource source = ModSpells.ECLIPSE_SEVERANCE.get().getDamageSource(this, caster);
         int successfulHits = 0;
         for (LivingEntity target : candidates) {
-            if (successfulHits >= MAX_TARGETS) {
+            if (successfulHits >= SpellConfig.eclipseMaxTargets) {
                 break;
             }
             if (!isInsideAttackVolume(target, forward) || !hasLineOfSight(level, caster, target)) {
@@ -162,14 +164,14 @@ public final class EclipseSeveranceEntity extends Entity {
     private boolean isInsideAttackVolume(LivingEntity target, Vec3 forward) {
         Vec3 targetCenter = target.getBoundingBox().getCenter();
         double verticalOffset = Math.abs(targetCenter.y - (this.getY() + 1.0D));
-        if (verticalOffset > VERTICAL_TOLERANCE) {
+        if (verticalOffset > SpellConfig.eclipseVerticalTolerance) {
             return false;
         }
 
         double offsetX = targetCenter.x - this.getX();
         double offsetZ = targetCenter.z - this.getZ();
         double horizontalDistanceSqr = offsetX * offsetX + offsetZ * offsetZ;
-        if (horizontalDistanceSqr > ATTACK_RADIUS * ATTACK_RADIUS) {
+        if (horizontalDistanceSqr > SpellConfig.eclipseAttackRadius * SpellConfig.eclipseAttackRadius) {
             return false;
         }
         if (horizontalDistanceSqr <= 1.0E-6D) {
@@ -178,7 +180,7 @@ public final class EclipseSeveranceEntity extends Entity {
 
         double inverseDistance = 1.0D / Math.sqrt(horizontalDistanceSqr);
         double facingDot = (offsetX * forward.x + offsetZ * forward.z) * inverseDistance;
-        return facingDot >= HALF_ANGLE_COS;
+        return facingDot >= Math.cos(Math.toRadians(SpellConfig.eclipseAttackAngleDegrees * 0.5D));
     }
 
     private boolean hasLineOfSight(ServerLevel level, LivingEntity caster, LivingEntity target) {
@@ -211,12 +213,12 @@ public final class EclipseSeveranceEntity extends Entity {
 
     private AABB attackBounds() {
         return new AABB(
-                this.getX() - ATTACK_RADIUS,
-                this.getY() - VERTICAL_TOLERANCE,
-                this.getZ() - ATTACK_RADIUS,
-                this.getX() + ATTACK_RADIUS,
-                this.getY() + VERTICAL_TOLERANCE,
-                this.getZ() + ATTACK_RADIUS);
+                this.getX() - SpellConfig.eclipseAttackRadius,
+                this.getY() - SpellConfig.eclipseVerticalTolerance,
+                this.getZ() - SpellConfig.eclipseAttackRadius,
+                this.getX() + SpellConfig.eclipseAttackRadius,
+                this.getY() + SpellConfig.eclipseVerticalTolerance,
+                this.getZ() + SpellConfig.eclipseAttackRadius);
     }
 
     @Override

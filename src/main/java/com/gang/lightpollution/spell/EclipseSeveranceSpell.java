@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.EclipseSeveranceEntity;
 import com.gang.lightpollution.registry.ModEntities;
@@ -43,6 +45,16 @@ public final class EclipseSeveranceSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("eclipseSeverance");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("eclipseSeverance");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -59,7 +71,7 @@ public final class EclipseSeveranceSpell extends AbstractSpell {
 
     @Override
     public int getSpellCooldown() {
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("eclipseSeverance") * 20;
     }
 
     @Override
@@ -85,7 +97,7 @@ public final class EclipseSeveranceSpell extends AbstractSpell {
 
         float facingYaw = caster.getYRot();
         int seed = caster.getRandom().nextInt();
-        float damage = getSpellPower(spellLevel, caster);
+        float damage = (float) SpellConfig.eclipseDamage;
         EclipseSeveranceEntity effect = new EclipseSeveranceEntity(
                 ModEntities.ECLIPSE_SEVERANCE.get(), serverLevel);
         effect.configure(caster, facingYaw, seed, damage);

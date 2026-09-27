@@ -1,6 +1,7 @@
 package com.gang.lightpollution.event;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.entity.StargraveSingularityEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -27,7 +28,7 @@ public final class StargraveSingularityProjectileEvents {
         Vec3 start = projectile.getBoundingBox().getCenter();
         Vec3 end = event.getRayTraceResult().getLocation();
         AABB searchBounds = new AABB(start, end)
-                .inflate(StargraveSingularityEntity.EFFECT_RADIUS);
+                .inflate(SpellConfig.stargraveEffectRadius);
 
         for (StargraveSingularityEntity singularity : level.getEntitiesOfClass(
                 StargraveSingularityEntity.class,

@@ -1,5 +1,7 @@
 package com.gang.lightpollution.spell;
 
+import com.gang.lightpollution.SpellConfig;
+
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.CelestialJudgmentEntity;
 import io.redspace.ironsspellbooks.api.config.DefaultConfig;
@@ -46,6 +48,16 @@ public class CelestialJudgmentSpell extends AbstractSpell {
     }
 
     @Override
+    public int getManaCost(int spellLevel) {
+        return SpellConfig.manaCost("celestialJudgment");
+    }
+
+    @Override
+    public int getCastTime(int spellLevel) {
+        return SpellConfig.castTimeTicks("celestialJudgment");
+    }
+
+    @Override
     public CastType getCastType() {
         return CastType.LONG;
     }
@@ -63,7 +75,7 @@ public class CelestialJudgmentSpell extends AbstractSpell {
     @Override
     public int getSpellCooldown() {
         // This spell deliberately ignores irons_spellbooks:cooldown_reduction.
-        return FIXED_COOLDOWN_TICKS;
+        return SpellConfig.cooldownSeconds("celestialJudgment") * 20;
     }
 
     @Override
@@ -72,7 +84,7 @@ public class CelestialJudgmentSpell extends AbstractSpell {
             int spellLevel,
             LivingEntity caster,
             MagicData magicData) {
-        return Utils.preCastTargetHelper(level, caster, magicData, this, 48, 0.5F, false);
+        return Utils.preCastTargetHelper(level, caster, magicData, this, SpellConfig.celestialTargetRange, 0.5F, false);
     }
 
     @Override
