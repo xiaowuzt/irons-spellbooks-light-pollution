@@ -3,8 +3,8 @@ package com.gang.lightpollution.text.world;
 /**
  * How one floating text behaves: how big, how long, and how it enters and leaves.
  *
- * <p>Ported from ArcaneVortex's {@code WorldTextConfig}, which is the same author's work and is
- * credited in {@code CREDITS.txt}. Builder-style so a call site reads as one expression.</p>
+ * <p>Ported from ArcaneVortex's {@code WorldTextConfig} with the original author's permission;
+ * see {@code CREDITS.txt}. Builder-style so a call site reads as one expression.</p>
  *
  * <p>Durations are in ticks. Zero is allowed for any of the three phases — {@code setNoStay} exists
  * for exactly that.</p>

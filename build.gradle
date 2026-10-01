@@ -270,12 +270,14 @@ tasks.named('jar', Jar).configure {
         ])
     }
 
-    // The attribution files travel with the jar, not just the repository. Apache 2.0 and MIT both
-    // require the notice to accompany the distribution, and someone who has the jar has the
-    // distribution.
+    // Keep the project license and every third-party notice with the distributed jar. The
+    // resource copy of the Some of FX license is already included by processResources; the
+    // explicit root files below make the notices easy to find at the jar root as well.
+    from(rootProject.file('LICENSE'))
+    from(rootProject.file('THIRD_PARTY_NOTICES.md'))
     from(rootProject.file('CREDITS.txt'))
+    from(rootProject.file('LICENSE.txt'))
     from(rootProject.file('TEXTANIMATOR_LICENSE.txt'))
-    from(rootProject.file('SOME_OF_FX_LICENSE.txt'))
 
     // This is the preferred method to reobfuscate your jar file
     finalizedBy 'reobfJar'
