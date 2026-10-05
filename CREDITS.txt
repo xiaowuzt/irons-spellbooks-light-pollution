@@ -128,3 +128,41 @@ with credit to it's authors.
 Forge Mod Loader downloads components from the Minecraft Coder Pack
 (http://mcp.ocean-labs.de/index.php/Main_Page) with kind permission from the MCP team.
 
+Gargantua With HDR Bloom (Shadertoy lstSRS), by sonicether, 2016-04-07
+  https://www.shadertoy.com/view/lstSRS
+  Event Horizon / 无光视界 adapts the source supplied by the project owner:
+  bent rays, GasDisc/Haze/noise, HDR bloom and the Image colour curve. The source
+  credits iq (Inigo Quilez) for its noise helper; that credit is preserved.
+  Minecraft camera/depth handling, lifecycle and bounded rendering are local
+  adaptations. The spell icon is derived from the adapted renderer's output;
+  original channel textures and website screenshots are not bundled.
+  Permission/licence for this shader is NOT VERIFIED. Confirm upstream terms or
+  obtain permission before public redistribution. See THIRD_PARTY_NOTICES.md.
+
+- GR BH with volume accretion disk / Redshift Abyss (赤移天渊)
+  Adapted from the owner-supplied Shadertoy source by baopinsui:
+  https://www.shadertoy.com/view/4XcfR2 (page date: 2025-01-20).
+  Page identifies an upstream fork of Black Hole test. Supplied bloom/Image
+  passes credit sonicether's Gargantua With HDR Bloom (lstSRS).
+  Periodic correlated noise is based on the iq helper used by Event Horizon.
+  Minecraft adaptation: normalized world/depth rays, bounded volume transport,
+  independent configuration and a render-derived spell icon.
+  Permission UNVERIFIED; see THIRD_PARTY_NOTICES.md before public distribution.
+
+
+- Black-hole family / 施瓦西镜界、辉环崩解、静滞奇点（光子回廊已删除）
+  R2: Eric Bruneton, black_hole_shader, BSD-3-Clause.
+  https://github.com/ebruneton/black_hole_shader
+  R7 principles: Real-time High-Quality Rendering of Non-Rotating Black Holes,
+  Eric Bruneton, arXiv:2010.08735 (2020).
+  R4: Xor, Blackhole / Xor's Shader Arsenal.
+  https://fragcoord.xyz/s/bdf4dchf
+  R5: owner-supplied A section from WltSDM on Shadertoy;
+  author identity and permission UNVERIFIED, not inferred from other authors.
+  R6 (wltSD7 / Photon Corridor) was removed from the build on 2026-10-04.
+  Its code is not packaged; Photon Corridor is retained only as a historical removal note.
+  R2/R4/R5 rendering cores stay separate; shared Minecraft integration and
+  three procedural scroll icons are local work. R1 attribution remains above.
+  R3 could not be retrieved (DEV article and API 404); no replacement invented.
+  See THIRD_PARTY_NOTICES.md for the source and licence audit status.
+  Only R2 has a verified source licence; local testing is not public release.

@@ -76,6 +76,15 @@ public final class ModItems {
     public static final RegistryObject<Item> CRAB_NEBULA_SCROLL = registerSpellScroll(
             "crab_nebula_scroll", ModSpells.CRAB_NEBULA);
 
+    public static final RegistryObject<Item> EVENT_HORIZON_SCROLL = registerSpellScroll(
+            "event_horizon_scroll", ModSpells.EVENT_HORIZON);
+    public static final RegistryObject<Item> REDSHIFT_ABYSS_SCROLL = registerSpellScroll(
+            "redshift_abyss_scroll", ModSpells.REDSHIFT_ABYSS);
+
+    public static final RegistryObject<Item> SCHWARZSCHILD_LENS_SCROLL = registerSpellScroll("schwarzschild_lens_scroll", ModSpells.SCHWARZSCHILD_LENS);
+    public static final RegistryObject<Item> RADIANT_COLLAPSE_SCROLL = registerSpellScroll("radiant_collapse_scroll", ModSpells.RADIANT_COLLAPSE);
+    public static final RegistryObject<Item> STASIS_SINGULARITY_SCROLL = registerSpellScroll("stasis_singularity_scroll", ModSpells.STASIS_SINGULARITY);
+
     private static RegistryObject<Item> registerSpellScroll(
             String id,
             RegistryObject<? extends io.redspace.ironsspellbooks.api.spells.AbstractSpell> spell) {

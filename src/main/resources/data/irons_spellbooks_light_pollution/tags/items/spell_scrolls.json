@@ -24,6 +24,11 @@
     "irons_spellbooks_light_pollution:starless_scroll",
     "irons_spellbooks_light_pollution:stellar_convergence_scroll",
     "irons_spellbooks_light_pollution:tidal_disruption_scroll",
-    "irons_spellbooks_light_pollution:world_tree_scroll"
+    "irons_spellbooks_light_pollution:world_tree_scroll",
+    "irons_spellbooks_light_pollution:event_horizon_scroll",
+    "irons_spellbooks_light_pollution:redshift_abyss_scroll",
+    "irons_spellbooks_light_pollution:schwarzschild_lens_scroll",
+    "irons_spellbooks_light_pollution:radiant_collapse_scroll",
+    "irons_spellbooks_light_pollution:stasis_singularity_scroll"
   ]
 }

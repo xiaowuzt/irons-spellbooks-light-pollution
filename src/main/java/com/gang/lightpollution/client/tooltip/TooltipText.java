@@ -35,6 +35,11 @@ public final class TooltipText {
         lines = List.copyOf(gathered);
     }
 
+    public static void clearCache() {
+        owner = ItemStack.EMPTY;
+        lines = List.of();
+    }
+
     /**
      * The lines belonging to this stack, or empty if the cache is for something else.
      *

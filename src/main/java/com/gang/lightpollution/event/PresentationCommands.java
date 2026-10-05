@@ -31,6 +31,10 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -46,7 +50,8 @@ import java.util.Locale;
  * <p>No permission requirement either, for the same reason — nothing here affects anyone else, and
  * needing operator rights to change your own tooltip border would be absurd.</p>
  */
-@Mod.EventBusSubscriber(modid = ExampleMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = ExampleMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE,
+        value = Dist.CLIENT)
 public final class PresentationCommands {
     private PresentationCommands() {
     }
@@ -182,6 +187,32 @@ public final class PresentationCommands {
 
     /** The handles handed out by the test command, so it can take them away again. */
     private static final java.util.List<FxHandle> TEST_HANDLES = new java.util.ArrayList<>();
+
+    @SubscribeEvent
+    public static void removeExpiredHandles(TickEvent.ClientTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && !TEST_HANDLES.isEmpty()) {
+            TEST_HANDLES.removeIf(handle -> !handle.isAlive());
+        }
+    }
+
+    @SubscribeEvent
+    public static void clearOnLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        releaseTestHandles();
+    }
+
+    @SubscribeEvent
+    public static void clearOnLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel().isClientSide()) {
+            releaseTestHandles();
+        }
+    }
+
+    private static void releaseTestHandles() {
+        for (FxHandle handle : TEST_HANDLES) {
+            handle.remove();
+        }
+        TEST_HANDLES.clear();
+    }
 
     /** Bumped per spawn so two nebulae in a row do not get identical knots. */
     private static int testSeed;

@@ -165,10 +165,12 @@ public class StargraveSingularityEntity extends Entity {
     }
 
     private void pullNearbyProjectiles(ServerLevel level) {
-        List<Entity> projectiles = List.copyOf(level.getEntities(
+        // Level already returns a detached query result; discarding an entity does not
+        // mutate this list. Keep its original iteration order without a second copy.
+        List<Entity> projectiles = level.getEntities(
                 this,
                 effectBounds().inflate(PROJECTILE_QUERY_PADDING),
-                this::canAbsorbProjectile));
+                this::canAbsorbProjectile);
 
         for (Entity projectile : projectiles) {
             Vec3 projectileCenter = projectile.getBoundingBox().getCenter();
@@ -277,10 +279,12 @@ public class StargraveSingularityEntity extends Entity {
 
     private void absorbProjectile(ServerLevel level, Entity projectile, Vec3 projectileCenter) {
         projectile.discard();
-        level.sendParticles(
-                ParticleTypes.REVERSE_PORTAL,
-                projectileCenter.x, projectileCenter.y, projectileCenter.z,
-                7, 0.18D, 0.18D, 0.18D, 0.04D);
+        if (com.gang.lightpollution.performance.ServerPerformanceBudget.allowAbsorptionParticles()) {
+            level.sendParticles(
+                    ParticleTypes.REVERSE_PORTAL,
+                    projectileCenter.x, projectileCenter.y, projectileCenter.z,
+                    7, 0.18D, 0.18D, 0.18D, 0.04D);
+        }
         if (this.lastProjectileAbsorbSoundTick != this.tickCount) {
             this.lastProjectileAbsorbSoundTick = this.tickCount;
             level.playSound(
@@ -295,8 +299,8 @@ public class StargraveSingularityEntity extends Entity {
 
     private void collapse(ServerLevel level) {
         Map<UUID, CollapseTarget> targets = new LinkedHashMap<>();
-        for (LivingEntity target : List.copyOf(SpellConfig.limitTargets("stargraveSingularity", level.getEntitiesOfClass(
-                LivingEntity.class, effectBounds(), this::canAffect)))) {
+        for (LivingEntity target : SpellConfig.limitTargets("stargraveSingularity", level.getEntitiesOfClass(
+                LivingEntity.class, effectBounds(), this::canAffect))) {
             targets.putIfAbsent(target.getUUID(), CollapseTarget.capture(target));
         }
 
@@ -314,9 +318,12 @@ public class StargraveSingularityEntity extends Entity {
             applied++;
         }
 
-        ExampleMod.LOGGER.debug(
-                "Stargrave Singularity collapse resolved {} candidates: {} applied, {} skipped",
-                targets.size(), applied, skipped);
+        if (ExampleMod.LOGGER.isDebugEnabled()
+                && com.gang.lightpollution.performance.ServerPerformanceBudget.allowDiagnostic()) {
+            ExampleMod.LOGGER.debug(
+                    "Stargrave Singularity collapse resolved {} candidates: {} applied, {} skipped",
+                    targets.size(), applied, skipped);
+        }
 
         level.sendParticles(
                 ParticleTypes.EXPLOSION_EMITTER,

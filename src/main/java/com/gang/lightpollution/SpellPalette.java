@@ -38,6 +38,11 @@ public final class SpellPalette {
         PALETTES.put("leviathan", "v");
         PALETTES.put("world_tree", "v");
         PALETTES.put("gargantua", "q");
+        PALETTES.put("event_horizon", "t");
+        PALETTES.put("redshift_abyss", "t");
+        PALETTES.put("schwarzschild_lens", "t");
+        PALETTES.put("radiant_collapse", "t");
+        PALETTES.put("stasis_singularity", "t");
         PALETTES.put("cosmic_horseshoe", "y");
         PALETTES.put("microquasar", "m");
         PALETTES.put("helix_nebula", "y");

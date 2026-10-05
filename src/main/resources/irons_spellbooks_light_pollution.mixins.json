@@ -13,7 +13,9 @@
     "FontStringRenderOutputMixin",
     "FontTextureMixin",
     "ItemStackMixin",
-    "MutableComponentMixin"
+    "MutableComponentMixin",
+    "MinecraftPerformanceMixin",
+    "ClientLevelLightingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,6 +1,7 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.SpellConfig;
+import com.gang.lightpollution.performance.PulseShapeSamples;
 
 import com.gang.lightpollution.api.PinwheelParams;
 import com.gang.lightpollution.fx.PinwheelShape;
@@ -84,9 +85,6 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in PinwheelShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = PinwheelParams.SPELL_LIFETIME_TICKS;
@@ -314,25 +312,14 @@ public final class PinwheelEntity extends Entity implements PinwheelSource {
             return;
         }
 
-        int samples = 46;
+        var samples = PulseShapeSamples.pinwheel(centre, rotation, ARM_TOUCH_RADIUS);
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
             }
+            PinwheelParams params = shapeParams();
             Vec3 at = target.getBoundingBox().getCenter();
-            boolean caught = false;
-            for (int arm = 0; arm < PinwheelShape.ARMS && !caught; ++arm) {
-                for (int i = 1; i <= samples; ++i) {
-                    double fraction = i / (double) samples;
-                    double reach = ARM_TOUCH_RADIUS + armWidth(fraction);
-                    if (armPoint(centre, arm, fraction, rotation).distanceToSqr(at)
-                            <= reach * reach) {
-                        caught = true;
-                        break;
-                    }
-                }
-            }
-            if (caught) {
+            if (samples.firstHit(params, at) >= 0) {
                 SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }

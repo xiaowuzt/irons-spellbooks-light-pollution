@@ -14,6 +14,7 @@ import net.minecraft.Util;
 import net.minecraft.util.Mth;
 import com.gang.lightpollution.mixin.FontInvoker;
 import com.gang.lightpollution.client.gpu.EffectGlyphEmitter;
+import com.gang.lightpollution.client.gpu.TextRenderTiming;
 import com.gang.lightpollution.text.EffectStyle;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
@@ -55,6 +56,18 @@ public final class DynamicTextRenderer {
             int backgroundColor,
             int packedLight
     ) {
+        long timing = TextRenderTiming.begin();
+        try {
+            return drawMeasured(font, text, x, y, color, shadow, pose, buffers, mode,
+                    backgroundColor, packedLight);
+        } finally {
+            TextRenderTiming.end(timing);
+        }
+    }
+
+    private static int drawMeasured(Font font, FormattedCharSequence text, float x, float y,
+                                    int color, boolean shadow, Matrix4f pose, MultiBufferSource buffers,
+                                    Font.DisplayMode mode, int backgroundColor, int packedLight) {
         int normalizedColor = normalizeColor(color);
         float[] redSpeedBounds = effectBounds(font, text, x, EffectStyle.RED_SPEED_NEON);
         float[] synthwaveBounds = effectBounds(font, text, x, EffectStyle.SYNTHWAVE_NEON);
@@ -146,8 +159,10 @@ public final class DynamicTextRenderer {
                     // Saturated, not the glyph's own colour: white text glowing white shows nothing.
                     int glowColour = multiplyAlpha(replaceRgb(primaryColor, saturate(primaryColor)),
                             glyph.glowAlpha);
-                    for (int pass = 0; pass < glyph.glowPasses; pass++) {
-                        double around = Math.PI * 2.0 * pass / glyph.glowPasses;
+                    int glowPasses = Math.max(1, Math.round(glyph.glowPasses
+                            * com.gang.lightpollution.client.perf.AdaptiveVisualQuality.decorationScale()));
+                    for (int pass = 0; pass < glowPasses; pass++) {
+                        double around = Math.PI * 2.0 * pass / glowPasses;
                         drawGlyph(font, codePoint, primaryStyle,
                                 drawX + (float) Math.cos(around) * glyph.glowRadius,
                                 drawY + (float) Math.sin(around) * glyph.glowRadius,

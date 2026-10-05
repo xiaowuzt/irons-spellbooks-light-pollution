@@ -24,7 +24,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.List;
 
 /**
- * Draws a tidal disruption's debris stream as one long wrapping tube.
+ * Draws the damage-reference debris spine beneath a layered stellar disruption.
  *
  * <p>The curve comes from the entity, so what is drawn and what lashes are the same function.
  * Real tube geometry rather than a camera-facing ribbon: see {@link CurveTube} for why that
@@ -87,8 +87,6 @@ public final class TidalDisruptionWorldRenderer {
 
     private static void drawStreams(List<TidalDisruptionSource> events, Vec3 camera,
                                     float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = begin();
-        int vertices = 0;
 
         for (TidalDisruptionSource entity : events) {
             float brightness = entity.brightness(partialTick);
@@ -99,13 +97,10 @@ public final class TidalDisruptionWorldRenderer {
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
+            BufferBuilder builder = begin();
+            int vertices = 0;
             float age = entity.getVisualAgeTicks(partialTick);
-            // The accretion flare at the hole. Faint while the star is only being stretched,
-            // then overwhelming when the bound debris comes back — driven by the same
-            // t^(-5/3) curve the entity computes.
-            float flare = entity.flare(partialTick);
-            EffectCore.add(centre, 2.0D + flare * 3.4D,
-                    1.00F, 0.86F, 0.70F, brightness * (0.7F + flare * 3.2F));
+            TidalDisruptionVisuals.draw(entity, camera, partialTick);
 
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
             // Straight to the shared shape maths rather than through a method on the source. The
@@ -117,8 +112,10 @@ public final class TidalDisruptionWorldRenderer {
                     fraction -> TidalDisruptionShape.streamWidth(params, fraction),
                     CurveTube.MODE_DEBRIS, 0.0F,
                     Math.min(1.0F, brightness * 0.16F), alpha);
+            CinematicVisuals.strand(shader, entity.getVisualAgeTicks(partialTick),
+                    CinematicVisuals.seed(entity, centre), centre.subtract(camera));
+            draw(builder, shader, vertices);
         }
-        draw(builder, shader, vertices);
     }
 
     /**

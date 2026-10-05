@@ -26,8 +26,7 @@ import com.google.common.collect.ImmutableMap;
  *       those samples read whichever glyph sits beside it in the atlas.</li>
  * </ul>
  *
- * <p>Sixteen extra floats per vertex. A page of animated lore is a few thousand vertices, so the cost
- * is nothing next to a single block model.</p>
+ * <p>Thirteen extra floats per vertex: 52 bytes beyond vanilla's 28-byte text vertex.</p>
  */
 public final class EffectVertexFormat {
     // Every element below takes index 0. The index is not the attribute slot — that comes from an

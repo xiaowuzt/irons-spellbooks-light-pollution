@@ -200,6 +200,12 @@ void main() {
     vec3 axisU = normalize(gap);
     vec3 axisV = cross(lensDir, axisU);
     vec2 theta = vec2(dot(offset, axisU), dot(offset, axisV)) / thetaE;
+    // Beyond six Einstein radii lensing is already zero and the remaining
+    // exponential emission is below 1e-6. Match the CPU's conservative bounds.
+    if (length(theta) > 6.0) {
+        fragColor = vec4(sceneColour, 1.0);
+        return;
+    }
 
     // Invert the lens map. An isothermal deflection has the same magnitude at every
     // radius -- that is the same flat-rotation-curve property that makes these profiles

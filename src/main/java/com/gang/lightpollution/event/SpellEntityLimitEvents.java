@@ -47,8 +47,10 @@ public final class SpellEntityLimitEvents {
             }
             EntityType<?> type = entity.getType();
             long sameType = active.stream().filter(value -> value.getType() == type).count();
+            var key = ForgeRegistries.ENTITY_TYPES.getKey(type);
+            int typeLimit = SpellConfig.entityLimitForRegistryPath(key == null ? null : key.getPath());
             if (active.size() >= SpellConfig.activeEntityLimit()
-                    || sameType >= SpellConfig.serverMaxEntitiesPerSpell) {
+                    || sameType >= typeLimit) {
                 event.setCanceled(true);
                 entity.discard();
                 return;

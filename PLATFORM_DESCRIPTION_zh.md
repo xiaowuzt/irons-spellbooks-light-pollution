@@ -7,9 +7,11 @@
 
 ## 法术列表
 
-当前版本包含以下 24 个法术（括号内为注册 ID）：
+当前源码包含以下 29 个法术（括号内为注册 ID）：
 
-苍穹裁决 (`celestial_judgment`)、葬星奇点 (`stargrave_singularity`)、星蚀断界斩 (`eclipse_severance`)、终焉葬星 (`funeral_nova`)、虹蚀吸积 (`chromatic_accretion`)、熄星 (`starless`)、焚星 (`constellation`)、逆光 (`silhouette`)、星坠 (`starfall`)、天倾 (`sky_collapse`)、星链天顶 (`stellar_convergence`)、第二个太阳 (`second_sun`)、奇点 (`singularity`)、星界巨蛇 (`leviathan`)、世界树 (`world_tree`)、卡冈图雅 (`gargantua`)、宇宙马蹄铁 (`cosmic_horseshoe`)、微类星体 (`microquasar`)、螺旋星云 (`helix_nebula`)、磁星 (`magnetar`)、潮汐撕裂 (`tidal_disruption`)、类星体喷流 (`quasar_jet`)、沃夫-拉叶风车 (`pinwheel`)、蟹状星云 (`crab_nebula`）。
+苍穹裁决 (`celestial_judgment`)、葬星奇点 (`stargrave_singularity`)、星蚀断界斩 (`eclipse_severance`)、终焉葬星 (`funeral_nova`)、虹蚀吸积 (`chromatic_accretion`)、熄星 (`starless`)、焚星 (`constellation`)、逆光 (`silhouette`)、星坠 (`starfall`)、天倾 (`sky_collapse`)、星链天顶 (`stellar_convergence`)、第二个太阳 (`second_sun`)、奇点 (`singularity`)、星界巨蛇 (`leviathan`)、世界树 (`world_tree`)、卡冈图雅 (`gargantua`)、无光视界 (`event_horizon`)、赤移天渊 (`redshift_abyss`)、施瓦西镜界 (`schwarzschild_lens`)、辉环崩解 (`radiant_collapse`)、静滞奇点 (`stasis_singularity`)、宇宙马蹄铁 (`cosmic_horseshoe`)、微类星体 (`microquasar`)、螺旋星云 (`helix_nebula`)、磁星 (`magnetar`)、潮汐撕裂 (`tidal_disruption`)、类星体喷流 (`quasar_jet`)、沃夫-拉叶风车 (`pinwheel`)、蟹状星云 (`crab_nebula`）。
+
+无光视界是独立的新黑洞法术：倾斜的炽白吸积盘、弯曲光弧与 HDR 辉光围绕黑色核心，持续牵引敌人并在最后坍缩；不会替换卡冈图雅。包含此法术的版本公开分发前，仍需确认上游着色器授权，详见 `THIRD_PARTY_NOTICES.md`。
 
 世界树是守护型法术：守护范围内的施法者与友方生物会持续回血并获得吸收盾，魔法、投射物和火焰伤害可分别设置为免疫；树根和树冠只负责视觉表现，不会攻击敌人。
 
@@ -69,7 +71,7 @@
 ```gradle
 repositories { maven { url = "https://api.modrinth.com/maven" } }
 dependencies {
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.2")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.4")
 }
 ```
 
@@ -89,3 +91,5 @@ handle.remove();
   户端。
 - 光照管线独立于原版方块光照等级，不影响生物生成等依赖光照等级的机制。
 - 着色器在特定驱动上编译失败时记录日志并跳过，仅损失对应特效。
+
+赤移天渊是另一种独立的黑洞法术：体积气体吸积盘、蓝白与橙红两侧、旋转牵引和终末坍缩。外观提供大小、流速、亮度、温度与多普勒色差配置；创造栏按学派排序。上游着色器授权尚未确认，公开分发前需处理。

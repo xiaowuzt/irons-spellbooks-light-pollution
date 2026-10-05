@@ -19,6 +19,8 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Optional;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 解析十种动态控制码，并保留原 Component 的颜色、粗体、点击、悬浮和字体样式。
@@ -47,6 +49,18 @@ public final class DynamicTextParser {
     public static final char MARK_ANIM = '\uE0FD';
     public static final char MARK_ANIM_END = '\uE0FE';
 
+    private static final int MAX_PARSED_STRINGS = 128;
+    private static final int MAX_CACHED_STRING_LENGTH = 4096;
+    private static final int MAX_CACHED_STYLE_RUNS = 128;
+    private record ParseKey(String text, int effectCharacterLimit) {
+    }
+    private static final Map<ParseKey, Component> PARSED_STRINGS = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<ParseKey, Component> eldest) {
+            return size() > MAX_PARSED_STRINGS;
+        }
+    };
+
     private DynamicTextParser() {
     }
 
@@ -59,13 +73,44 @@ public final class DynamicTextParser {
             return Component.empty().setStyle(baseStyle == null ? Style.EMPTY : baseStyle);
         }
 
+        Style initialStyle = baseStyle == null ? Style.EMPTY : baseStyle;
+        // Cache only literal strings with the default base style. Arbitrary Component
+        // trees, hover payloads and mutable caller-owned styles are never cache keys.
+        ParseKey cacheKey = initialStyle == Style.EMPTY && text.length() <= MAX_CACHED_STRING_LENGTH
+                ? new ParseKey(text, DynamicTextClientConfig.maxTextLength()) : null;
+        if (cacheKey != null) {
+            synchronized (PARSED_STRINGS) {
+                Component cached = PARSED_STRINGS.get(cacheKey);
+                if (cached != null) {
+                    return copyLiteralTree(cached);
+                }
+            }
+        }
         MutableComponent result = Component.empty();
         ParseState state = new ParseState(result);
-        Style initialStyle = baseStyle == null ? Style.EMPTY : baseStyle;
         state.beginStyle(initialStyle);
         state.consume(text, EffectStyle.isEncoded(initialStyle));
         state.finish();
+        if (cacheKey != null && result.getSiblings().size() <= MAX_CACHED_STYLE_RUNS) {
+            synchronized (PARSED_STRINGS) {
+                PARSED_STRINGS.put(cacheKey, copyLiteralTree(result));
+            }
+        }
         return result;
+    }
+
+    private static MutableComponent copyLiteralTree(Component source) {
+        MutableComponent copy = MutableComponent.create(source.getContents()).setStyle(source.getStyle());
+        for (Component sibling : source.getSiblings()) {
+            copy.append(copyLiteralTree(sibling));
+        }
+        return copy;
+    }
+
+    public static void clearCache() {
+        synchronized (PARSED_STRINGS) {
+            PARSED_STRINGS.clear();
+        }
     }
 
     public static Component parse(Component source) {

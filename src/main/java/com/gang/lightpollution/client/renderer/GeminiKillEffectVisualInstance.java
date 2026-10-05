@@ -1,5 +1,7 @@
 package com.gang.lightpollution.client.renderer;
 
+import com.gang.lightpollution.client.perf.AdaptiveVisualQuality;
+
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Random;
@@ -37,6 +39,7 @@ public final class GeminiKillEffectVisualInstance {
     private static final float T_AFTERGLOW_END = 15.0F;
     private static final float TRANSITION_OVERLAP = 0.30F;
     private static final float SIMULATION_STEP = 0.05F;
+    private static final int MAX_CATCHUP_STEPS = 8;
 
     private static final int MAX_PARTICLES = 3000;
     private static final int MAX_BURST = 1800;
@@ -46,6 +49,7 @@ public final class GeminiKillEffectVisualInstance {
     private final float[] burstData = new float[MAX_BURST * 8];
     private final Random random;
     private final int synchronizedSeed;
+    private final long initialSeed;
 
     private Vec3 position;
     private int particleCount;
@@ -60,6 +64,7 @@ public final class GeminiKillEffectVisualInstance {
         long mixedSeed = Integer.toUnsignedLong(synchronizedSeed)
                 ^ Double.doubleToLongBits(position.x * 17.0D + position.z * 31.0D)
                 ^ Double.doubleToLongBits(position.y * 13.0D);
+        this.initialSeed = mixedSeed;
         this.random = new Random(mixedSeed);
     }
 
@@ -185,8 +190,16 @@ public final class GeminiKillEffectVisualInstance {
 
     /** Advances the deterministic 20 TPS particle simulation to the entity age. */
     public void advanceTo(float ageSeconds) {
+        if (!Float.isFinite(ageSeconds)) return;
         float target = Math.min(Math.max(ageSeconds, 0.0F), TOTAL_DURATION_SECONDS);
-        while (simulatedAgeSeconds + SIMULATION_STEP <= target + 1.0E-5F) {
+        if (target - simulatedAgeSeconds > (MAX_CATCHUP_STEPS + 1) * SIMULATION_STEP) {
+            float start = Math.max(0.0F, (float) Math.floor(target / SIMULATION_STEP)
+                    * SIMULATION_STEP - MAX_CATCHUP_STEPS * SIMULATION_STEP);
+            restoreDecorativeState(start);
+        }
+        int steps = 0;
+        while (steps++ < MAX_CATCHUP_STEPS
+                && simulatedAgeSeconds + SIMULATION_STEP <= target + 1.0E-5F) {
             float stepAge = simulatedAgeSeconds + SIMULATION_STEP;
             int stage = currentStage(stepAge);
             updateShake(stage, stepAge);
@@ -198,6 +211,48 @@ public final class GeminiKillEffectVisualInstance {
             }
             simulatedAgeSeconds = stepAge;
         }
+    }
+
+    /** Restore a cosmetic snapshot after an unseen interval; never replay old combat time. */
+    private void restoreDecorativeState(float age) {
+        simulatedAgeSeconds = age;
+        particleCount = 0;
+        burstCount = 0;
+        burstSpawned = false;
+        shakeIntensity = 0.0F;
+        random.setSeed(initialSeed ^ (long) Math.round(age / SIMULATION_STEP) * 0x9E3779B97F4A7C15L);
+        int stage = currentStage(age);
+        float quality = AdaptiveVisualQuality.decorationScale();
+        if (stage >= STAGE_MAGIC_CIRCLE && stage <= STAGE_COLLAPSE) {
+            particleCount = Math.min(MAX_PARTICLES,
+                    Math.max(0, Math.round(Math.min(age, T_TOWER_END) / SIMULATION_STEP * 30 * quality)));
+            for (int index = 0; index < particleCount; index++) {
+                if (stage <= STAGE_MAGIC_TOWER) spawnSkyParticle(index);
+                else respawnAccretionParticle(index);
+            }
+        }
+        float burstTime = T_VOID_END + (T_FLASH_END - T_VOID_END) * 0.30F;
+        if (age >= burstTime && stage <= STAGE_AFTERGLOW) {
+            spawnBurst();
+            int elapsedSteps = Math.max(0, (int) Math.floor((age - burstTime) / SIMULATION_STEP));
+            float drag = (float) Math.exp(-1.15D * SIMULATION_STEP);
+            float decay = (float) Math.pow(drag, elapsedSteps);
+            float sum = drag * (1.0F - decay) / (1.0F - drag);
+            float gravity = 1.65F * SIMULATION_STEP;
+            for (int index = 0; index < burstCount; index++) {
+                int at = index * 8;
+                burstData[at] += SIMULATION_STEP * burstData[at + 3] * sum;
+                burstData[at + 1] += SIMULATION_STEP * (burstData[at + 4] * sum
+                        - gravity / (1.0F - drag) * (elapsedSteps - sum));
+                burstData[at + 2] += SIMULATION_STEP * burstData[at + 5] * sum;
+                burstData[at + 3] *= decay;
+                burstData[at + 4] = burstData[at + 4] * decay
+                        - gravity * (1.0F - decay) / (1.0F - drag);
+                burstData[at + 5] *= decay;
+                burstData[at + 6] = elapsedSteps * SIMULATION_STEP;
+            }
+        }
+        updateShake(stage, age);
     }
 
     public int particleCount() {
@@ -339,7 +394,8 @@ public final class GeminiKillEffectVisualInstance {
         boolean preBlackHole = stage == STAGE_MAGIC_CIRCLE || stage == STAGE_MAGIC_TOWER;
         boolean blackHole = stage >= STAGE_BLACK_HOLE && stage <= STAGE_COLLAPSE;
         if (preBlackHole && particleCount < MAX_PARTICLES) {
-            for (int i = 0; i < 30 && particleCount < MAX_PARTICLES; i++) {
+            int spawnCount = Math.max(1, Math.round(30 * AdaptiveVisualQuality.decorationScale()));
+            for (int i = 0; i < spawnCount && particleCount < MAX_PARTICLES; i++) {
                 spawnSkyParticle(particleCount++);
             }
         }
@@ -450,7 +506,8 @@ public final class GeminiKillEffectVisualInstance {
 
     private void spawnBurst() {
         burstSpawned = true;
-        int count = Math.min(MAX_BURST, 1270);
+        int count = Math.min(MAX_BURST, Math.max(1,
+                Math.round(1270 * AdaptiveVisualQuality.decorationScale())));
         float centerX = (float) position.x;
         float centerY = (float) position.y + 1.6F;
         float centerZ = (float) position.z;

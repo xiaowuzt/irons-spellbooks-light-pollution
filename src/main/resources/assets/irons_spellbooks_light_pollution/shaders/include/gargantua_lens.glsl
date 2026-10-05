@@ -175,8 +175,10 @@ void main() {
     // step is enough to turn contouring into noise the eye reads as grain.
     p += d * (gargWhiteNoise(vUv * 512.0) * 0.1);
 
-    int steps = int(mix(48.0, float(GARG_STEPS_MAX),
-            clamp(reach / max(holeDistance, 0.001) * 1.6, 0.0, 1.0)));
+    float baseSteps = mix(48.0, float(GARG_STEPS_MAX),
+            clamp(reach / max(holeDistance, 0.001) * 1.6, 0.0, 1.0));
+    int steps = int(max(24.0, baseSteps * clamp(DiskShape.z, 0.35, 1.0)));
+    float stride = float(int(baseSteps)) / float(steps);
 
     vec3 accum = vec3(0.0);
     float alpha = 0.0;
@@ -200,7 +202,7 @@ void main() {
         // ray, the step pins at its minimum, and ninety-six steps cover four units of
         // a fifteen-unit journey -- the march never reaches the hole at all.
         float nearPlane = max(abs(height) * 0.55, radius * 0.02);
-        float dt = clamp(min(radius * 0.13, nearPlane), 0.03, 1.4);
+        float dt = clamp(min(radius * 0.13, nearPlane), 0.03, 1.4) * stride;
 
         p += d * dt;
         travelledBlocks += dt * rg;
@@ -370,8 +372,7 @@ void main() {
             // the same stars: the field behaves as a fixed celestial sphere instead of
             // sliding with the camera, which is the only way lensed starlight reads as
             // lensed rather than as noise.
-            vec3 stars = starNest(d, time * 0.01);
-            vec3 escaped = stars;
+            vec3 escaped;
             vec4 outClip = ProjectionMat * vec4(d * max(holeDistance, 32.0), 1.0);
             if (outClip.w > 0.0001) {
                 vec2 outUv = (outClip.xy / outClip.w) * 0.5 + 0.5;
@@ -379,8 +380,13 @@ void main() {
                 // On screen, read the scene. Off screen, hand over to the stars by how far
                 // off it went, so the two cross over smoothly rather than stepping.
                 float strayed = length(outUv - inside);
-                escaped = mix(texture(SceneSampler, inside).rgb, stars,
-                        clamp(strayed * 7.0, 0.0, 1.0));
+                escaped = texture(SceneSampler, inside).rgb;
+                if (strayed > 0.0) {
+                    escaped = mix(escaped, starNest(d, time * 0.01),
+                            clamp(strayed * 7.0, 0.0, 1.0));
+                }
+            } else {
+                escaped = starNest(d, time * 0.01);
             }
             background = mix(sceneColour, escaped, lensed);
         }

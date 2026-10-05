@@ -1,6 +1,7 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.SpellConfig;
+import com.gang.lightpollution.performance.PulseShapeSamples;
 
 import com.gang.lightpollution.api.MicroquasarParams;
 import com.gang.lightpollution.fx.MicroquasarShape;
@@ -75,9 +76,6 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in MicroquasarShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = MicroquasarParams.SPELL_LIFETIME_TICKS;
@@ -307,23 +305,14 @@ public final class MicroquasarEntity extends Entity implements MicroquasarSource
             return;
         }
 
-        double hitSqr = MicroquasarShape.BEAM_RADIUS * MicroquasarShape.BEAM_RADIUS;
+        var samples = PulseShapeSamples.microquasar(centre, ageTicks);
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
             }
+            MicroquasarParams params = shapeParams();
             Vec3 at = target.getBoundingBox().getCenter();
-            boolean struck = false;
-            for (int side = 0; side < 2 && !struck; ++side) {
-                for (int i = 1; i <= MicroquasarShape.BULLETS_PER_JET; ++i) {
-                    if (bulletPosition(centre, ageTicks, side == 0, i)
-                            .distanceToSqr(at) <= hitSqr) {
-                        struck = true;
-                        break;
-                    }
-                }
-            }
-            if (struck) {
+            if (samples.firstHit(params, at) >= 0) {
                 SpellDamage.apply(this, target, source, fraction);
             }
         }

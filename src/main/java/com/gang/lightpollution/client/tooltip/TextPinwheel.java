@@ -1,5 +1,7 @@
 package com.gang.lightpollution.client.tooltip;
 
+import com.gang.lightpollution.client.gpu.TextRenderTiming;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.gui.Font;
@@ -12,6 +14,8 @@ import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -52,6 +56,13 @@ public final class TextPinwheel {
 
     /** Reused, and reseeded per glyph, so it allocates nothing per frame. */
     private static final Random JITTER_SOURCE = new Random();
+    private static final Map<Character, GlyphMetrics> METRICS = new LinkedHashMap<>(64, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Character, GlyphMetrics> eldest) {
+            return size() > 1024;
+        }
+    };
+    private static Font cachedFont;
 
     private TextPinwheel() {
     }
@@ -70,6 +81,21 @@ public final class TextPinwheel {
         if (lines.isEmpty()) {
             return;
         }
+        if (cachedFont != font) {
+            clearCache();
+            cachedFont = font;
+        }
+        long timing = TextRenderTiming.begin();
+        try {
+            // GuiGraphics.drawString otherwise ends the GUI batch after every character.
+            graphics.drawManaged(() -> renderSpokes(graphics, font, lines, centreX, centreY, seconds));
+        } finally {
+            TextRenderTiming.end(timing);
+        }
+    }
+
+    private static void renderSpokes(GuiGraphics graphics, Font font, List<Component> lines,
+                                     float centreX, float centreY, float seconds) {
         float carousel = (seconds * SPIN) % 360.0F;
         for (int index = 0; index < lines.size(); index++) {
             float spokeAngle = carousel + index * (360.0F / lines.size());
@@ -81,7 +107,7 @@ public final class TextPinwheel {
     private static void spoke(GuiGraphics graphics, Font font, Component line,
                               float centreX, float centreY, float spokeAngle, float carousel,
                               int seed) {
-        List<Glyph> glyphs = glyphsOf(line);
+        List<Glyph> glyphs = glyphsOf(line, font);
         if (glyphs.isEmpty()) {
             return;
         }
@@ -120,7 +146,7 @@ public final class TextPinwheel {
             float x = midX + along * cos + sideways * sin + jitterX;
             float y = midY + along * sin - sideways * cos + jitterY;
 
-            String text = String.valueOf(glyph.character());
+            GlyphMetrics metrics = glyph.metrics();
             PoseStack pose = graphics.pose();
             pose.pushPose();
             try {
@@ -128,8 +154,8 @@ public final class TextPinwheel {
                 pose.mulPose(Axis.ZP.rotationDegrees(tilt));
                 pose.scale(GLYPH_SCALE, GLYPH_SCALE, GLYPH_SCALE);
                 // Centred on its own point, so the tilt turns the glyph about itself.
-                pose.translate(-font.width(text) * 0.5F, -LINE_HEIGHT * 0.5F, 0.0F);
-                graphics.drawString(font, text, 0, 0, glyph.colour(), true);
+                pose.translate(-metrics.width() * 0.5F, -LINE_HEIGHT * 0.5F, 0.0F);
+                graphics.drawString(font, metrics.text(), 0, 0, glyph.colour(), true);
             } finally {
                 pose.popPose();
             }
@@ -137,7 +163,10 @@ public final class TextPinwheel {
     }
 
     /** One character and the colour its style run gave it. */
-    private record Glyph(char character, int colour) {
+    private record Glyph(char character, int colour, GlyphMetrics metrics) {
+    }
+
+    private record GlyphMetrics(String text, int width) {
     }
 
     /**
@@ -148,13 +177,25 @@ public final class TextPinwheel {
      * varies per character, and taking the string alone would throw that away and leave one flat
      * colour.</p>
      */
-    private static List<Glyph> glyphsOf(Component line) {
+    private static List<Glyph> glyphsOf(Component line, Font font) {
+        // Visit colours every frame: other mods may supply a time-dependent sequence.
+        // Cache only the character string and its font metrics, not the rendered colours.
         List<Glyph> glyphs = new ArrayList<>();
         line.getVisualOrderText().accept((FormattedCharSink) (position, style, codePoint) -> {
-            glyphs.add(new Glyph((char) codePoint, colourOf(style)));
+            char character = (char) codePoint;
+            GlyphMetrics metrics = METRICS.computeIfAbsent(character, value -> {
+                String text = String.valueOf(value);
+                return new GlyphMetrics(text, font.width(text));
+            });
+            glyphs.add(new Glyph(character, colourOf(style), metrics));
             return true;
         });
         return glyphs;
+    }
+
+    public static void clearCache() {
+        METRICS.clear();
+        cachedFont = null;
     }
 
     private static int colourOf(Style style) {

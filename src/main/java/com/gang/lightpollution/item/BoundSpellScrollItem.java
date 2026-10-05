@@ -29,6 +29,11 @@ public class BoundSpellScrollItem extends Scroll {
         this.spellLevel = spellLevel;
     }
 
+    /** Registry identity used by the creative tab without constructing temporary scroll NBT. */
+    public AbstractSpell getBoundSpell() {
+        return spell.get();
+    }
+
     @Override
     public ItemStack getDefaultInstance() {
         ItemStack stack = super.getDefaultInstance();

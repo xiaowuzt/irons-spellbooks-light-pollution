@@ -119,9 +119,7 @@ public final class HelixNebulaWorldRenderer {
                 continue;
             }
             float age = nebula.getVisualAgeTicks(partialTick);
-            // The white dwarf. It is what ionises every knot in the shell, and it was not
-            // being drawn at all.
-            EffectCore.add(centre, 1.5D, 0.80F, 0.92F, 1.00F, brightness * 1.9F);
+            NebulaVisuals.helix(nebula, camera, partialTick);
 
             // Straight to the shared shape maths rather than through a method on the source, so a
             // spell anchor and an API instance go down the same path.
@@ -135,7 +133,9 @@ public final class HelixNebulaWorldRenderer {
                     continue;
                 }
                 vertices += knot(builder, camera, knot.at(), knot.outward(),
-                        brightness * knot.shade(), knot.outerRing());
+                        brightness * knot.shade() * (0.18F + 0.82F * CinematicLightSources.helixIonization(
+                                CinematicVisuals.helix(nebula, partialTick), centre.distanceTo(knot.at()))),
+                        knot.outerRing(), params.scale());
             }
         }
         draw(builder, shader, vertices);
@@ -149,20 +149,20 @@ public final class HelixNebulaWorldRenderer {
      * from the star for every knot without the shader being told where the star is.</p>
      */
     private static int knot(BufferBuilder builder, Vec3 camera, Vec3 at, Vec3 outward,
-                            float intensity, boolean outerRing) {
+                            float intensity, boolean outerRing, float scale) {
         Vec3 toCamera = camera.subtract(at);
         Vec3 across = outward.cross(toCamera);
         if (across.lengthSqr() < 1.0e-8D) {
-            return 0;
+            across = CinematicVisuals.planeU(outward.normalize());
         }
-        across = across.normalize().scale(KNOT_HALF_WIDTH);
+        across = across.normalize().scale(KNOT_HALF_WIDTH * scale);
         Vec3 downwind = outward.normalize();
 
         // The quad reaches back past the knot, not just forward from it. The shader places the
         // head at HEAD_MARGIN of the way along; with the quad starting exactly at the knot the
         // head's gaussian was half outside it and every knot rendered as a clean-cut
         // hemisphere. HEAD_MARGIN here and HS_HEAD_AT in helix_knot.fsh are the same number.
-        double total = KNOT_LENGTH / (1.0D - HEAD_MARGIN);
+        double total = KNOT_LENGTH * scale / (1.0D - HEAD_MARGIN);
         Vec3 back = downwind.scale(-total * HEAD_MARGIN);
         Vec3 front = downwind.scale(total * (1.0D - HEAD_MARGIN));
 

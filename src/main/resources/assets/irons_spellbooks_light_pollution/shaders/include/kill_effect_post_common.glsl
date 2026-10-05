@@ -1251,9 +1251,12 @@ bool slEntityDepthOccluded(vec3 viewPos, vec3 lightPos, vec3 worldPos) {
 // depth-writing entities can cast shadows even though they are not in voxels.
 bool slTraceScreenSpaceRay(vec3 origin, float depth, vec3 direction,
         float maxRayDistance, inout vec3 seed) {
-    const int samples = 25;
+    // Keep the same half-block contact reach at every quality. The default
+    // budget of 32 preserves the original 25 depth taps; lower budgets take
+    // fewer, wider steps instead of shortening shadows.
+    int samples = int(clamp(floor(MiscParams.y * (25.0 / 32.0) + 0.5), 6.0, 64.0));
     vec3 screenSpaceWorld = origin + direction * 0.01 * length(origin);
-    float stepSize = 1.0 / 50.0;
+    float stepSize = min(maxRayDistance, 0.5) / float(samples);
     float jitter = postHash(seed.xy + seed.z * vec2(0.754877, 0.569841));
     seed += vec3(0.37, 0.61, 0.17);
     screenSpaceWorld += direction * jitter * stepSize;
@@ -1304,7 +1307,7 @@ vec3 slRandomPointOnSphere(inout vec3 state) {
 //
 // Cost is SL_SHADOW_SAMPLES block-DDA traces per light instead of one. Four
 // converges within a few frames once the temporal pass accumulates them.
-#define SL_SHADOW_SAMPLES 4
+#define SL_SHADOW_SAMPLES 8
 // Radius of the emitter surface the shadow rays aim at. VanillaDI's
 // sphereLight() uses 0.5, but that figure sizes the light for its RADIANCE term;
 // reusing it as the shadow aperture makes the penumbra far wider than a fine
@@ -1329,7 +1332,12 @@ float slShadowVisibility(vec3 viewPos, float depth, vec3 N,
     // splitting it across the active lights: one light keeps the full quality,
     // and many lights each get fewer samples, with the temporal pass resolving
     // the extra noise. MiscParams.x carries the light count.
-    int shadowSamples = int(clamp(float(SL_SHADOW_SAMPLES)
+    // MiscParams.y controls the per-pixel area-ray budget independently of
+    // contact-ray spacing. At the default 32 this remains four rays total.
+    // Never truncate the exact block/subvoxel DDA: that would leak light
+    // through occluders beyond an arbitrary quality-dependent distance.
+    float rayBudget = clamp(floor(MiscParams.y / 8.0), 1.0, float(SL_SHADOW_SAMPLES));
+    int shadowSamples = int(clamp(rayBudget
             / max(MiscParams.x, 1.0), 1.0, float(SL_SHADOW_SAMPLES)));
 
     for (int sampleIndex = 0; sampleIndex < shadowSamples; sampleIndex++) {

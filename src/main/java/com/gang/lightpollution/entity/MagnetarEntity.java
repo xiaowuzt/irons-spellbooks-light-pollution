@@ -1,6 +1,7 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.SpellConfig;
+import com.gang.lightpollution.performance.PulseShapeSamples;
 
 import com.gang.lightpollution.api.MagnetarParams;
 import com.gang.lightpollution.fx.MagnetarShape;
@@ -74,9 +75,6 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form of the magnetar lives in MagnetarShape, which the renderer and the public API both
     // read, so there is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = MagnetarParams.SPELL_LIFETIME_TICKS;
@@ -323,23 +321,14 @@ public final class MagnetarEntity extends Entity implements MagnetarSource {
         }
 
         double touchSqr = LOOP_TOUCH_RADIUS * LOOP_TOUCH_RADIUS;
-        int samples = 18;
+        var samples = PulseShapeSamples.magnetar(centre, woundFraction, touchSqr);
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
             }
+            MagnetarParams params = shapeParams();
             Vec3 at = target.getBoundingBox().getCenter();
-            boolean touching = false;
-            for (int line = 0; line < MagnetarShape.FIELD_LINES && !touching; ++line) {
-                for (int i = 1; i < samples; ++i) {
-                    if (fieldPoint(centre, line, i / (double) samples, woundFraction)
-                            .distanceToSqr(at) <= touchSqr) {
-                        touching = true;
-                        break;
-                    }
-                }
-            }
-            if (touching) {
+            if (samples.firstHit(params, at) >= 0) {
                 SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }

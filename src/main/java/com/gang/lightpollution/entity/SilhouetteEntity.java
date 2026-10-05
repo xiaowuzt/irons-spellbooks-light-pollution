@@ -154,13 +154,13 @@ public final class SilhouetteEntity extends Entity {
     public float getInversionStrength(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
         if (isChannelling()) {
-            return smoothstep(age / FLIP_TICKS);
+            return smoothstep(age / SpellConfig.phaseTick(CONFIG_ID, 1));
         }
         if (this.releasedAtTick < 0) {
             return 0.0F;
         }
         float since = age - this.releasedAtTick;
-        return smoothstep(1.0F - since / FLIP_TICKS);
+        return smoothstep(1.0F - since / SpellConfig.phaseTick(CONFIG_ID, 1));
     }
 
     private static float smoothstep(float t) {
@@ -192,7 +192,7 @@ public final class SilhouetteEntity extends Entity {
         // Linger just long enough for the settle-back to finish.
         boolean finished = !isChannelling()
                 && this.releasedAtTick >= 0
-                && timelineTick - this.releasedAtTick >= FLIP_TICKS;
+                && timelineTick - this.releasedAtTick >= SpellConfig.phaseTick(CONFIG_ID, 1);
         if (finished || timelineTick >= configuredLifetime()) {
             this.discard();
         }

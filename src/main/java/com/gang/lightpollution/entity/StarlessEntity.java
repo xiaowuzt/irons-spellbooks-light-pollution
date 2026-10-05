@@ -268,12 +268,12 @@ public final class StarlessEntity extends Entity {
             if (timelineTick >= configuredPhaseOne() && timelineTick <= configuredPhaseThree()) {
                 countSwallowedLights(serverLevel);
             }
-            if (!this.starvationDamageResolved && timelineTick >= STARVATION_DAMAGE_TICK) {
+            if (!this.starvationDamageResolved && timelineTick >= configuredPhaseOne()) {
                 this.starvationDamageResolved = true;
                 resolveDamagePulse(serverLevel, configuredPrimaryDamage(),
                         MAX_VOID_RADIUS, false);
             }
-            if (!this.releaseDamageResolved && timelineTick >= RELEASE_DAMAGE_TICK) {
+            if (!this.releaseDamageResolved && timelineTick >= configuredPhaseThree()) {
                 this.releaseDamageResolved = true;
                 float bonus = Math.min(getSwallowedCount(), SpellConfig.starlessSwallowedDamageCap)
                         * (float) SpellConfig.starlessSwallowedDamageStep;

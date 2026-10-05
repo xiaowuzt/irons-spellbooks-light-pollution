@@ -3,6 +3,8 @@ package com.gang.lightpollution.client.renderer;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.GeminiKillEffectPostShaders;
 import com.gang.lightpollution.client.GeminiKillEffectPostShaders.Pass;
+import com.gang.lightpollution.client.perf.AdaptiveVisualQuality;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
@@ -106,6 +108,7 @@ public final class GeminiKillEffectPostProcessor {
             return false;
         }
 
+        long started = PerfTracker.begin(PerfTracker.Section.CINEMATIC);
         try {
             ensureTargets(frameTarget.width, frameTarget.height);
             if (!targetsIndependent(frameTarget)) {
@@ -189,6 +192,7 @@ public final class GeminiKillEffectPostProcessor {
             return false;
         } finally {
             snapshot.restore();
+            PerfTracker.end(PerfTracker.Section.CINEMATIC, started);
         }
     }
 
@@ -217,8 +221,24 @@ public final class GeminiKillEffectPostProcessor {
     private static TextureTarget runAlternating(Pass pass, TextureTarget source,
                                                  int depthTexture, UniformData uniforms) {
         TextureTarget destination = other(source);
+        ScreenEffectBounds bounds = null;
+        if (pass == Pass.BLACK_HOLE) {
+            float radius = uniforms.bhRadiusUv.x;
+            float stage = uniforms.bhRadiusUv.y;
+            float progress = uniforms.bhRadiusUv.z;
+            if (stage > 2.5F && stage < 3.5F) radius *= 1.0F - (float) Math.exp(-progress * 4.0F);
+            else if (stage > 4.5F) radius *= Math.max(1.0F - progress * progress * 0.85F, 0.01F);
+            if (radius < 0.001F) return source;
+            float x = uniforms.center1.x * 0.5F + 0.5F;
+            float y = uniforms.center1.y * 0.5F + 0.5F;
+            float rx = radius * 9.0F, ry = rx * source.width / source.height;
+            bounds = ScreenEffectBounds.uv(x - rx, y - ry, x + rx, y + ry, source.width, source.height);
+            if (bounds.empty()) return source;
+            // Untouched pixels must be current input, never an older ping-pong pass.
+            copyColor(source, destination);
+        }
         runPass(pass, source.getColorTextureId(), bloom.getColorTextureId(), depthTexture,
-                destination, uniforms);
+                destination, uniforms, bounds);
         return destination;
     }
 
@@ -228,6 +248,12 @@ public final class GeminiKillEffectPostProcessor {
 
     private static void runPass(Pass pass, int sceneTexture, int bloomTexture, int depthTexture,
                                 TextureTarget destination, UniformData uniforms) {
+        runPass(pass, sceneTexture, bloomTexture, depthTexture, destination, uniforms, null);
+    }
+
+    private static void runPass(Pass pass, int sceneTexture, int bloomTexture, int depthTexture,
+                                TextureTarget destination, UniformData uniforms,
+                                ScreenEffectBounds bounds) {
         ShaderInstance shader = GeminiKillEffectPostShaders.shader(pass);
         if (shader == null) {
             throw new IllegalStateException("Missing Funeral Nova post shader: " + pass);
@@ -235,6 +261,7 @@ public final class GeminiKillEffectPostProcessor {
 
         destination.bindWrite(true);
         configureFullscreenState();
+        if (bounds != null) RenderSystem.enableScissor(bounds.x(), bounds.y(), bounds.width(), bounds.height());
 
         shader.setSampler("SceneSampler", sceneTexture);
         shader.setSampler("BloomSampler", bloomTexture);
@@ -327,7 +354,8 @@ public final class GeminiKillEffectPostProcessor {
                         lightProjection.viewZ, parameters.lightRadius),
                 new Vec4(parameters.lightRed, parameters.lightGreen,
                         parameters.lightBlue, parameters.lightIntensity),
-                new Vec4(parameters.ssrIntensity, parameters.volumetricSteps,
+                new Vec4(parameters.ssrIntensity, Math.max(8.0F,
+                        parameters.volumetricSteps * AdaptiveVisualQuality.decorationScale()),
                         parameters.chainFade, 0.0F));
     }
 
@@ -369,7 +397,13 @@ public final class GeminiKillEffectPostProcessor {
         builder.vertex(1.0D, 1.0D, 0.0D).uv(1.0F, 1.0F).endVertex();
         builder.vertex(-1.0D, 1.0D, 0.0D).uv(0.0F, 1.0F).endVertex();
         try {
-            BufferUploader.drawWithShader(builder.end());
+            BufferBuilder.RenderedBuffer rendered = builder.end();
+            int gpu = PerfTracker.beginGpu(PerfTracker.Section.CINEMATIC);
+            try {
+                BufferUploader.drawWithShader(rendered);
+            } finally {
+                PerfTracker.endGpu(gpu);
+            }
         } catch (RuntimeException | LinkageError failure) {
             finish(builder);
             throw failure;
@@ -465,7 +499,7 @@ public final class GeminiKillEffectPostProcessor {
     private static TextureTarget createTarget(int width, int height) {
         TextureTarget target = new TextureTarget(width, height, false, Minecraft.ON_OSX);
         GlStateManager._bindTexture(target.getColorTextureId());
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F,
+        TextureUpload.image2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F,
                 width, height, 0, GL11.GL_RGBA, GL11.GL_FLOAT, (ByteBuffer) null);
         target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         target.setFilterMode(GL11.GL_LINEAR);
@@ -511,6 +545,7 @@ public final class GeminiKillEffectPostProcessor {
     private static void blitColor(int sourceFramebuffer, int sourceReadBuffer,
                                   int sourceX0, int sourceY0, int sourceX1, int sourceY1,
                                   RenderTarget destination) {
+        RenderSystem.disableScissor();
         GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, sourceFramebuffer);
         int previousReadBuffer = GL11.glGetInteger(GL11.GL_READ_BUFFER);
         if (sourceReadBuffer != GL11.GL_NONE) {

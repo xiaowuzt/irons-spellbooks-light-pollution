@@ -3,6 +3,8 @@ package com.gang.lightpollution.client.renderer;
 import com.gang.lightpollution.SpellConfig;
 import com.gang.lightpollution.SpellLightConfig;
 import com.gang.lightpollution.entity.GargantuaEntity;
+import com.gang.lightpollution.entity.EventHorizonEntity;
+import com.gang.lightpollution.entity.RedshiftAbyssEntity;
 import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.MicroquasarEntity;
 import com.gang.lightpollution.entity.HelixNebulaEntity;
@@ -46,6 +48,7 @@ import java.util.Set;
 
 /** Computes light markers from the synchronized client-side spell timelines. */
 public final class SpellLightEmitter {
+    private static final StableLightSelector LIGHT_SELECTOR = new StableLightSelector();
     private static final Set<CelestialJudgmentEntity> CELESTIAL =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<ChromaticAccretionEntity> CHROMATIC =
@@ -72,6 +75,8 @@ public final class SpellLightEmitter {
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<SingularityEntity> SINGULARITY =
             Collections.newSetFromMap(new IdentityHashMap<>());
+    private static final Set<EventHorizonEntity> EVENT_HORIZON = new java.util.HashSet<>();
+    private static final Set<RedshiftAbyssEntity> REDSHIFT_ABYSS = new java.util.HashSet<>();
     private static final Set<GargantuaEntity> GARGANTUA =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<CosmicHorseshoeEntity> COSMIC_HORSESHOE =
@@ -119,7 +124,10 @@ public final class SpellLightEmitter {
     }
 
     public static void add(Object entity) {
-        if (entity instanceof CelestialJudgmentEntity value) CELESTIAL.add(value);
+        if (entity instanceof CelestialJudgmentEntity value) {
+            CELESTIAL.add(value);
+            CelestialJudgmentVisuals.add(value);
+        }
         if (entity instanceof ChromaticAccretionEntity value) CHROMATIC.add(value);
         if (entity instanceof EclipseSeveranceEntity value) ECLIPSE.add(value);
         if (entity instanceof FuneralNovaEntity value) FUNERAL_NOVA.add(value);
@@ -133,6 +141,8 @@ public final class SpellLightEmitter {
         if (entity instanceof SecondSunEntity value) SECOND_SUN.add(value);
         if (entity instanceof SingularityEntity value) SINGULARITY.add(value);
         if (entity instanceof GargantuaEntity value) GARGANTUA.add(value);
+        if (entity instanceof EventHorizonEntity value) EVENT_HORIZON.add(value);
+        if (entity instanceof RedshiftAbyssEntity value) REDSHIFT_ABYSS.add(value);
         if (entity instanceof CosmicHorseshoeEntity value) COSMIC_HORSESHOE.add(value);
         if (entity instanceof MicroquasarEntity value) MICROQUASAR.add(value);
         if (entity instanceof HelixNebulaEntity value) HELIX_NEBULA.add(value);
@@ -146,7 +156,10 @@ public final class SpellLightEmitter {
     }
 
     public static void remove(Object entity) {
-        if (entity instanceof CelestialJudgmentEntity value) CELESTIAL.remove(value);
+        if (entity instanceof CelestialJudgmentEntity value) {
+            CELESTIAL.remove(value);
+            CelestialJudgmentVisuals.remove(value);
+        }
         if (entity instanceof ChromaticAccretionEntity value) CHROMATIC.remove(value);
         if (entity instanceof EclipseSeveranceEntity value) ECLIPSE.remove(value);
         if (entity instanceof FuneralNovaEntity value) FUNERAL_NOVA.remove(value);
@@ -160,6 +173,8 @@ public final class SpellLightEmitter {
         if (entity instanceof SecondSunEntity value) SECOND_SUN.remove(value);
         if (entity instanceof SingularityEntity value) SINGULARITY.remove(value);
         if (entity instanceof GargantuaEntity value) GARGANTUA.remove(value);
+        if (entity instanceof EventHorizonEntity value) EVENT_HORIZON.remove(value);
+        if (entity instanceof RedshiftAbyssEntity value) REDSHIFT_ABYSS.remove(value);
         if (entity instanceof CosmicHorseshoeEntity value) COSMIC_HORSESHOE.remove(value);
         if (entity instanceof MicroquasarEntity value) MICROQUASAR.remove(value);
         if (entity instanceof HelixNebulaEntity value) HELIX_NEBULA.remove(value);
@@ -173,7 +188,9 @@ public final class SpellLightEmitter {
     }
 
     public static void clear() {
+        LIGHT_SELECTOR.clear();
         CELESTIAL.clear();
+        CelestialJudgmentVisuals.clear();
         CHROMATIC.clear();
         ECLIPSE.clear();
         FUNERAL_NOVA.clear();
@@ -187,6 +204,8 @@ public final class SpellLightEmitter {
         SECOND_SUN.clear();
         SINGULARITY.clear();
         GARGANTUA.clear();
+        EVENT_HORIZON.clear();
+        REDSHIFT_ABYSS.clear();
         COSMIC_HORSESHOE.clear();
         MICROQUASAR.clear();
         HELIX_NEBULA.clear();
@@ -244,6 +263,17 @@ public final class SpellLightEmitter {
     }
 
     public static List<Light> collect(float partialTick) {
+        long measurement = com.gang.lightpollution.client.perf.PerfTracker.begin(
+                com.gang.lightpollution.client.perf.PerfTracker.Section.LIGHT_COLLECTION);
+        try {
+            return collectInternal(partialTick);
+        } finally {
+            com.gang.lightpollution.client.perf.PerfTracker.end(
+                    com.gang.lightpollution.client.perf.PerfTracker.Section.LIGHT_COLLECTION, measurement);
+        }
+    }
+
+    private static List<Light> collectInternal(float partialTick) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) return List.of();
 
@@ -260,6 +290,8 @@ public final class SpellLightEmitter {
         CONVERGENCE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         SECOND_SUN.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         SINGULARITY.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        EVENT_HORIZON.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
+        REDSHIFT_ABYSS.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         GARGANTUA.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         COSMIC_HORSESHOE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         MICROQUASAR.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
@@ -272,18 +304,25 @@ public final class SpellLightEmitter {
         LEVIATHAN.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
         WORLD_TREE.removeIf(entity -> !entity.isAlive() || entity.level() != minecraft.level);
 
+        if (!SpellLightConfig.enabled) return List.of();
+
         List<Light> result = new ArrayList<>();
         Light currentTestLight = testLight;
         if (currentTestLight != null) {
             result.add(currentTestLight);
         }
-        for (CelestialJudgmentEntity entity : CELESTIAL) {
-            float age = entity.tickCount + partialTick;
-            float formation = Mth.clamp(age / 36.0F, 0.0F, 1.0F);
-            float impact = bell(age - SpellConfig.celestialImpactTick, 7.0F);
-            result.add(new Light(interpolated(entity, partialTick).add(0.0D, 2.2D, 0.0D),
-                    20.0F, 0.35F + formation * 0.75F + impact * 2.5F,
-                    0.36F, 0.82F, 1.0F));
+        for (var view : CelestialJudgmentVisuals.views(partialTick)) {
+            var time = view.time();
+            float flash = time.flash(18) * SpellLightConfig.cinematicFlashStrength;
+            float fade = time.fade();
+            result.add(new Light(view.feet().add(0, view.height() * 0.45, 0), 20,
+                    fade * (0.25F + time.formation() * 0.45F + flash * 2.2F), 0.36F, 0.82F, 1));
+            if (time.formation() > 0.01F) result.add(new Light(view.sky().add(0, -3.2, 0), 28,
+                    fade * time.formation() * (0.45F + time.charge() * 0.8F + flash), 0.28F, 0.68F, 1));
+            if (time.beamTravel() > 0 && view.age() < time.impact()) {
+                Vec3 moving = view.sky().add(0, -3.2, 0).lerp(view.feet(), time.beamTravel());
+                result.add(new Light(moving, 14, fade * time.beamTravel() * 0.65F, 0.56F, 0.85F, 1));
+            }
         }
         for (ChromaticAccretionEntity entity : CHROMATIC) {
             float age = entity.getVisualAgeTicks(partialTick);
@@ -355,17 +394,18 @@ public final class SpellLightEmitter {
         // every occluder throw a long shadow that swings right around it as the
         // star passes, which many dim sources cannot do -- they average into a
         // flat wash and cancel each other's shadows out.
-        for (ConstellationEntity entity : CONSTELLATION) {
-            for (int star = 0; star < ConstellationShape.STAR_COUNT; star++) {
-                float brightness = entity.starBrightness(star, partialTick);
-                if (brightness <= 0.02F) {
-                    continue;
-                }
-                result.add(new Light(entity.starPosition(star, partialTick),
-                        26.0F,
-                        brightness * 2.6F,
-                        1.0F, 0.93F, 0.72F));
-            }
+        List<com.gang.lightpollution.fx.ConstellationSource> stars = new ArrayList<>(CONSTELLATION);
+        stars.addAll(com.gang.lightpollution.fx.FxRegistry.constellations());
+        for (var source : stars) {
+            int life = CinematicVisuals.constellationLifetime(source);
+            float age = source.getVisualAgeTicks(partialTick);
+            float brightness = ConstellationShape.starBrightness(age, life);
+            if (brightness <= 0.02F) continue;
+            var p = source.shapeParams();
+            result.add(new Light(ConstellationShape.starPosition(p, source.anchorCenter(partialTick), age, life),
+                    26.0F * p.scale(),
+                    brightness * (2.6F + CinematicVisuals.burnPulse(source, partialTick) * 0.35F),
+                    1.0F, 0.78F, 0.42F));
         }
         // Falling meteors are moving lights, which is what keeps the ground
         // shadows sweeping for the whole bombardment. The cap matters: shadow cost
@@ -474,6 +514,18 @@ public final class SpellLightEmitter {
                         0.94F, 0.86F, 1.0F));
             }
         }
+        for (EventHorizonEntity entity : EVENT_HORIZON) {
+            float light = entity.envelope(partialTick);
+            if (light > .01F) result.add(new Light(entity.position(),
+                    entity.unitRadius(partialTick) * SpellLightConfig.eventHorizonVisualScale * 8,
+                    light * SpellLightConfig.eventHorizonDiskBrightness * 1.6F, 1, .88F, .72F));
+        }
+        for (RedshiftAbyssEntity entity : REDSHIFT_ABYSS) {
+            float light = entity.envelope(partialTick);
+            if (light > .01F) result.add(new Light(entity.position(),
+                    entity.unitRadius(partialTick) * SpellLightConfig.redshiftAbyssVisualScale * 14,
+                    light * SpellLightConfig.redshiftAbyssDiskBrightness * 1.6F, 1, .55F, .22F));
+        }
         // Gargantua: the accretion disk is the light source, not the hole. Its
         // colour is the disk's own 4500 K amber rather than anything blue -- the
         // film's disk is deliberately cool, because a real quasar disk would have
@@ -547,18 +599,18 @@ public final class SpellLightEmitter {
                         1.0F, Math.min(1.0F, green + 0.1F), Math.min(1.0F, blue + 0.1F)));
             }
         }
+        CinematicLightSources.append(result, partialTick);
+        Vec3 eye = minecraft.gameRenderer.getMainCamera().getPosition();
+        double visibleReach = minecraft.options.getEffectiveRenderDistance() * 28.0 + 64.0;
+        result.removeIf(light -> light.radius() <= 0 || light.intensity() <= 0
+                || light.position().distanceToSqr(eye) > Math.pow(visibleReach + light.radius(), 2));
         return limitLights(drainByGargantuas(drainByVoids(result, partialTick), partialTick));
     }
 
-    /** Keep the brightest sources when a crowded scene exceeds the configured GPU budget. */
+    /** Prefer screen contribution with a retention margin rather than reselecting on intensity ties. */
     private static List<Light> limitLights(List<Light> lights) {
-        int cap = Math.max(1, SpellLightConfig.maxLights);
-        if (lights.size() <= cap) {
-            return lights;
-        }
-        List<Light> strongest = new ArrayList<>(lights);
-        strongest.sort(Comparator.comparingDouble(Light::intensity).reversed());
-        return new ArrayList<>(strongest.subList(0, cap));
+        return LIGHT_SELECTOR.select(lights, Minecraft.getInstance().gameRenderer.getMainCamera().getPosition(),
+                com.gang.lightpollution.client.perf.AdaptiveVisualQuality.lightLimit(SpellLightConfig.maxLights));
     }
 
     /**
@@ -724,6 +776,17 @@ public final class SpellLightEmitter {
     }
 
     /** Live leviathans, for the body, fins and jaws. */
+    public static List<EventHorizonEntity> collectEventHorizons() {
+        var level = net.minecraft.client.Minecraft.getInstance().level;
+        EVENT_HORIZON.removeIf(e -> !e.isAlive() || e.level() != level);
+        return EVENT_HORIZON.isEmpty() ? List.of() : new ArrayList<>(EVENT_HORIZON);
+    }
+    public static List<RedshiftAbyssEntity> collectRedshiftAbysses() {
+        var level = net.minecraft.client.Minecraft.getInstance().level;
+        REDSHIFT_ABYSS.removeIf(e -> !e.isAlive() || e.level() != level);
+        return REDSHIFT_ABYSS.isEmpty() ? List.of() : new ArrayList<>(REDSHIFT_ABYSS);
+    }
+
     public static List<GargantuaEntity> collectGargantuas() {
         return GARGANTUA.isEmpty() ? List.of() : new ArrayList<>(GARGANTUA);
     }

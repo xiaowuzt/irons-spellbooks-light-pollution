@@ -1,9 +1,12 @@
 package com.gang.lightpollution.client.renderer;
 
+import com.gang.lightpollution.client.perf.AdaptiveVisualQuality;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.platform.TextureUtil;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -19,6 +22,11 @@ import org.lwjgl.opengl.GL30;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.BitSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -34,7 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>Storage is toroidal, so rolling the anchor by a block only recollects the
  * slab that just entered the volume; a block leaving shares its slot with the
  * block entering opposite it. At one 16-bit id per block the whole volume is
- * 512 KB, small enough to re-upload whenever anything changes.</p>
+ * 512 KB. Only changed texture-row spans are transferred after collection.</p>
  */
 final class SpellLightStateVolume {
     /** Same camera-local span as the occupancy cache it feeds. */
@@ -42,8 +50,7 @@ final class SpellLightStateVolume {
     private static final int VOLUME = SIZE * SIZE * SIZE;
     private static final int TEXTURE_WIDTH = 512;
     private static final int TEXTURE_HEIGHT = VOLUME / TEXTURE_WIDTH;
-    /** Horizontal planes revalidated per frame; the volume cycles every 16. */
-    private static final int SCRUB_PLANES = 4;
+    private static final int MAX_DIRTY_BLOCKS = 128;
 
     private final SpellLightBlockMaskAtlas atlas;
     private final short[] ids = new short[VOLUME];
@@ -51,6 +58,11 @@ final class SpellLightStateVolume {
             .order(ByteOrder.nativeOrder());
     /** Set from interaction callbacks, which Forge may dispatch off-thread. */
     private final AtomicBoolean rebuildRequested = new AtomicBoolean();
+    private final Set<Long> dirtyBlocks = ConcurrentHashMap.newKeySet();
+    private final Map<Long, Long> recentDirtyBlocks = new LinkedHashMap<>();
+    private final BitSet dirtyRows = new BitSet(TEXTURE_HEIGHT);
+    private final int[] dirtyMin = new int[TEXTURE_HEIGHT];
+    private final int[] dirtyMax = new int[TEXTURE_HEIGHT];
     private java.lang.ref.WeakReference<ClientLevel> trackedLevel =
             new java.lang.ref.WeakReference<>(null);
 
@@ -64,6 +76,7 @@ final class SpellLightStateVolume {
 
     SpellLightStateVolume(SpellLightBlockMaskAtlas atlas) {
         this.atlas = atlas;
+        Arrays.fill(dirtyMin, TEXTURE_WIDTH);
     }
 
     int textureId() {
@@ -92,6 +105,11 @@ final class SpellLightStateVolume {
         rebuildRequested.set(true);
     }
 
+    /** Interaction callbacks only enqueue coordinates; GL stays on the render thread. */
+    void requestRefresh(BlockPos position) {
+        if (dirtyBlocks.size() < MAX_DIRTY_BLOCKS) dirtyBlocks.add(position.asLong());
+    }
+
     /**
      * Refreshes the volume for this frame's camera anchor and uploads changes.
      * The anchor deliberately matches {@link SpellLightVoxelGrid}'s so the
@@ -103,6 +121,15 @@ final class SpellLightStateVolume {
         if (level == null || cameraPosition == null) {
             return false;
         }
+        long started = PerfTracker.begin(PerfTracker.Section.VOXEL);
+        try {
+            return updateVolume(level, cameraPosition);
+        } finally {
+            PerfTracker.end(PerfTracker.Section.VOXEL, started);
+        }
+    }
+
+    private boolean updateVolume(ClientLevel level, Vec3 cameraPosition) {
         ensureTexture();
 
         int targetX = Mth.floor(cameraPosition.x) - SIZE / 2;
@@ -112,11 +139,13 @@ final class SpellLightStateVolume {
         boolean levelChanged = trackedLevel.get() != level;
         if (levelChanged) {
             trackedLevel = new java.lang.ref.WeakReference<>(level);
+            dirtyBlocks.clear();
+            recentDirtyBlocks.clear();
         }
 
         idsChanged = false;
-        boolean rebuild = !hasOrigin || levelChanged
-                || rebuildRequested.getAndSet(false)
+        boolean requested = rebuildRequested.getAndSet(false);
+        boolean rebuild = !hasOrigin || levelChanged || requested
                 || Math.abs(targetX - originX) >= SIZE
                 || Math.abs(targetY - originY) >= SIZE
                 || Math.abs(targetZ - originZ) >= SIZE;
@@ -135,10 +164,23 @@ final class SpellLightStateVolume {
             scrub(level);
         }
 
-        if (idsChanged) {
+        refreshDirtyBlocks(level);
+        boolean masksChanged = atlas.processPending(Math.max(1,
+                Math.min(8, AdaptiveVisualQuality.voxelScrubSlabs() * 2)));
+        if (atlas.consumeRemapRequired()) {
+            for (int index = 0; index < ids.length; index++) {
+                short resolved = (short) atlas.resolvedId(ids[index] & 0xFFFF);
+                if (ids[index] != resolved) {
+                    ids[index] = resolved;
+                    markChanged(index);
+                }
+            }
+        }
+
+        if (!dirtyRows.isEmpty()) {
             uploadIds();
         }
-        return idsChanged;
+        return idsChanged || masksChanged;
     }
 
     void release() {
@@ -150,6 +192,11 @@ final class SpellLightStateVolume {
         scrubPlane = 0;
         idsChanged = false;
         rebuildRequested.set(false);
+        dirtyBlocks.clear();
+        recentDirtyBlocks.clear();
+        dirtyRows.clear();
+        Arrays.fill(dirtyMin, TEXTURE_WIDTH);
+        Arrays.fill(dirtyMax, 0);
         trackedLevel = new java.lang.ref.WeakReference<>(null);
         Arrays.fill(ids, (short) 0);
     }
@@ -180,9 +227,41 @@ final class SpellLightStateVolume {
 
     /** Revalidates a rolling band so other players' block changes heal. */
     private void scrub(ClientLevel level) {
-        for (int plane = 0; plane < SCRUB_PLANES; plane++) {
+        int planes = Math.max(1, Math.min(SIZE, AdaptiveVisualQuality.voxelScrubSlabs()));
+        for (int plane = 0; plane < planes; plane++) {
             collect(level, originX, originY + scrubPlane, originZ, SIZE, 1, SIZE);
             scrubPlane = (scrubPlane + 1) % SIZE;
+        }
+    }
+
+    private void refreshDirtyBlocks(ClientLevel level) {
+        long now = level.getGameTime();
+        for (Long position : dirtyBlocks) {
+            if (dirtyBlocks.remove(position)) {
+                if (recentDirtyBlocks.size() >= MAX_DIRTY_BLOCKS && !recentDirtyBlocks.containsKey(position)) {
+                    var oldest = recentDirtyBlocks.keySet().iterator();
+                    oldest.next();
+                    oldest.remove();
+                }
+                // Network block updates can follow the mouse event later.
+                recentDirtyBlocks.put(position, now + 12);
+            }
+        }
+        var iterator = recentDirtyBlocks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            var entry = iterator.next();
+            if (entry.getValue() < now) {
+                iterator.remove();
+                continue;
+            }
+            BlockPos position = BlockPos.of(entry.getKey());
+            int x = Math.max(originX, position.getX() - 1);
+            int y = Math.max(originY, position.getY() - 1);
+            int z = Math.max(originZ, position.getZ() - 1);
+            collect(level, x, y, z,
+                    Math.min(originX + SIZE, position.getX() + 2) - x,
+                    Math.min(originY + SIZE, position.getY() + 2) - y,
+                    Math.min(originZ + SIZE, position.getZ() + 2) - z);
         }
     }
 
@@ -240,7 +319,7 @@ final class SpellLightStateVolume {
         for (int z = minZ; z < maxZ; z++) {
             for (int y = minY; y < maxY; y++) {
                 for (int x = minX; x < maxX; x++) {
-                    write(x, y, z, (short) 0);
+                    write(x, y, z, (short) SpellLightBlockMaskAtlas.AIR_STATE);
                 }
             }
         }
@@ -250,8 +329,17 @@ final class SpellLightStateVolume {
         int index = index(x, y, z);
         if (ids[index] != id) {
             ids[index] = id;
-            idsChanged = true;
+            markChanged(index);
         }
+    }
+
+    private void markChanged(int index) {
+        idsChanged = true;
+        int row = index / TEXTURE_WIDTH;
+        int column = index % TEXTURE_WIDTH;
+        dirtyRows.set(row);
+        dirtyMin[row] = Math.min(dirtyMin[row], column);
+        dirtyMax[row] = Math.max(dirtyMax[row], column + 1);
     }
 
     /** Toroidal address; SIZE is a power of two so the wrap is a mask. */
@@ -285,24 +373,55 @@ final class SpellLightStateVolume {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RG8,
+        TextureUpload.image2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RG8,
                 TEXTURE_WIDTH, TEXTURE_HEIGHT, 0,
                 GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
         hasOrigin = false;
-        Arrays.fill(ids, (short) 0);
+        Arrays.fill(ids, (short) SpellLightBlockMaskAtlas.SOLID_STATE);
+        dirtyRows.set(0, TEXTURE_HEIGHT);
+        Arrays.fill(dirtyMin, 0);
+        Arrays.fill(dirtyMax, TEXTURE_WIDTH);
     }
 
     private void uploadIds() {
-        transfer.clear();
-        for (short id : ids) {
-            transfer.put((byte) (id & 0xFF));
-            transfer.put((byte) ((id >> 8) & 0xFF));
-        }
-        transfer.flip();
         GlStateManager._activeTexture(GL13.GL_TEXTURE0);
         GlStateManager._bindTexture(textureId);
-        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0,
-                TEXTURE_WIDTH, TEXTURE_HEIGHT,
-                GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, transfer);
+        int alignment = GL11.glGetInteger(GL11.GL_UNPACK_ALIGNMENT);
+        int rowLength = GL11.glGetInteger(GL11.GL_UNPACK_ROW_LENGTH);
+        int skipPixels = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_PIXELS);
+        int skipRows = GL11.glGetInteger(GL11.GL_UNPACK_SKIP_ROWS);
+        try {
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
+            for (int first = dirtyRows.nextSetBit(0); first >= 0;
+                    first = dirtyRows.nextSetBit(first)) {
+                int end = dirtyRows.nextClearBit(first);
+                int min = TEXTURE_WIDTH, max = 0;
+                for (int row = first; row < end; row++) {
+                    min = Math.min(min, dirtyMin[row]);
+                    max = Math.max(max, dirtyMax[row]);
+                }
+                transfer.clear();
+                for (int row = first; row < end; row++) {
+                    for (int column = min; column < max; column++) {
+                        int id = ids[row * TEXTURE_WIDTH + column] & 0xFFFF;
+                        transfer.put((byte) id).put((byte) (id >>> 8));
+                    }
+                }
+                transfer.flip();
+                TextureUpload.subImage2D(GL11.GL_TEXTURE_2D, 0, min, first,
+                        max - min, end - first, GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, transfer);
+                dirtyRows.clear(first, end);
+                Arrays.fill(dirtyMin, first, end, TEXTURE_WIDTH);
+                Arrays.fill(dirtyMax, first, end, 0);
+            }
+        } finally {
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
+            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, rowLength);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, skipPixels);
+            GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, skipRows);
+        }
     }
 }

@@ -1,6 +1,0 @@
-{
-    "parent": "minecraft:custom/light",
-    "textures": {
-      "layer0": "minecraft:custom/light2"
-    }
-  }

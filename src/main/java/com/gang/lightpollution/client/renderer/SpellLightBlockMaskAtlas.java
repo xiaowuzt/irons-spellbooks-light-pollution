@@ -21,6 +21,8 @@ import org.lwjgl.opengl.GL13;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,15 +66,19 @@ final class SpellLightBlockMaskAtlas {
 
     /** Id 0 is reserved for "no baked mask; fall back to depth collection". */
     private static final int NO_STATE = 0;
+    static final int SOLID_STATE = 1;
+    static final int AIR_STATE = 2;
 
     private final Map<BlockState, Integer> stateIds = new IdentityHashMap<>();
     /**
-     * Baked masks by atlas id. Index 0 is the reserved {@link #NO_STATE} slot and
-     * must be occupied from the start: ids are handed out as {@code masks.size()},
-     * so an empty list would give the first real state id 0 and the shader would
-     * read it back as "no baked mask".
+     * Stable atlas ids: 0 is depth fallback, 1 is conservative solid occupancy,
+     * 2 is known air. Model ids start at 3 and retain their slot while baking.
      */
-    private final List<byte[]> masks = new ArrayList<>(List.of(new byte[BYTES_PER_STATE]));
+    private final List<byte[]> masks = new ArrayList<>(List.of(
+            new byte[BYTES_PER_STATE], solidMask(), new byte[BYTES_PER_STATE]));
+    private final ArrayDeque<PendingMask> pending = new ArrayDeque<>();
+    private final int[] resolvedIds = new int[MAX_STATES];
+    private boolean remapRequired;
     private final ByteBuffer transfer = ByteBuffer.allocateDirect(BYTES_PER_STATE)
             .order(ByteOrder.nativeOrder());
     private int textureId = -1;
@@ -83,17 +89,21 @@ final class SpellLightBlockMaskAtlas {
     }
 
     /**
-     * Returns this state's atlas id, baking and uploading its mask on first
-     * sight. Returns {@link #NO_STATE} for air, for states with no occupancy at
-     * all, and once the atlas is full.
+     * Returns a stable atlas id. Unseen non-cube models queue for budgeted
+     * baking with an opaque placeholder; air and solid cubes share reserved
+     * masks. Unsupported/empty models retain the depth fallback.
      */
     int idFor(BlockState state) {
         if (state == null || state.isAir()) {
-            return NO_STATE;
+            return AIR_STATE;
         }
         Integer existing = stateIds.get(state);
         if (existing != null) {
             return existing;
+        }
+        if (state.isSolidRender(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)) {
+            stateIds.put(state, SOLID_STATE);
+            return SOLID_STATE;
         }
         if (masks.size() >= MAX_STATES) {
             if (!exhaustedLogged) {
@@ -106,18 +116,55 @@ final class SpellLightBlockMaskAtlas {
             return NO_STATE;
         }
 
-        byte[] mask = bake(state);
-        if (isEmpty(mask)) {
-            stateIds.put(state, NO_STATE);
-            return NO_STATE;
-        }
         int id = masks.size();
+        byte[] mask = solidMask();
         masks.add(mask);
         stateIds.put(state, id);
-        upload(id, mask);
+        resolvedIds[id] = id;
+        pending.addLast(new PendingMask(state, id));
         return id;
     }
 
+    /** Bound cold model baking per frame; unknown models stay opaque until ready. */
+    boolean processPending(int maximum) {
+        ensureTexture();
+        boolean changed = false;
+        long deadline = System.nanoTime() + 2_000_000L;
+        for (int count = 0; count < maximum && !pending.isEmpty(); count++) {
+            PendingMask next = pending.removeFirst();
+            byte[] mask = bake(next.state());
+            if (isEmpty(mask)) {
+                // Keep the original depth fallback for models without a baked
+                // surface. Existing volume references are remapped this frame.
+                stateIds.put(next.state(), NO_STATE);
+                resolvedIds[next.id()] = NO_STATE;
+                remapRequired = true;
+            }
+            masks.set(next.id(), mask);
+            upload(next.id(), mask);
+            changed = true;
+            if (System.nanoTime() >= deadline) break;
+        }
+        return changed;
+    }
+
+    boolean consumeRemapRequired() {
+        boolean result = remapRequired;
+        remapRequired = false;
+        return result;
+    }
+
+    int resolvedId(int id) {
+        return id <= AIR_STATE ? id : resolvedIds[id];
+    }
+
+    private static byte[] solidMask() {
+        byte[] mask = new byte[BYTES_PER_STATE];
+        Arrays.fill(mask, (byte) 0xFF);
+        return mask;
+    }
+
+    private record PendingMask(BlockState state, int id) {}
 
 
     /** Drops every baked mask; call when block models are rebuilt. */
@@ -125,6 +172,11 @@ final class SpellLightBlockMaskAtlas {
         stateIds.clear();
         masks.clear();
         masks.add(new byte[BYTES_PER_STATE]);
+        masks.add(solidMask());
+        masks.add(new byte[BYTES_PER_STATE]);
+        pending.clear();
+        Arrays.fill(resolvedIds, 0);
+        remapRequired = false;
         exhaustedLogged = false;
         if (textureId >= 0) {
             TextureUtil.releaseTextureId(textureId);
@@ -347,7 +399,7 @@ final class SpellLightBlockMaskAtlas {
         transfer.flip();
         GlStateManager._activeTexture(GL13.GL_TEXTURE0);
         GlStateManager._bindTexture(textureId);
-        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0,
+        TextureUpload.subImage2D(GL11.GL_TEXTURE_2D, 0,
                 (id % STATES_PER_ROW) * TEXELS_PER_STATE, id / STATES_PER_ROW,
                 TEXELS_PER_STATE, 1,
                 GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, transfer);
@@ -364,14 +416,18 @@ final class SpellLightBlockMaskAtlas {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8,
-                ATLAS_WIDTH, ATLAS_ROWS, 0,
-                GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
-
-        // Re-upload everything already baked; the atlas may be recreated after
-        // a resource reload while the state ids remain valid.
-        for (int id = 1; id < masks.size(); id++) {
-            upload(id, masks.get(id));
+        // Pre-fill even unassigned slots with conservative occupancy in one
+        // transfer. Discovering many states must not issue one GL call per
+        // placeholder before the baking budget has had a chance to run.
+        ByteBuffer initial = ByteBuffer.allocateDirect(ATLAS_WIDTH * ATLAS_ROWS * 4);
+        while (initial.hasRemaining()) initial.put((byte) 0xFF);
+        for (int id = 0; id < masks.size(); id++) {
+            initial.position(id * BYTES_PER_STATE);
+            initial.put(masks.get(id));
         }
+        initial.clear();
+        TextureUpload.image2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8,
+                ATLAS_WIDTH, ATLAS_ROWS, 0,
+                GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, initial);
     }
 }

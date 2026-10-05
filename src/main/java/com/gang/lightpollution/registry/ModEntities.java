@@ -2,6 +2,11 @@ package com.gang.lightpollution.registry;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.entity.GargantuaEntity;
+import com.gang.lightpollution.entity.EventHorizonEntity;
+import com.gang.lightpollution.entity.RedshiftAbyssEntity;
+import com.gang.lightpollution.entity.SchwarzschildLensEntity;
+import com.gang.lightpollution.entity.RadiantCollapseEntity;
+import com.gang.lightpollution.entity.StasisSingularityEntity;
 import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.MicroquasarEntity;
 import com.gang.lightpollution.entity.HelixNebulaEntity;
@@ -130,6 +135,31 @@ public final class ModEntities {
                     .of(GargantuaEntity::new, MobCategory.MISC)
                     .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
                     .build(ExampleMod.MODID + ":gargantua"));
+
+    public static final RegistryObject<EntityType<EventHorizonEntity>> EVENT_HORIZON =
+            ENTITY_TYPES.register("event_horizon", () -> EntityType.Builder
+                    .of(EventHorizonEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(96).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":event_horizon"));
+    // EntityType tracking units are chunks: 12 * 16 = 192 blocks, matching the optical cutoff.
+    public static final RegistryObject<EntityType<SchwarzschildLensEntity>> SCHWARZSCHILD_LENS =
+            ENTITY_TYPES.register("schwarzschild_lens", () -> EntityType.Builder.of(SchwarzschildLensEntity::new, MobCategory.MISC)
+                    .sized(1F, 1F).clientTrackingRange(12).updateInterval(2).fireImmune().build(ExampleMod.MODID + ":schwarzschild_lens"));
+
+    public static final RegistryObject<EntityType<RadiantCollapseEntity>> RADIANT_COLLAPSE =
+            ENTITY_TYPES.register("radiant_collapse", () -> EntityType.Builder.of(RadiantCollapseEntity::new, MobCategory.MISC)
+                    .sized(1F, 1F).clientTrackingRange(12).updateInterval(2).fireImmune().build(ExampleMod.MODID + ":radiant_collapse"));
+
+    public static final RegistryObject<EntityType<StasisSingularityEntity>> STASIS_SINGULARITY =
+            ENTITY_TYPES.register("stasis_singularity", () -> EntityType.Builder.of(StasisSingularityEntity::new, MobCategory.MISC)
+                    .sized(1F, 1F).clientTrackingRange(12).updateInterval(2).fireImmune().build(ExampleMod.MODID + ":stasis_singularity"));
+
+
+    public static final RegistryObject<EntityType<RedshiftAbyssEntity>> REDSHIFT_ABYSS =
+            ENTITY_TYPES.register("redshift_abyss", () -> EntityType.Builder
+                    .of(RedshiftAbyssEntity::new, MobCategory.MISC)
+                    .sized(1.0F, 1.0F).clientTrackingRange(12).updateInterval(1).fireImmune()
+                    .build(ExampleMod.MODID + ":redshift_abyss"));
 
     public static final RegistryObject<EntityType<CosmicHorseshoeEntity>> COSMIC_HORSESHOE =
             ENTITY_TYPES.register("cosmic_horseshoe", () -> EntityType.Builder

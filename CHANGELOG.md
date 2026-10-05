@@ -4,6 +4,50 @@ Newest first. The top section is what gets uploaded to CurseForge and Modrinth,
 so keep it about this release and keep it readable — it is release notes, not a
 commit log.
 
+## 1.7.4
+
+### 中文更新说明
+
+- **施瓦西镜界**：将原本的平滑校准环替换为带厚度、密度变化、流动和亮度控制的气体状吸积盘；加入独立 LUT、深度裁剪和掠射角保护。
+- **辉环崩解**：直接恢复原始迭代场的计算方式，并固定到施法世界平面；视觉场与服务端伤害壳分离，避免两者互相影响。
+- **赤移天渊**：恢复原始材质噪声、吸积盘输运、相机起点积分、亚像素采样和八级泛光链路；每个施法实例独立保存颜色/深度历史，减少换视角、换配置和遮挡造成的拖影。
+- **无光视界与黑洞法术组**：完善深度合成、低画质/粒子回退、LUT 与阴影纹理上传、HDR 目标和模板缓冲处理。
+- **配置系统**：补全服务器玩法配置和客户端视觉配置，覆盖已注册法术的实际字段；提供默认值、范围和中英文 TOML 示例。配置注释可跟随游戏语言切换，切换时保留已有数值和行内注释。
+- **生命周期与稳定性**：修复历史颜色/深度缓冲在尺寸变化、模板状态变化和多实例切换时的重建问题；补充资源重载、纹理上传和客户端启动检查。
+- **移除内容**：移除光子回廊（`photon_corridor`）及其卷轴、实体、渲染器、路径伤害和展示命令。其他黑洞法术不受影响。
+
+### English Release Notes
+
+- **Schwarzschild Lens** now uses a finite gas-like accretion disk with thickness, density contrast, flow and brightness controls instead of a smooth calibration ring. Added independent LUT, depth clipping and grazing-angle safeguards.
+- **Radiant Collapse** evaluates the supplied iterative field directly in its world-anchored plane. The visual field and server damage shell are separate.
+- **Redshift Abyss** restores the source material noise, accretion transport, camera-start integration, subpixel sampling and eight-level bloom chain. Each cast keeps isolated colour/depth history to reduce trails after camera, configuration or occlusion changes.
+- Improved depth compositing, low-quality/particle fallbacks, LUT and shadow texture uploads, HDR targets and stencil-buffer handling across the black-hole spell family.
+- Completed server gameplay and client visual configuration coverage, with defaults, ranges and bilingual TOML examples. Comment language changes preserve configured values and inline notes.
+- Fixed history-buffer rebuilds during resize, stencil changes and multi-instance switching; added resource-reload, texture-upload and client bootstrap checks.
+- Removed Photon Corridor (`photon_corridor`), including its scroll, entity, renderer, path damage and preview commands. Other black-hole spells are unaffected.
+
+### Compatibility
+
+- Minecraft 1.20.1
+- Forge 47+
+- Iron's Spells 'n Spellbooks 1.20.1-3.16.1+
+- Iron's Lib 1.20.1-1.1.0+
+
+### Known limitations
+
+- Redshift Abyss is adapted for Minecraft's camera, depth and floating-point pipeline; it is not advertised as strict pixel-for-pixel equivalence with the original Shadertoy Buffer A on every GPU and viewpoint.
+- Some adapted third-party shader sources have attribution recorded but their redistribution terms remain unverified. Check `THIRD_PARTY_NOTICES.md` before redistributing the binary.
+
+## 1.7.3
+
+### Cinematic spell rendering
+
+- Added cinematic client rendering for Tidal Disruption, Celestial Judgment, Constellation, Helix Nebula, Crab Nebula and Pinwheel.
+- Added analytic stellar bodies, volume gas and dust, accretion structures, local refraction, magnetic filaments and structural dynamic lights.
+- Extended Microquasar, Magnetar and Quasar Jet materials with animated per-source motion and lighting.
+- Added client controls for cinematic flashes and local distortion.
+- Spell gameplay values, collision paths, IDs, recipes, saves and public API behavior remain unchanged.
+
 ## 1.7.2
 
 ### Rendering and lifecycle polish

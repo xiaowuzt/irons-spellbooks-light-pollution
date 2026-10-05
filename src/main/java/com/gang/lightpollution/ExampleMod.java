@@ -15,8 +15,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.ModLoadingContext;
-import com.gang.lightpollution.text.DynamicTextClientConfig;
-import net.minecraftforge.fml.config.ModConfig;
 import org.slf4j.Logger;
 
 @Mod(ExampleMod.MODID)
@@ -35,13 +33,10 @@ public final class ExampleMod {
         // The mod's first network channel. Everything else here is drawn from synced entity
         // data, but damage is resolved in a server-only tick, so the floating text needs telling.
         com.gang.lightpollution.net.ModNetwork.register();
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, SpellConfig.SPEC);
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SpellLightConfig.SPEC);
-        // The ported text effects, under an explicit file name. Two CLIENT specs would
-        // otherwise both want <modid>-client.toml and collide. Its own accessors fall back
-        // to defaults when unloaded, so registering it only adds the player-facing toggles.
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT,
-                DynamicTextClientConfig.SPEC, "irons_spellbooks_light_pollution-text.toml");
+        boolean physicalClient = net.minecraftforge.fml.loading.FMLEnvironment.dist == Dist.CLIENT;
+        ConfigLocalization.initialize(physicalClient, net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get(),
+                net.minecraftforge.fml.loading.FMLPaths.CONFIGDIR.get());
+        ConfigurationFiles.register(ModLoadingContext.get(), physicalClient);
     }
 
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -71,6 +66,11 @@ public final class ExampleMod {
             // dereferences the renderer before it asks whether to render, so the
             // entity needs one registered or the first frame it exists throws.
             event.registerEntityRenderer(ModEntities.GARGANTUA.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.EVENT_HORIZON.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.REDSHIFT_ABYSS.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.SCHWARZSCHILD_LENS.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.RADIANT_COLLAPSE.get(), NoopRenderer::new);
+            event.registerEntityRenderer(ModEntities.STASIS_SINGULARITY.get(), NoopRenderer::new);
             event.registerEntityRenderer(ModEntities.COSMIC_HORSESHOE.get(),
                     NoopRenderer::new);
             event.registerEntityRenderer(ModEntities.MICROQUASAR.get(),

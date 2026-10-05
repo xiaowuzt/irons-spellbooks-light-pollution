@@ -89,9 +89,6 @@ public final class QuasarJetEntity extends Entity implements QuasarJetSource {
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in QuasarJetShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = QuasarJetParams.SPELL_LIFETIME_TICKS;

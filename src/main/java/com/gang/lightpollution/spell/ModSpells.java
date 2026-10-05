@@ -83,6 +83,15 @@ public final class ModSpells {
     public static final RegistryObject<AbstractSpell> CRAB_NEBULA = SPELLS.register(
             "crab_nebula", CrabNebulaSpell::new);
 
+    public static final RegistryObject<AbstractSpell> EVENT_HORIZON = SPELLS.register(
+            "event_horizon", EventHorizonSpell::new);
+    public static final RegistryObject<AbstractSpell> REDSHIFT_ABYSS = SPELLS.register(
+            "redshift_abyss", RedshiftAbyssSpell::new);
+
+    public static final RegistryObject<AbstractSpell> SCHWARZSCHILD_LENS = SPELLS.register("schwarzschild_lens", SchwarzschildLensSpell::new);
+    public static final RegistryObject<AbstractSpell> RADIANT_COLLAPSE = SPELLS.register("radiant_collapse", RadiantCollapseSpell::new);
+    public static final RegistryObject<AbstractSpell> STASIS_SINGULARITY = SPELLS.register("stasis_singularity", StasisSingularitySpell::new);
+
     private ModSpells() {
     }
 }

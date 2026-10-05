@@ -80,7 +80,7 @@ public final class SpellLightEvents {
     @SubscribeEvent
     public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
         if (event.getLevel().isClientSide) {
-            SpellLightPostProcessor.requestVoxelRefresh();
+            SpellLightPostProcessor.requestVoxelRefresh(event.getPos());
         }
     }
 
@@ -88,7 +88,10 @@ public final class SpellLightEvents {
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide) {
-            SpellLightPostProcessor.requestVoxelRefresh();
+            SpellLightPostProcessor.requestVoxelRefresh(event.getPos());
+            if (event.getFace() != null) {
+                SpellLightPostProcessor.requestVoxelRefresh(event.getPos().relative(event.getFace()));
+            }
         }
     }
 
@@ -109,6 +112,12 @@ public final class SpellLightEvents {
             lastTargetState = null;
             return;
         }
+        // Mining may remove the previous target and move the crosshair onto a
+        // different block before this tick. Recheck the old target first.
+        if (lastTargetPos != null && lastTargetState != null
+                && !lastTargetState.equals(minecraft.level.getBlockState(lastTargetPos))) {
+            SpellLightPostProcessor.requestVoxelRefresh(lastTargetPos);
+        }
         if (!(minecraft.hitResult instanceof BlockHitResult blockHit)) {
             lastTargetPos = null;
             lastTargetState = null;
@@ -120,7 +129,7 @@ public final class SpellLightEvents {
                 || lastTargetState == null || !lastTargetState.equals(targetState)) {
             if (lastTargetPos != null && lastTargetPos.equals(targetPos)
                     && lastTargetState != null && !lastTargetState.equals(targetState)) {
-                SpellLightPostProcessor.requestVoxelRefresh();
+                SpellLightPostProcessor.requestVoxelRefresh(targetPos);
             }
             lastTargetPos = targetPos.immutable();
             lastTargetState = targetState;
@@ -189,6 +198,12 @@ public final class SpellLightEvents {
         SpellLightPostProcessor.renderCosmicHorseshoe(
                 SpellLightEmitter.collectCosmicHorseshoes(),
                 projection, view, event.getCamera(), event.getPartialTick());
+        EventHorizonRenderer.render(SpellLightEmitter.collectEventHorizons(),
+                projection, view, event.getCamera(), event.getPartialTick());
+        // R2 lenses see the game scene BEFORE the independently traced R1 disk (no double lensing of R1).
+        BlackHoleRenderer.render(projection, view, event.getCamera(), event.getPartialTick());
+        RedshiftAbyssRenderer.render(SpellLightEmitter.collectRedshiftAbysses(),
+                projection, view, event.getCamera(), event.getPartialTick());
     }
 
     @SubscribeEvent
@@ -198,5 +213,8 @@ public final class SpellLightEvents {
         lastTargetPos = null;
         lastTargetState = null;
         SpellLightPostProcessor.release();
+        EventHorizonRenderer.reset();
+        RedshiftAbyssRenderer.reset();
+        BlackHoleRenderer.reset();
     }
 }

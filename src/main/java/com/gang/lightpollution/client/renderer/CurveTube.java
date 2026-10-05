@@ -25,6 +25,9 @@ public final class CurveTube {
     public static final float MODE_DEBRIS = 2.0F / 255.0F;
     public static final float MODE_ARM = 3.0F / 255.0F;
     public static final float MODE_FILAMENT = 4.0F / 255.0F;
+    public static final float MODE_PLASMA = 5.0F / 255.0F;
+    public static final float MODE_RUNE = 6.0F / 255.0F;
+    public static final float MODE_BEAM = 7.0F / 255.0F;
 
     /**
      * Sides around the tube.
@@ -34,6 +37,21 @@ public final class CurveTube {
      * is a pixel or two wide. A per-vertex facing term would need three times as many.</p>
      */
     private static final int SIDES = 8;
+    private static final ThreadLocal<CurveScratch> SCRATCH = ThreadLocal.withInitial(CurveScratch::new);
+
+    private static final class CurveScratch {
+        Vec3[] points = new Vec3[0];
+        float[] radii = new float[0];
+        TubeMeshBuilder.Ring[] rings = new TubeMeshBuilder.Ring[0];
+
+        void ensure(int count) {
+            if (points.length >= count) return;
+            int capacity = Integer.highestOneBit(Math.max(16, count - 1)) << 1;
+            points = new Vec3[capacity];
+            radii = new float[capacity];
+            rings = new TubeMeshBuilder.Ring[capacity];
+        }
+    }
 
     private CurveTube() {
     }
@@ -55,8 +73,11 @@ public final class CurveTube {
         if (segments < 2) {
             return 0;
         }
-        Vec3[] path = new Vec3[segments + 1];
-        float[] radii = new float[segments + 1];
+        segments = CurveLod.segments(segments, camera, from, to, curve);
+        CurveScratch scratch = SCRATCH.get();
+        scratch.ensure(segments + 2);
+        Vec3[] path = scratch.points;
+        float[] radii = scratch.radii;
         for (int i = 0; i <= segments; ++i) {
             double fraction = from + (to - from) * (i / (double) segments);
             Vec3 point = curve.at(fraction);
@@ -69,8 +90,8 @@ public final class CurveTube {
         // Null rolls: these curves have no inherent up, so carrying the reference axis forward
         // from ring to ring is right. Rebuilding it from world up each ring would make the tube
         // twist wherever the curve passes near vertical.
-        TubeMeshBuilder.Ring[] rings = TubeMeshBuilder.frames(path, radii, null);
-        return TubeMeshBuilder.emit(builder, rings, SIDES, TubeMeshBuilder.CIRCLE,
+        TubeMeshBuilder.curveFrames(path, radii, segments + 1, false, scratch.rings);
+        return TubeMeshBuilder.emit(builder, scratch.rings, segments + 1, SIDES, TubeMeshBuilder.CIRCLE,
                 mode, aux, intensity, alpha, 0.0F, 1.0F);
     }
 
@@ -90,15 +111,18 @@ public final class CurveTube {
         if (segments < 3) {
             return 0;
         }
-        Vec3[] loop = new Vec3[segments];
-        float[] radii = new float[segments];
+        segments = CurveLod.segments(segments, camera, 0, 1, curve);
+        CurveScratch scratch = SCRATCH.get();
+        scratch.ensure(segments + 2);
+        Vec3[] loop = scratch.points;
+        float[] radii = scratch.radii;
         for (int i = 0; i < segments; ++i) {
             double fraction = i / (double) segments;
             loop[i] = curve.at(fraction).subtract(camera);
             radii[i] = (float) radius.at(fraction);
         }
-        TubeMeshBuilder.Ring[] rings = TubeMeshBuilder.closedFrames(loop, radii);
-        return TubeMeshBuilder.emit(builder, rings, SIDES, TubeMeshBuilder.CIRCLE,
+        TubeMeshBuilder.curveFrames(loop, radii, segments, true, scratch.rings);
+        return TubeMeshBuilder.emit(builder, scratch.rings, segments + 1, SIDES, TubeMeshBuilder.CIRCLE,
                 mode, aux, intensity, alpha, 0.0F, 1.0F);
     }
 }

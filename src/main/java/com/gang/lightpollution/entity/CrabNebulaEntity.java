@@ -1,6 +1,7 @@
 package com.gang.lightpollution.entity;
 
 import com.gang.lightpollution.SpellConfig;
+import com.gang.lightpollution.performance.PulseShapeSamples;
 
 import com.gang.lightpollution.api.CrabNebulaParams;
 import com.gang.lightpollution.fx.CrabNebulaShape;
@@ -302,23 +303,16 @@ public final class CrabNebulaEntity extends Entity implements CrabNebulaSource {
         // A closed loop at this radius is around 130 blocks long, so 48 puts them under three
         // blocks apart; the 16 that covered the old half-arcs would leave gaps a player could
         // stand in while visibly inside a filament.
-        int samples = 48;
+        // Pulse-local: the cage is identical for every target. Populate on demand so an
+        // early hit (or a list containing only ineligible targets) stays cheap too.
+        var samples = PulseShapeSamples.crab(centre, ageTicks, touchSqr);
         for (LivingEntity target : targets) {
             if (!canAffect(caster, target)) {
                 continue;
             }
+            CrabNebulaParams params = shapeParams();
             Vec3 at = target.getBoundingBox().getCenter();
-            boolean touching = false;
-            for (int filament = 0; filament < CrabNebulaShape.FILAMENTS && !touching; ++filament) {
-                for (int i = 0; i <= samples; ++i) {
-                    if (filamentPoint(centre, filament, i / (double) samples, ageTicks)
-                            .distanceToSqr(at) <= touchSqr) {
-                        touching = true;
-                        break;
-                    }
-                }
-            }
-            if (touching) {
+            if (samples.firstHit(params, at) >= 0) {
                 SpellDamage.apply(this, target, source, configuredPrimaryDamage());
             }
         }

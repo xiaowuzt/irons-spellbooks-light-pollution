@@ -2,6 +2,7 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.gang.lightpollution.api.CrabNebulaParams;
 import com.gang.lightpollution.fx.CrabNebulaShape;
 import com.gang.lightpollution.fx.CrabNebulaSource;
@@ -32,14 +33,13 @@ import java.util.List;
  * lose what makes the object recognisable.</p>
  *
  * <p>The filaments stay on the shell's surface, each a closed loop with no ends. Nothing is drawn
- * between them, which is the whole point: it is a cage over a void, and a player can be inside
- * it.</p>
+ * as an opaque wall: ragged gas sheets and fine capillaries leave the interior readable.
+ * The pulsar wave reaches each layer at its physical distance.</p>
  */
 @Mod.EventBusSubscriber(modid = ExampleMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE,
         value = Dist.CLIENT)
 public final class CrabNebulaWorldRenderer {
     private static final int BUFFER_CAPACITY = 2_097_152;
-    private static final double RENDER_DISTANCE_SQR = 224.0D * 224.0D;
     /**
      * Quads around one filament loop.
      *
@@ -47,7 +47,7 @@ public final class CrabNebulaWorldRenderer {
      * the 60 of the half-arcs it replaced, so the old count would have left segments nearly four
      * blocks long and the loop would read as a polygon.</p>
      */
-    private static final int SEGMENTS = 56;
+    private static final int SEGMENTS = 112;
 
     /** The wind nebula: synchrotron, blue-white and structureless. */
     private static final float WIND_R = 0.72F;
@@ -82,6 +82,13 @@ public final class CrabNebulaWorldRenderer {
 
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
+        var view = AstralScene.frame(event);
+        nebulae.removeIf(source -> {
+            double radius = Math.max(6 * source.shapeParams().scale(),
+                    CrabNebulaShape.shellRadius(source.shapeParams(), source.getVisualAgeTicks(partialTick)) * 1.88);
+            return !view.visible(source.centre(partialTick), radius);
+        });
+        if (nebulae.isEmpty()) return;
 
         GlStateGuard state = GlStateGuard.capture();
         PoseStack modelView = RenderSystem.getModelViewStack();
@@ -91,7 +98,12 @@ public final class CrabNebulaWorldRenderer {
             modelView.mulPoseMatrix(SpellRenderStage.levelPose(event));
             RenderSystem.applyModelViewMatrix();
             drawWind(nebulae, camera, partialTick, shader);
-            drawCage(nebulae, camera, partialTick, strandShader);
+            long timing = PerfTracker.begin(PerfTracker.Section.GEOMETRY);
+            try {
+                drawCage(nebulae, camera, partialTick, strandShader);
+            } finally {
+                PerfTracker.end(PerfTracker.Section.GEOMETRY, timing);
+            }
             // The central bodies, over everything else. Six of these effects drew
             // only their outer structure and left the middle empty.
             EffectCore.flush(effectBuffer, camera);
@@ -113,10 +125,8 @@ public final class CrabNebulaWorldRenderer {
                 continue;
             }
             Vec3 centre = nebula.centre(partialTick);
-            if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
-                continue;
-            }
             float age = nebula.getVisualAgeTicks(partialTick);
+            if (NebulaVisuals.crab(nebula, camera, partialTick)) continue;
             double radius = CrabNebulaShape.shellRadius(nebula.shapeParams(), age)
                     * CrabNebulaShape.WIND_FRACTION;
             // Pulses on the pulsar's rhythm, which is the tell that something is driving it.
@@ -129,27 +139,20 @@ public final class CrabNebulaWorldRenderer {
 
     private static void drawCage(List<CrabNebulaSource> nebulae, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = beginTube();
-        int vertices = 0;
         for (CrabNebulaSource nebula : nebulae) {
             float brightness = nebula.brightness(partialTick);
             if (brightness <= 0.01F) {
                 continue;
             }
             Vec3 centre = nebula.centre(partialTick);
-            if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
-                continue;
-            }
+            BufferBuilder builder = beginTube();
+            int vertices = 0;
             float age = nebula.getVisualAgeTicks(partialTick);
             // Straight to the shared shape maths rather than through a method on the source, so a
             // spell anchor and an API instance go down the same path.
             CrabNebulaParams params = nebula.shapeParams();
             int seed = params.seed();
             int alpha = (int) Math.max(0.0F, Math.min(255.0F, brightness * 235.0F));
-            // The pulsar. It drives the whole interior, and it pulses on its own rhythm.
-            EffectCore.add(centre, 1.3D, 0.86F, 0.92F, 1.00F,
-                    brightness * (1.4F + CrabNebulaShape.windPulse(age) * 2.2F));
-
             for (int filament = 0; filament < CrabNebulaShape.FILAMENTS; ++filament) {
                 final int index = filament;
                 // Roughly a third of the filaments run green rather than red, which is what
@@ -158,14 +161,17 @@ public final class CrabNebulaWorldRenderer {
                 float shade = 0.6F + 0.5F * (float) FxHash.at(seed, filament, 8);
 
                 vertices += CurveTube.emitLoop(builder, camera, SEGMENTS,
-                        fraction -> CrabNebulaShape.filamentPoint(
-                                params, centre, index, fraction, age),
-                        fraction -> CrabNebulaShape.FILAMENT_HALF_WIDTH,
+                        fraction -> CinematicLightSources.crabPoint(nebula, centre, index, fraction, partialTick),
+                        fraction -> CrabNebulaShape.FILAMENT_HALF_WIDTH * params.scale()
+                                * (0.40 + 0.60 * Math.pow(0.5 + 0.5 * Math.sin(fraction * Math.PI * 14 + index * 1.7), 2))
+                                * (1 - CinematicVisuals.crab(nebula, partialTick).collapse(44) * 0.5),
                         CurveTube.MODE_FILAMENT, green ? 1.0F : 0.0F,
                         Math.min(1.0F, brightness * shade * 0.17F), alpha);
             }
+            CinematicVisuals.strand(shader, nebula.getVisualAgeTicks(partialTick),
+                    CinematicVisuals.seed(nebula, centre), centre.subtract(camera));
+            draw(builder, shader, vertices, 1.0F);
         }
-        draw(builder, shader, vertices, 1.0F);
     }
 
     /** A camera-facing square carrying a centred unit disc in its UVs. */
@@ -245,7 +251,13 @@ public final class CrabNebulaWorldRenderer {
             RenderSystem.disableCull();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, modulatorAlpha);
             RenderSystem.setShader(() -> shader);
-            BufferUploader.drawWithShader(builder.end());
+            BufferBuilder.RenderedBuffer mesh = builder.end();
+            int gpu = PerfTracker.beginGpu(PerfTracker.Section.GEOMETRY);
+            try {
+                BufferUploader.drawWithShader(mesh);
+            } finally {
+                PerfTracker.endGpu(gpu);
+            }
         } catch (RuntimeException | LinkageError failure) {
             finish(builder);
             throw failure;

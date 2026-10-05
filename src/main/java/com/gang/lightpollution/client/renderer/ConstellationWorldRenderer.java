@@ -104,17 +104,18 @@ public final class ConstellationWorldRenderer {
 
     private static void drawStar(Vec3 camera, ConstellationSource entity,
                                  int star, float partialTick, ShaderInstance shader) {
-        float brightness = ConstellationShape.starBrightness(entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
+        float brightness = ConstellationShape.starBrightness(entity.getVisualAgeTicks(partialTick), CinematicVisuals.constellationLifetime(entity));
         if (brightness <= 0.02F) {
             return;
         }
-        Vec3 position = ConstellationShape.starPosition(entity.shapeParams(), entity.anchorCenter(partialTick), entity.getVisualAgeTicks(partialTick), entity.shapeParams().lifetimeTicks());
+        if (StellarVisuals.draw(entity, camera, partialTick)) return;
+        Vec3 position = ConstellationShape.starPosition(entity.shapeParams(), entity.anchorCenter(partialTick), entity.getVisualAgeTicks(partialTick), CinematicVisuals.constellationLifetime(entity));
         float age = entity.getVisualAgeTicks(partialTick);
 
         // A slow swell and a slow rise in temperature across the star's life, so
         // it reads as something building rather than a fixed prop, and shrinks
         // back as it burns out.
-        int lifetimeTicks = entity.shapeParams().lifetimeTicks();
+        int lifetimeTicks = CinematicVisuals.constellationLifetime(entity);
         float lifetime = lifetimeTicks <= 0
                 ? 0.0F
                 : Mth.clamp(age / (float) lifetimeTicks, 0.0F, 1.0F);

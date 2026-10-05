@@ -108,7 +108,15 @@ minecraft {
             // has to be in a world to drive the camera:
             //   ./gradlew runClient -PautotestWorld=<save directory name>
             // A plain runClient is unaffected and still stops at the title screen.
-            if (project.hasProperty('autotestWorld')) {
+            if (project.hasProperty('performanceSmoke')) {
+                workingDirectory project.file('build/performance-smoke')
+                property 'lightpollution.performanceSmoke', 'true'
+                property 'forge.logging.console.level', 'info'
+                args '--width', '854', '--height', '480'
+                mods {
+                    "${mod_id}" { source sourceSets.test }
+                }
+            } else if (project.hasProperty('autotestWorld')) {
                 args '--quickPlaySingleplayer', project.property('autotestWorld')
             }
         }
@@ -122,7 +130,10 @@ minecraft {
         // By default, the server will crash when no gametests are provided.
         // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
+            workingDirectory project.file('build/black-hole-gametest')
             property 'forge.enabledGameTestNamespaces', mod_id
+            property 'forge.logging.console.level', 'info'
+            mods { "${mod_id}" { source sourceSets.test } }
         }
 
         data {
@@ -241,6 +252,8 @@ dependencies {
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
 tasks.named('processResources', ProcessResources).configure {
+    // Preserve non-ASCII metadata on Windows; never use the host default charset.
+    filteringCharset = 'UTF-8'
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
             forge_version: forge_version, forge_version_range: forge_version_range,
@@ -356,4 +369,227 @@ publishMods {
         minecraftVersions.add(minecraft_version)
         requires { slug = 'irons-spells-n-spellbooks' }
     }
+}
+
+// Visual-only regressions have no JUnit/network dependency. The GL probe is opt-in because it
+// requires a real desktop driver; it creates a hidden context and never opens a Minecraft save.
+tasks.register('verifyCinematicTimelines', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.CinematicTimelineChecks'
+}
+tasks.named('check') { dependsOn 'verifyCinematicTimelines' }
+
+def performanceChecks = [
+        AdaptiveQuality: 'com.gang.lightpollution.client.perf.AdaptiveQualityChecks',
+        ServerDecorationBudget: 'com.gang.lightpollution.performance.ServerDecorationBudgetChecks',
+        PulseShapeSamples: 'com.gang.lightpollution.performance.PulseShapeSamplesChecks',
+        TextPerformance: 'com.gang.lightpollution.text.TextPerformanceChecks',
+        CurveGeometry: 'com.gang.lightpollution.client.renderer.CurveGeometryChecks',
+        StableLightSelector: 'com.gang.lightpollution.client.renderer.StableLightSelectorChecks',
+        ScreenEffectBounds: 'com.gang.lightpollution.client.renderer.ScreenEffectBoundsChecks'
+]
+performanceChecks.each { label, entrypoint ->
+    tasks.register("verify${label}", JavaExec) {
+        group = 'verification'
+        dependsOn testClasses
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = entrypoint
+    }
+    tasks.named('check') { dependsOn "verify${label}" }
+}
+tasks.register('verifyLightingShaders', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.LightingShaderChecks'
+}
+tasks.register('verifyCinematicShaders', JavaExec) {
+    group = 'verification'
+    description = 'Compile/link cinematic GLSL on the local GPU and check synthetic depth/colour output.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.CinematicShaderProbe'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file("${buildDir}/reports/cinematic-shaders").absolutePath
+}
+
+// Test subscribers are available only in this isolated client run, never in the mod jar.
+if (project.hasProperty('performanceSmoke')) {
+    tasks.matching { it.name == 'runClient' }.configureEach {
+        dependsOn testClasses
+        doFirst {
+            def smokeDir = file("${buildDir}/performance-smoke")
+            smokeDir.mkdirs()
+            java.nio.file.Files.deleteIfExists(new File(smokeDir, 'passed.txt').toPath())
+            new File(smokeDir, 'options.txt').text = 'onboardAccessibility:false\nsoundCategory_master:0.0\nmaxFps:60\nenableVsync:false\n'
+        }
+        doLast {
+            if (!file("${buildDir}/performance-smoke/passed.txt").isFile()) {
+                throw new GradleException('Client smoke test did not complete; inspect build/performance-smoke/logs/latest.log')
+            }
+        }
+    }
+}
+
+// Event Horizon: pure timeline checks in check; real OpenGL validation remains opt-in.
+tasks.register('verifyEventHorizonShape', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.fx.EventHorizonShapeChecks'
+}
+tasks.named('check') { dependsOn 'verifyEventHorizonShape' }
+tasks.register('verifyEventHorizonShaders', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.EventHorizonShaderChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file("${buildDir}/reports/event-horizon").absolutePath
+}
+
+// Redshift Abyss: pure timeline checks in check; real OpenGL validation remains opt-in.
+tasks.register('verifyRedshiftAbyssShape', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.fx.RedshiftAbyssShapeChecks'
+}
+tasks.named('check') { dependsOn 'verifyRedshiftAbyssShape' }
+tasks.register('verifyRedshiftAbyssShaders', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.RedshiftAbyssShaderChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file("${buildDir}/reports/redshift-abyss").absolutePath
+}
+
+tasks.register('verifyRedshiftAbyssResources', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.RedshiftAbyssResourceChecks'
+    args file('src/main/resources').absolutePath
+}
+tasks.named('check') { dependsOn 'verifyRedshiftAbyssResources' }
+
+// Black-hole family: independent source cores, shared parameter/resource contracts.
+tasks.register('verifyBlackHoleMath', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.fx.BlackHoleMathChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/textures/effect/black_hole').absolutePath
+}
+tasks.register('verifyBlackHoleResources', JavaExec) {
+    group = 'verification'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.BlackHoleResourceChecks'
+    args file('src/main/resources').absolutePath
+}
+tasks.named('check') { dependsOn 'verifyBlackHoleMath', 'verifyBlackHoleResources' }
+tasks.register('verifyBlackHoleShaders', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.BlackHoleShaderChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders').absolutePath,
+            file("${buildDir}/reports/black-hole").absolutePath
+}
+
+// Server-authority integration tests. Test classes/structures are never packaged in the mod jar.
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    dependsOn testClasses
+}
+
+// Real-driver check for non-default pixel-unpack state left by Minecraft/other mods.
+tasks.register('verifyTextureUploads', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.TextureUploadChecks'
+}
+
+// Pixel parity against the owner's original Buffer A (real OpenGL, opt-in).
+tasks.register('verifyRedshiftSource', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.RedshiftSourceChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file('docs/black-hole/references/R1-original.txt').absolutePath
+}
+
+// Independent parity check for the supplied Buffer B/C/D/Image bloom pipeline (real OpenGL, opt-in).
+tasks.register('verifyRedshiftBloomSource', JavaExec) {
+    group = 'verification'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.RedshiftBloomSourceChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file('docs/black-hole/references/R1-original.txt').absolutePath,
+            file("${buildDir}/reports/redshift-bloom-source").absolutePath
+}
+
+[
+        verifyRedshiftDiskParameters: 'com.gang.lightpollution.fx.RedshiftDiskParametersChecks',
+        verifyRedshiftTemporalPolicy: 'com.gang.lightpollution.fx.RedshiftTemporalPolicyChecks'
+].each { taskName, checkMain ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+        dependsOn testClasses
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = checkMain
+    }
+}
+tasks.named('check') {
+    dependsOn 'verifyRedshiftDiskParameters', 'verifyRedshiftTemporalPolicy'
+}
+
+// Generated guides/examples are audited, not silently regenerated by check.
+tasks.register('generateConfigurationDocs', JavaExec) {
+    group = 'documentation'
+    description = 'Regenerate bilingual configuration guides and complete TOML examples from the Forge specs.'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.ConfigurationDocumentation'
+    workingDir projectDir
+    jvmArgs '-Dfile.encoding=UTF-8'
+}
+tasks.register('verifyConfiguration', JavaExec) {
+    group = 'verification'
+    description = 'Check real config fields, bilingual documentation, and safe comment-only language changes.'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.ConfigurationChecks'
+    workingDir projectDir
+    enableAssertions = true
+    jvmArgs '-Dfile.encoding=UTF-8'
+}
+tasks.named('check') { dependsOn 'verifyConfiguration' }
+
+// Full independent Buffer A ray transport, not just the shared disk function.
+tasks.register('verifyRedshiftBufferASource', JavaExec) {
+    group = 'verification'
+    description = 'Compare original Buffer A ray transport against the current GPU trace with explicit Minecraft adaptations.'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(17) }
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.gang.lightpollution.client.renderer.RedshiftBufferASourceChecks'
+    args file('src/main/resources/assets/irons_spellbooks_light_pollution/shaders/core').absolutePath,
+            file('docs/black-hole/references/R1-original.txt').absolutePath,
+            file("${buildDir}/reports/redshift-buffer-a-source").absolutePath
 }

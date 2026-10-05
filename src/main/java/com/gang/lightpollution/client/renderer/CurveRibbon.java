@@ -20,6 +20,19 @@ import net.minecraft.world.phys.Vec3;
  * so the frame turns smoothly through a bend instead of stepping at each joint.</p>
  */
 public final class CurveRibbon {
+    private static final ThreadLocal<RibbonScratch> SCRATCH = ThreadLocal.withInitial(RibbonScratch::new);
+
+    private static final class RibbonScratch {
+        Vec3[] points = new Vec3[0], across = new Vec3[0];
+        double[] fractions = new double[0];
+        int[] colours = new int[0];
+        void ensure(int count) {
+            if (points.length >= count) return;
+            int capacity = Integer.highestOneBit(Math.max(16, count - 1)) << 1;
+            points = new Vec3[capacity]; across = new Vec3[capacity];
+            fractions = new double[capacity]; colours = new int[capacity];
+        }
+    }
     /** Supplies a point on the curve at a fraction from 0 to 1. */
     public interface Curve {
         Vec3 at(double fraction);
@@ -51,9 +64,12 @@ public final class CurveRibbon {
         if (segments < 1) {
             return 0;
         }
-        Vec3[] points = new Vec3[segments + 1];
-        Vec3[] across = new Vec3[segments + 1];
-        double[] fractions = new double[segments + 1];
+        segments = CurveLod.segments(segments, camera, from, to, curve);
+        RibbonScratch scratch = SCRATCH.get();
+        scratch.ensure(segments + 1);
+        Vec3[] points = scratch.points;
+        Vec3[] across = scratch.across;
+        double[] fractions = scratch.fractions;
 
         for (int i = 0; i <= segments; ++i) {
             fractions[i] = from + (to - from) * (i / (double) segments);
@@ -79,7 +95,7 @@ public final class CurveRibbon {
         // with the colour of its own midpoint, so every joint became a step in brightness. The
         // positions, widths and along-coordinates were already shared or interpolated; the
         // colour was not, and one uniform channel is enough to draw the seam.
-        int[] colours = new int[segments + 1];
+        int[] colours = scratch.colours;
         for (int i = 0; i <= segments; ++i) {
             colours[i] = colour.at(fractions[i]);
         }

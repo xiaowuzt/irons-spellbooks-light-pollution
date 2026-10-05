@@ -1,0 +1,66 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:black_hole_fullscreen",
+  "fragment": "irons_spellbooks_light_pollution:black_hole_resolve",
+  "samplers": [
+    {
+      "name": "bhSceneSampler"
+    },
+    {
+      "name": "bhDepthSampler"
+    },
+    {
+      "name": "bhEffectSampler"
+    }
+  ],
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "uniforms": [
+    {
+      "name": "bhInverseProjectionMatrix",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "name": "bhCenterRadius",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "bhRadii",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

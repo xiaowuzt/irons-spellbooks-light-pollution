@@ -90,7 +90,7 @@ public final class DynamicTextClientConfig {
                 .defineListAllowEmpty("compatibleScreens", List.of("*"), value -> value instanceof String);
         builder.pop();
 
-        SPEC = builder.build();
+        SPEC = com.gang.lightpollution.ConfigComments.build(builder);
     }
 
     private DynamicTextClientConfig() {

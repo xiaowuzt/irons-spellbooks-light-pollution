@@ -32,6 +32,15 @@ public class CelestialJudgmentEntity extends Entity {
     private static final EntityDataAccessor<Integer> DATA_PHASE = SynchedEntityData.defineId(
             CelestialJudgmentEntity.class, EntityDataSerializers.INT);
 
+    // Visual-only metadata. Damage still runs exclusively from the existing tickCount/impacted logic.
+    // Deliberately not persisted: on load the original gameplay counter also restarts at zero.
+    private static final EntityDataAccessor<Long> DATA_VISUAL_START = SynchedEntityData.defineId(
+            CelestialJudgmentEntity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Boolean> DATA_VISUAL_IMPACT = SynchedEntityData.defineId(
+            CelestialJudgmentEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_VISUAL_KILL = SynchedEntityData.defineId(
+            CelestialJudgmentEntity.class, EntityDataSerializers.BOOLEAN);
+
     private UUID casterUuid;
     private UUID targetUuid;
     private boolean impacted;
@@ -44,6 +53,7 @@ public class CelestialJudgmentEntity extends Entity {
     }
 
     public void configure(LivingEntity caster, LivingEntity target) {
+        this.entityData.set(DATA_VISUAL_START, this.level().getGameTime() - this.tickCount);
         this.casterUuid = caster.getUUID();
         this.targetUuid = target.getUUID();
         this.entityData.set(DATA_TARGET_ID, target.getId());
@@ -58,13 +68,25 @@ public class CelestialJudgmentEntity extends Entity {
         return this.entityData.get(DATA_PHASE);
     }
 
+    public float getVisualAgeTicks(float partialTick) {
+        long start = this.entityData.get(DATA_VISUAL_START);
+        return Math.max(0, start < 0 ? this.tickCount + partialTick
+                : (float) (this.level().getGameTime() - start) + partialTick);
+    }
+
+    public boolean hasVisualImpact() { return this.entityData.get(DATA_VISUAL_IMPACT); }
+    public boolean hasVisualKill() { return this.entityData.get(DATA_VISUAL_KILL); }
+
     @Override
     public void tick() {
         super.tick();
 
         if (this.level() instanceof ServerLevel serverLevel) {
+            if (this.entityData.get(DATA_VISUAL_START) < 0)
+                this.entityData.set(DATA_VISUAL_START, this.level().getGameTime() - this.tickCount);
             LivingEntity target = resolveTarget(serverLevel);
             if (target == null || !target.isAlive()) {
+                if (this.impacted && target != null && !target.isAlive()) this.entityData.set(DATA_VISUAL_KILL, true);
                 if (++this.missingTargetTicks > 5) {
                     this.discard();
                     return;
@@ -76,7 +98,9 @@ public class CelestialJudgmentEntity extends Entity {
 
                 if (!this.impacted && this.tickCount >= SpellConfig.celestialImpactTick) {
                     this.impacted = true;
+                    this.entityData.set(DATA_VISUAL_IMPACT, true);
                     applyImpact(serverLevel, target);
+                    this.entityData.set(DATA_VISUAL_KILL, !target.isAlive());
                 }
             }
 
@@ -129,6 +153,9 @@ public class CelestialJudgmentEntity extends Entity {
     protected void defineSynchedData() {
         this.entityData.define(DATA_TARGET_ID, 0);
         this.entityData.define(DATA_PHASE, 0);
+        this.entityData.define(DATA_VISUAL_START, -1L);
+        this.entityData.define(DATA_VISUAL_IMPACT, false);
+        this.entityData.define(DATA_VISUAL_KILL, false);
     }
 
     @Override
@@ -136,6 +163,7 @@ public class CelestialJudgmentEntity extends Entity {
         this.casterUuid = tag.hasUUID("Caster") ? tag.getUUID("Caster") : null;
         this.targetUuid = tag.hasUUID("Target") ? tag.getUUID("Target") : null;
         this.impacted = tag.getBoolean("Impacted");
+        this.entityData.set(DATA_VISUAL_IMPACT, this.impacted);
         this.missingTargetTicks = tag.getInt("MissingTargetTicks");
         this.entityData.set(DATA_TARGET_ID, tag.getInt("TargetId"));
         this.entityData.set(DATA_PHASE, tag.getInt("Phase"));

@@ -1,6 +1,7 @@
 package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.gang.lightpollution.client.GeminiKillEffectShaders;
 import com.gang.lightpollution.entity.FuneralNovaEntity;
 import com.mojang.blaze3d.platform.GlStateManager;
@@ -133,10 +134,12 @@ public final class GeminiKillEffectWorldRenderer {
         Vec3 cameraPosition = event.getCamera().getPosition();
         POST_STATES.clear();
         RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        long started = PerfTracker.begin(PerfTracker.Section.CINEMATIC);
         try {
             int rendered = 0;
             for (FuneralNovaEntity entity : ACTIVE) {
                 if (rendered >= MAX_EFFECTS) break;
+                if (cameraPosition.distanceToSqr(entity.position()) > RENDER_DISTANCE_SQR) continue;
                 float age = entity.getVisualAgeTicks(partialTick) / 20.0F;
                 GeminiKillEffectVisualInstance visual = visualFor(entity);
                 visual.setPosition(entity.position());
@@ -170,6 +173,7 @@ public final class GeminiKillEffectWorldRenderer {
                     continue;
                 }
                 Vec3 at = visual.position();
+                if (cameraPosition.distanceToSqr(at) > RENDER_DISTANCE_SQR) continue;
                 POST_STATES.add(new PostFrameState(at.add(0.0D, 1.5D, 0.0D), stage,
                         visual.stageProgress(age), age, 1.0F, visual.chainFade(age)));
                 if (!GeminiKillEffectShaders.ready()
@@ -182,6 +186,7 @@ public final class GeminiKillEffectWorldRenderer {
             }
         } finally {
             snapshot.restore();
+            PerfTracker.end(PerfTracker.Section.CINEMATIC, started);
         }
     }
 
@@ -212,7 +217,9 @@ public final class GeminiKillEffectWorldRenderer {
 
         float shake = 0.0F;
         for (FuneralNovaEntity entity : ACTIVE) {
-            if (entity.isRemoved() || entity.level() != minecraft.level) {
+            if (entity.isRemoved() || entity.level() != minecraft.level
+                    || minecraft.gameRenderer.getMainCamera().getPosition()
+                    .distanceToSqr(entity.position()) > RENDER_DISTANCE_SQR) {
                 continue;
             }
             GeminiKillEffectVisualInstance visual = visualFor(entity);
@@ -658,7 +665,13 @@ public final class GeminiKillEffectWorldRenderer {
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             RenderSystem.setShader(() -> shader);
             if (uniforms != null) uniforms.accept(shader);
-            BufferUploader.drawWithShader(builder.end());
+            BufferBuilder.RenderedBuffer rendered = builder.end();
+            int gpu = PerfTracker.beginGpu(PerfTracker.Section.CINEMATIC);
+            try {
+                BufferUploader.drawWithShader(rendered);
+            } finally {
+                PerfTracker.endGpu(gpu);
+            }
         } catch (RuntimeException | LinkageError failure) {
             finish(builder);
             throw failure;

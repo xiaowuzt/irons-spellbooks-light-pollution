@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "EIE",
+    "RPR",
+    "ETE"
+  ],
+  "key": {
+    "E": {
+      "item": "irons_spellbooks:arcane_essence"
+    },
+    "I": {
+      "item": "irons_spellbooks:legendary_ink"
+    },
+    "R": {
+      "item": "irons_spellbooks:ender_rune"
+    },
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "T": {
+      "item": "minecraft:spyglass"
+    }
+  },
+  "result": {
+    "item": "irons_spellbooks_light_pollution:schwarzschild_lens_scroll",
+    "count": 1
+  }
+}

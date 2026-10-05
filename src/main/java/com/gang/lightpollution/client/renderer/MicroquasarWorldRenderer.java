@@ -94,8 +94,6 @@ public final class MicroquasarWorldRenderer {
 
     private static void drawJets(List<MicroquasarSource> jets, Vec3 camera,
                                  float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = begin();
-        int vertices = 0;
 
         for (MicroquasarSource entity : jets) {
             float brightness = entity.brightness(partialTick);
@@ -106,6 +104,8 @@ public final class MicroquasarWorldRenderer {
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
+            BufferBuilder builder = begin();
+            int vertices = 0;
             float age = entity.getVisualAgeTicks(partialTick);
             // Straight to the shared shape maths rather than through a method on the source, so a
             // spell anchor and an API instance go down the same path.
@@ -128,8 +128,10 @@ public final class MicroquasarWorldRenderer {
                         CurveTube.MODE_JET, forward ? 1.0F : 0.0F,
                         Math.min(1.0F, brightness * 0.17F), alpha);
             }
+            CinematicVisuals.strand(shader, entity.getVisualAgeTicks(partialTick),
+                    CinematicVisuals.seed(entity, centre), centre.subtract(camera));
+            draw(builder, shader, vertices);
         }
-        draw(builder, shader, vertices);
     }
 
     /**

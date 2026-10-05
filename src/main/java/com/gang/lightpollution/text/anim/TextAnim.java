@@ -264,7 +264,9 @@ public enum TextAnim {
             if (glyph.shadow) {
                 return;
             }
-            glyph.glowPasses = (int) Math.max(4.0F, params.number("p", 10.0F));
+            float passes = params.number("p", 10.0F);
+            glyph.glowPasses = Float.isFinite(passes)
+                    ? (int) Math.min(32.0F, Math.max(4.0F, passes)) : 10;
             glyph.glowRadius = params.number("r", 2.0F);
             // Upstream's 0.12 is faint, and the glow takes the glyph's own colour — so white text
             // glowed white and showed nothing. Raised, and the renderer tints it toward the hue.

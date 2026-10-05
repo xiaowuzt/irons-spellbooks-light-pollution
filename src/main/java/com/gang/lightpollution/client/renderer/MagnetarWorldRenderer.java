@@ -100,8 +100,6 @@ public final class MagnetarWorldRenderer {
 
     private static void drawField(List<MagnetarSource> stars, Vec3 camera,
                                   float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = begin();
-        int vertices = 0;
 
         for (MagnetarSource entity : stars) {
             float brightness = entity.brightness(partialTick);
@@ -112,6 +110,8 @@ public final class MagnetarWorldRenderer {
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
+            BufferBuilder builder = begin();
+            int vertices = 0;
             float woundFraction = entity.wound(partialTick);
             // Straight to the shared shape maths rather than through a method on the source, so a
             // spell anchor and an API instance go down the same path.
@@ -136,8 +136,10 @@ public final class MagnetarWorldRenderer {
                         // computed correctly and then thrown away by the exposure.
                         Math.min(1.0F, brightness * 0.13F), alpha);
             }
+            CinematicVisuals.strand(shader, entity.getVisualAgeTicks(partialTick),
+                    CinematicVisuals.seed(entity, centre), centre.subtract(camera));
+            draw(builder, shader, vertices);
         }
-        draw(builder, shader, vertices);
     }
 
     /**

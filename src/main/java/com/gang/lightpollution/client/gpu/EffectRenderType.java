@@ -6,7 +6,7 @@ import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.LinkedHashMap;
 
 /**
  * The render type the effect glyphs go through.
@@ -24,7 +24,13 @@ public final class EffectRenderType extends RenderType {
 
     // A map rather than Util.memoize: that call reobfuscates to an SRG name this jar cannot resolve
     // against the running game, and the failure lands in a static initialiser during shader load.
-    private static final Map<ResourceLocation, RenderType> CACHE = new ConcurrentHashMap<>();
+    private static final int MAX_ATLASES = 128;
+    private static final Map<ResourceLocation, RenderType> CACHE = new LinkedHashMap<>(16, 0.75F, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<ResourceLocation, RenderType> eldest) {
+            return size() > MAX_ATLASES;
+        }
+    };
 
     private static RenderType build(ResourceLocation atlas) {
         CompositeState state = CompositeState.builder()
@@ -33,8 +39,8 @@ public final class EffectRenderType extends RenderType {
                 .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                 .setLightmapState(LIGHTMAP)
                 .createCompositeState(false);
-        // 256 vertices to start, growing as needed; sortOnUpload false, affectsCrumbling true, both
-        // matching Forge's text type. Text is drawn front to back already and does not need sorting.
+        // Preserve text sorting: this type is also used by translucent world labels,
+        // whose overlapping glyphs can require distance ordering.
         return create("light_pollution_effect_text", EffectVertexFormat.FORMAT, VertexFormat.Mode.QUADS,
                 256, false, true, state);
     }
@@ -51,8 +57,12 @@ public final class EffectRenderType extends RenderType {
      * <p>Cached because render types are compared by identity when the buffer source decides whether it
      * can keep batching — a fresh instance per glyph would flush between every character.</p>
      */
-    public static RenderType of(ResourceLocation atlas) {
+    public static synchronized RenderType of(ResourceLocation atlas) {
         return CACHE.computeIfAbsent(atlas, EffectRenderType::build);
+    }
+
+    public static synchronized void clearCache() {
+        CACHE.clear();
     }
 
     public static ShaderInstance shader() {

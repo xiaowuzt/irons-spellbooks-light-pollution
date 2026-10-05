@@ -30,6 +30,7 @@ import org.joml.Vector3f;
  * whatever space the path was given in.</p>
  */
 public final class TubeMeshBuilder {
+    private static final ThreadLocal<Scratch> EMIT_SCRATCH = ThreadLocal.withInitial(Scratch::new);
     private TubeMeshBuilder() {
     }
 
@@ -97,6 +98,50 @@ public final class TubeMeshBuilder {
      */
     public record Ring(Vec3 centre, float radius, Vector3f right, Vector3f up,
                        Vector3f tangent) {
+    }
+
+    /** Reuses frame vectors and array storage; only the explicitly active prefix is touched. */
+    static void curveFrames(Vec3[] path, float[] radii, int count, boolean closed, Ring[] rings) {
+        if (count < 2) return;
+        int ringCount = count + (closed ? 1 : 0);
+        Vector3f carried = null;
+        for (int i = 0; i < ringCount; i++) {
+            int index = i % count;
+            Vec3 before = path[closed ? (index + count - 1) % count : Math.max(0, index - 1)];
+            Vec3 after = path[closed ? (index + 1) % count : Math.min(count - 1, index + 1)];
+            Ring previous = rings[i];
+            Vector3f tangent = previous == null ? new Vector3f() : previous.tangent();
+            Vector3f right = previous == null ? new Vector3f() : previous.right();
+            Vector3f up = previous == null ? new Vector3f() : previous.up();
+            tangent.set((float) (after.x - before.x), (float) (after.y - before.y), (float) (after.z - before.z));
+            if (tangent.lengthSquared() < 1.0E-10F) tangent.set(0, 1, 0);
+            tangent.normalize();
+            if (carried == null) {
+                right.set(Math.abs(tangent.y) < 0.9F ? 0 : 1, Math.abs(tangent.y) < 0.9F ? 1 : 0, 0).cross(tangent);
+            } else {
+                right.set(carried).cross(tangent).cross(tangent).negate();
+                if (right.lengthSquared() < 1.0E-10F)
+                    right.set(Math.abs(tangent.y) < 0.9F ? 0 : 1, Math.abs(tangent.y) < 0.9F ? 1 : 0, 0).cross(tangent);
+            }
+            right.normalize();
+            up.set(tangent).cross(right).normalize();
+            rings[i] = new Ring(path[index], radii[index], right, up, tangent);
+            carried = right;
+        }
+        if (closed) {
+            float drift = signedAngle(rings[0].right(), rings[count].right(), rings[0].tangent());
+            for (int i = 1; i < count; i++) {
+                Vector3f right = rings[i].right(), up = rings[i].up();
+                float cos = Mth.cos(-drift * i / count), sin = Mth.sin(-drift * i / count);
+                float x = right.x, y = right.y, z = right.z;
+                right.set(x * cos + up.x * sin, y * cos + up.y * sin, z * cos + up.z * sin).normalize();
+                up.set(up.x * cos - x * sin, up.y * cos - y * sin, up.z * cos - z * sin).normalize();
+            }
+            // Exact closing normals/positions prevent a seam, including after a LOD transition.
+            rings[count].right().set(rings[0].right());
+            rings[count].up().set(rings[0].up());
+            rings[count].tangent().set(rings[0].tangent());
+        }
     }
 
     /**
@@ -283,17 +328,23 @@ public final class TubeMeshBuilder {
     public static int emit(BufferBuilder builder, Ring[] rings, int sides,
                            Section section, float mode, float aux, float intensity,
                            int alpha, float vStart, float vEnd) {
-        if (rings.length < 2 || sides < 3) {
+        return emit(builder, rings, rings.length, sides, section, mode, aux, intensity, alpha, vStart, vEnd);
+    }
+
+    static int emit(BufferBuilder builder, Ring[] rings, int count, int sides,
+                    Section section, float mode, float aux, float intensity,
+                    int alpha, float vStart, float vEnd) {
+        if (count < 2 || sides < 3) {
             return 0;
         }
-        Scratch scratch = new Scratch();
+        Scratch scratch = EMIT_SCRATCH.get();
         int vertices = 0;
 
-        for (int segment = 0; segment + 1 < rings.length; segment++) {
+        for (int segment = 0; segment + 1 < count; segment++) {
             Ring a = rings[segment];
             Ring b = rings[segment + 1];
-            float sa = segment / (float) (rings.length - 1);
-            float sb = (segment + 1) / (float) (rings.length - 1);
+            float sa = segment / (float) (count - 1);
+            float sb = (segment + 1) / (float) (count - 1);
             float va = Mth.lerp(sa, vStart, vEnd);
             float vb = Mth.lerp(sb, vStart, vEnd);
 
@@ -328,7 +379,7 @@ public final class TubeMeshBuilder {
             return 0;
         }
         Ring point = new Ring(tip, 0.0F, ring.right(), ring.up(), ring.tangent());
-        Scratch scratch = new Scratch();
+        Scratch scratch = EMIT_SCRATCH.get();
         int vertices = 0;
 
         for (int side = 0; side < sides; side++) {
@@ -392,6 +443,14 @@ public final class TubeMeshBuilder {
         Vector3f normal = scratch.normal;
         surfacePoint(ring, angle, alongUnit, section, scratch.section, position);
 
+        if (section == CIRCLE) {
+            // For a circle the analytic outward normal equals the old finite difference.
+            // Derive it from the frame, so zero-radius tips also have a finite normal.
+            float cos = Mth.cos(angle), sin = Mth.sin(angle);
+            normal.set(ring.right().x * cos + ring.up().x * sin,
+                    ring.right().y * cos + ring.up().y * sin,
+                    ring.right().z * cos + ring.up().z * sin).normalize();
+        } else {
         // Tangent around the circumference, by finite difference on the outline.
         float step = 0.02F;
         surfacePoint(ring, angle - step, alongUnit, section, scratch.section,
@@ -402,7 +461,9 @@ public final class TubeMeshBuilder {
 
         if (around.lengthSquared() < 1.0E-12F || ring.radius() < 1.0E-5F) {
             // Degenerate at a cap tip: fall back to the outward offset.
-            normal.set(position).normalize();
+            normal.set(position);
+            if (normal.lengthSquared() < 1.0E-12F) normal.set(ring.right());
+            normal.normalize();
         } else {
             normal.set(around).cross(ring.tangent());
             if (normal.lengthSquared() < 1.0E-12F) {
@@ -413,6 +474,7 @@ public final class TubeMeshBuilder {
             if (normal.dot(position) < 0.0F) {
                 normal.negate();
             }
+        }
         }
 
         builder.vertex(

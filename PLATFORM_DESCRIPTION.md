@@ -7,9 +7,11 @@ means of avoidance: some by distance, some by timing, some by where you stand.
 
 ## Spells
 
-The current release contains 24 spells (the registry ID is in parentheses):
+The current source tree contains 29 spells (the registry ID is in parentheses):
 
-Celestial Judgment (`celestial_judgment`), Stargrave Singularity (`stargrave_singularity`), Eclipse Severance (`eclipse_severance`), Funeral Nova (`funeral_nova`), Chromatic Accretion (`chromatic_accretion`), Starless (`starless`), Pyre Star / Constellation (`constellation`), Silhouette (`silhouette`), Starfall (`starfall`), Sky Collapse (`sky_collapse`), Stellar Convergence (`stellar_convergence`), Second Sun (`second_sun`), Singularity (`singularity`), Leviathan (`leviathan`), World Tree (`world_tree`), Gargantua (`gargantua`), Cosmic Horseshoe (`cosmic_horseshoe`), Microquasar (`microquasar`), Helix Nebula (`helix_nebula`), Magnetar (`magnetar`), Tidal Disruption (`tidal_disruption`), Quasar Jet (`quasar_jet`), Wolf-Rayet Pinwheel (`pinwheel`) and Crab Nebula (`crab_nebula`).
+Celestial Judgment (`celestial_judgment`), Stargrave Singularity (`stargrave_singularity`), Eclipse Severance (`eclipse_severance`), Funeral Nova (`funeral_nova`), Chromatic Accretion (`chromatic_accretion`), Starless (`starless`), Pyre Star / Constellation (`constellation`), Silhouette (`silhouette`), Starfall (`starfall`), Sky Collapse (`sky_collapse`), Stellar Convergence (`stellar_convergence`), Second Sun (`second_sun`), Singularity (`singularity`), Leviathan (`leviathan`), World Tree (`world_tree`), Gargantua (`gargantua`), Event Horizon (`event_horizon`), Redshift Abyss (`redshift_abyss`), Schwarzschild Lens (`schwarzschild_lens`), Radiant Collapse (`radiant_collapse`), Stasis Singularity (`stasis_singularity`), Cosmic Horseshoe (`cosmic_horseshoe`), Microquasar (`microquasar`), Helix Nebula (`helix_nebula`), Magnetar (`magnetar`), Tidal Disruption (`tidal_disruption`), Quasar Jet (`quasar_jet`), Wolf-Rayet Pinwheel (`pinwheel`) and Crab Nebula (`crab_nebula`).
+
+Event Horizon is a separate white-hot, tilted black hole: bent light arcs and HDR bloom surround its dark core, while enemies are drawn inward before a final collapse. It leaves Gargantua unchanged. The upstream shader permission must be confirmed before publishing a build containing it; see `THIRD_PARTY_NOTICES.md`.
 
 World Tree is a sanctuary spell: allies inside its area are healed over time and receive absorption. Magic, projectile and fire protection are independent server options; its roots and crown are visual guardians and do not attack.
 
@@ -84,7 +86,7 @@ mod. Visuals only — no damage, no entity, no spell.
 ```gradle
 repositories { maven { url = "https://api.modrinth.com/maven" } }
 dependencies {
-    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.2")
+    compileOnly fg.deobf("maven.modrinth:irons-spellbooks-light-pollution:1.7.4")
 }
 ```
 
@@ -108,3 +110,5 @@ and how to register your own items for a tooltip frame, is in `API.md` in the re
   mob spawning or anything else that reads them.
 - A shader failing to compile on a particular driver is logged and skipped, costing only that
   effect.
+
+Redshift Abyss adds a volumetric gas disk, Doppler-shifted blue-white/orange-red sides, orbital drag and final collapse. It has independent scale, speed, brightness, temperature and Doppler controls and joins the school-sorted creative tab. Its upstream shader permission also remains unverified; resolve it before public distribution.

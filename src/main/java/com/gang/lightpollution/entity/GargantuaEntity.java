@@ -200,6 +200,10 @@ public final class GargantuaEntity extends Entity {
     private UUID casterUuid;
     private boolean blastResolved;
 
+    private static int configuredFadeStart() {
+        return Math.min(configuredLifetime() - 1, SpellConfig.phaseTick(CONFIG_ID, 3) + 30);
+    }
+
     public GargantuaEntity(EntityType<? extends GargantuaEntity> entityType, Level level) {
         super(entityType, level);
         this.noPhysics = true;
@@ -280,7 +284,7 @@ public final class GargantuaEntity extends Entity {
         // A display hole opens and then stops. Capping it just short of criticality
         // keeps the disk at its settled brightness rather than the overexposed flare.
         if (isDisplay()) {
-            return Math.min(age, HOLD_END_TICK - 1.0F);
+            return Math.min(age, SpellConfig.phaseTick(CONFIG_ID, 2) - 1.0F);
         }
         return Math.min(configuredLifetime(), age);
     }
@@ -307,34 +311,34 @@ public final class GargantuaEntity extends Entity {
     /** How far into the closing fade it is, 0 to 1. */
     public float fade(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= FADE_START_TICK) {
+        if (age <= configuredFadeStart()) {
             return 0.0F;
         }
-        return Mth.clamp((age - FADE_START_TICK)
-                / (float) (configuredLifetime() - FADE_START_TICK), 0.0F, 1.0F);
+        return Mth.clamp((age - configuredFadeStart())
+                / (float) (configuredLifetime() - configuredFadeStart()), 0.0F, 1.0F);
     }
 
     /** How far it has opened, 0 to 1. Scales the disk in during the tear. */
     public float opened(float partialTick) {
-        return smoothstep(getVisualAgeTicks(partialTick) / TEAR_END_TICK);
+        return smoothstep(getVisualAgeTicks(partialTick) / SpellConfig.phaseTick(CONFIG_ID, 1));
     }
 
     /** Overexposure of the disk approaching the blast, 0 to 1. */
     public float criticality(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= HOLD_END_TICK) {
+        if (age <= SpellConfig.phaseTick(CONFIG_ID, 2)) {
             return 0.0F;
         }
-        if (age >= CRITICAL_END_TICK) {
+        if (age >= SpellConfig.phaseTick(CONFIG_ID, 3)) {
             return 1.0F;
         }
-        return smoothstep((age - HOLD_END_TICK)
-                / (float) (CRITICAL_END_TICK - HOLD_END_TICK));
+        return smoothstep((age - SpellConfig.phaseTick(CONFIG_ID, 2))
+                / (float) (SpellConfig.phaseTick(CONFIG_ID, 3) - SpellConfig.phaseTick(CONFIG_ID, 2)));
     }
 
     /** Flash of the detonation, 0 outside its window. */
     public float blastFlash(float partialTick) {
-        float since = getVisualAgeTicks(partialTick) - BLAST_TICK;
+        float since = getVisualAgeTicks(partialTick) - SpellConfig.phaseTick(CONFIG_ID, 3);
         if (since < 0.0F || since > 18.0F) {
             return 0.0F;
         }
@@ -344,13 +348,13 @@ public final class GargantuaEntity extends Entity {
     /** Overall brightness envelope, including the post-blast fade. */
     public float brightness(float partialTick) {
         float age = getVisualAgeTicks(partialTick);
-        if (age <= TEAR_END_TICK) {
+        if (age <= SpellConfig.phaseTick(CONFIG_ID, 1)) {
             return opened(partialTick);
         }
-        if (age <= HOLD_END_TICK) {
+        if (age <= SpellConfig.phaseTick(CONFIG_ID, 2)) {
             return 1.0F;
         }
-        if (age <= CRITICAL_END_TICK) {
+        if (age <= SpellConfig.phaseTick(CONFIG_ID, 3)) {
             return 1.0F + criticality(partialTick) * 1.6F;
         }
         return Math.max(0.0F, 1.0F - fade(partialTick));
@@ -377,14 +381,14 @@ public final class GargantuaEntity extends Entity {
 
         int timelineTick = getTimelineAgeTicks();
         if (this.level() instanceof ServerLevel serverLevel) {
-            if (timelineTick > TEAR_END_TICK / 2 && timelineTick < BLAST_TICK) {
+            if (timelineTick > SpellConfig.phaseTick(CONFIG_ID, 1) / 2 && timelineTick < SpellConfig.phaseTick(CONFIG_ID, 3)) {
                 applyPull(serverLevel);
                 if (timelineTick % Math.max(1, SpellConfig.damageIntervalTicks(CONFIG_ID)) == 0) {
                     resolveTidal(serverLevel);
                     countSwallowedLights(serverLevel);
                 }
             }
-            if (!this.blastResolved && timelineTick >= BLAST_TICK) {
+            if (!this.blastResolved && timelineTick >= SpellConfig.phaseTick(CONFIG_ID, 3)) {
                 this.blastResolved = true;
                 resolveBlast(serverLevel);
             }
@@ -408,7 +412,9 @@ public final class GargantuaEntity extends Entity {
         float radius = gravitationalRadius(1.0F);
         // Eased in over the opening tear rather than by the hole growing, so the first
         // second is a warning rather than an immediate yank.
-        double strength = PULL_ACCELERATION * radius * radius * opened(1.0F);
+        double strength = PULL_ACCELERATION * SpellConfig.gargantuaPullStrength
+                * radius * radius * opened(1.0F);
+        if (strength <= 0.0D) return;
         double horizon = radius * HORIZON_RADIUS;
 
         for (Entity target : gatherAny(level, caster, centre, configuredRadius())) {
@@ -480,7 +486,8 @@ public final class GargantuaEntity extends Entity {
             float closeness = (float) Mth.clamp(
                     1.0D - (distance - horizon) / (configuredRadius() - horizon), 0.0D, 1.0D);
             float fraction = Mth.lerp(closeness * closeness,
-                    TIDAL_MIN_FRACTION, TIDAL_MAX_FRACTION);
+                    (float) SpellConfig.damageFraction(CONFIG_ID),
+                    (float) SpellConfig.gargantuaTidalMaxDamageFraction);
             SpellDamage.apply(this, target, source, fraction);
         }
     }
@@ -495,7 +502,7 @@ public final class GargantuaEntity extends Entity {
                 com.gang.lightpollution.SpellPalette.accentFor(this), 1.9F);
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = centre(1.0F);
-        List<LivingEntity> targets = gather(level, caster, centre, BLAST_RADIUS);
+        List<LivingEntity> targets = gather(level, caster, centre, SpellConfig.gargantuaBlastRadius);
         if (targets.isEmpty()) {
             return;
         }

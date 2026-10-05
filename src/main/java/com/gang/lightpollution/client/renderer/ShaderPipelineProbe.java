@@ -74,7 +74,7 @@ public final class ShaderPipelineProbe {
         RenderLevelStageEvent.Stage stage = event.getStage();
 
         if (stage == RenderLevelStageEvent.Stage.AFTER_SKY) {
-            maybeAutoArm();
+            if (Boolean.getBoolean("lightpollution.autoPipelineProbe")) maybeAutoArm();
         }
 
         if (!armed) {
@@ -90,7 +90,7 @@ public final class ShaderPipelineProbe {
     }
 
     /**
-     * Probes once per launch, and again whenever a shader pack is turned on or off.
+     * Opt-in with -Dlightpollution.autoPipelineProbe=true: probe on launch and pack changes.
      *
      * <p>The re-probe on toggle is the point. Packs are selected from the in-game
      * menu long after the world has loaded, so a launch-time probe only ever

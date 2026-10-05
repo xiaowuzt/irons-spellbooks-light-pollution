@@ -76,9 +76,6 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form of the nebula lives in HelixNebulaShape, which is what the renderer and the public API
     // both read, so there is one definition rather than a spell copy and an API copy that can drift.
     // What stays here is only what the server needs in order to hurt things.
@@ -191,7 +188,7 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
     /** What this entity's synced state amounts to, for the shared shape maths. */
     @Override
     public HelixNebulaParams shapeParams() {
-        return HelixNebulaParams.of(azimuth(), getSeed());
+        return HelixNebulaParams.of(azimuth(), getSeed()).scale((float) (configuredRadius() / 22.0D)).lifetime(configuredLifetime());
     }
 
     /** Radius of the inner ring at a given age, in blocks. */
@@ -265,12 +262,12 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
     private void resolveShell(ServerLevel level, float ageTicks) {
         double radius = shellRadius(ageTicks);
         double previous = this.lastSweptRadius < 0.0D
-                ? HelixNebulaShape.SHELL_START_RADIUS
+                ? (HelixNebulaShape.SHELL_START_RADIUS * shapeParams().scale())
                 : this.lastSweptRadius;
         this.lastSweptRadius = radius;
 
-        double inner = Math.min(previous, radius) - HelixNebulaShape.SHELL_THICKNESS;
-        double outer = Math.max(previous, radius) + HelixNebulaShape.SHELL_THICKNESS;
+        double inner = Math.min(previous, radius) - (HelixNebulaShape.SHELL_THICKNESS * shapeParams().scale());
+        double outer = Math.max(previous, radius) + (HelixNebulaShape.SHELL_THICKNESS * shapeParams().scale());
 
         LivingEntity caster = resolveCaster(level);
         DamageSource source = HelixNebulaDamage.shell(level, caster, this);
@@ -294,7 +291,7 @@ public final class HelixNebulaEntity extends Entity implements HelixNebulaSource
         LivingEntity caster = resolveCaster(level);
         DamageSource source = HelixNebulaDamage.shell(level, caster, this);
         Vec3 centre = this.position().add(0.0D, HOVER_HEIGHT, 0.0D);
-        double reach = HelixNebulaShape.SHELL_END_RADIUS * HelixNebulaShape.OUTER_RING_SCALE;
+        double reach = (HelixNebulaShape.SHELL_END_RADIUS * shapeParams().scale()) * HelixNebulaShape.OUTER_RING_SCALE;
 
         for (LivingEntity target : SpellConfig.limitTargets("helixNebula", level.getEntitiesOfClass(LivingEntity.class,
                 new AABB(centre.x - reach, centre.y - reach, centre.z - reach,

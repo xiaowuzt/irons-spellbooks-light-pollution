@@ -12,7 +12,7 @@
 ========================================
 
 
-铁魔法：光污染 是 Iron's Spells 'n Spellbooks（铁魔法）的附属模组，为其加入 24 个高规格的传奇法术，并为这些法术配套了一套独立的实时动态彩色光照与光线追踪阴影渲染管线。
+铁魔法：光污染 是 Iron's Spells 'n Spellbooks（铁魔法）的附属模组，为其加入 29 个高规格的传奇法术，并为这些法术配套了一套独立的实时动态彩色光照与光线追踪阴影渲染管线。
 
 法术释放时不再只是贴图特效，而是会作为真实光源照亮周围的方块与生物，并投下随几何形状变化的彩色阴影。
 
@@ -40,7 +40,7 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 
 ── 法术列表 ──
 
-当前版本共 24 个法术。法术的稀有度、等级和施法方式以游戏内 Iron's Spells 'n Spellbooks 的法术信息为准；下面列出注册名称，方便在模组页面和配置文件中查找。
+当前版本共 29 个法术。法术的稀有度、等级和施法方式以游戏内 Iron's Spells 'n Spellbooks 的法术信息为准；下面列出注册名称，方便在模组页面和配置文件中查找。
 
 【法术名单】
 
@@ -68,6 +68,11 @@ Iron's Lib 1.20.1-1.1.0 及以上（必需）
 类星体喷流 Quasar Jet (`quasar_jet`)
 沃夫-拉叶风车 Wolf-Rayet Pinwheel (`pinwheel`)
 蟹状星云 Crab Nebula (`crab_nebula`)
+无光视界 Event Horizon (`event_horizon`)
+赤移天渊 Redshift Abyss (`redshift_abyss`)
+施瓦西镜界 Schwarzschild Lens (`schwarzschild_lens`)
+辉环崩解 Radiant Collapse (`radiant_collapse`)
+静滞奇点 Stasis Singularity (`stasis_singularity`)
 
 【苍穹裁决】Celestial Judgment
 学派：神圣　施法时间：2.5 秒

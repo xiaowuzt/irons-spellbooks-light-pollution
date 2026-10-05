@@ -79,9 +79,6 @@ public final class SingularityEntity extends Entity implements SingularitySource
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in SingularityShape, which the renderer and the public API both read, so there
     // is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = SingularityParams.SPELL_LIFETIME_TICKS;
@@ -187,7 +184,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
     /** What this entity's synced state amounts to, for the shared shape maths. */
     @Override
     public SingularityParams shapeParams() {
-        return SingularityParams.of(getSeed());
+        return SingularityParams.of(getSeed()).scale((float) (configuredRadius() / 22.0D)).lifetime(configuredLifetime());
     }
 
     public float charge(float partialTick) {
@@ -352,14 +349,14 @@ public final class SingularityEntity extends Entity implements SingularitySource
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = coreCentre(1.0F);
         float charge = charge(1.0F);
-        for (LivingEntity target : gather(level, caster, centre, PULL_RADIUS)) {
+        for (LivingEntity target : gather(level, caster, centre, (PULL_RADIUS * shapeParams().scale()))) {
             Vec3 toCore = centre.subtract(target.getBoundingBox().getCenter());
             double distance = toCore.length();
             if (distance < 0.001D) {
                 continue;
             }
-            double strength = PULL_ACCELERATION * (0.25D + charge)
-                    * (1.0D - distance / PULL_RADIUS);
+            double strength = PULL_ACCELERATION * SpellConfig.singularityPullStrength * (0.25D + charge)
+                    * (1.0D - distance / (PULL_RADIUS * shapeParams().scale()));
             if (strength <= 0.0D) {
                 continue;
             }
@@ -378,16 +375,16 @@ public final class SingularityEntity extends Entity implements SingularitySource
     private void resolveCrush(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = coreCentre(1.0F);
-        List<LivingEntity> caught = gather(level, caster, centre, PULL_RADIUS);
+        List<LivingEntity> caught = gather(level, caster, centre, (PULL_RADIUS * shapeParams().scale()));
         if (caught.isEmpty()) {
             return;
         }
         DamageSource source = SingularityDamage.source(level, this, caster);
         for (LivingEntity target : caught) {
             double distance = centre.distanceTo(target.getBoundingBox().getCenter());
-            double closeness = 1.0D - Mth.clamp(distance / PULL_RADIUS, 0.0D, 1.0D);
+            double closeness = 1.0D - Mth.clamp(distance / (PULL_RADIUS * shapeParams().scale()), 0.0D, 1.0D);
             float fraction = (float) Mth.lerp(closeness * closeness,
-                    configuredPrimaryDamage(), CRUSH_MAX_FRACTION);
+                    configuredPrimaryDamage(), SpellConfig.singularityCrushMaxDamageFraction);
             SpellDamage.apply(this, target, source, fraction);
         }
     }
@@ -395,7 +392,7 @@ public final class SingularityEntity extends Entity implements SingularitySource
     private void resolveBlast(ServerLevel level) {
         LivingEntity caster = resolveCaster(level);
         Vec3 centre = coreCentre(1.0F);
-        List<LivingEntity> targets = gather(level, caster, centre, BLAST_RADIUS);
+        List<LivingEntity> targets = gather(level, caster, centre, (BLAST_RADIUS * shapeParams().scale()));
         if (targets.isEmpty()) {
             return;
         }

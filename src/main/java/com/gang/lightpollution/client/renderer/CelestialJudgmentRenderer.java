@@ -62,8 +62,11 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
         float layerGap = Mth.clamp(height * 0.10F, 0.28F, 1.80F);
         float topBaseY = height + topOffset;
         float finalTopY = topBaseY + layerGap * 3.0F;
-        float age = effect.tickCount + partialTick;
-        float alpha = fadeAlpha(age);
+        float age = effect.getVisualAgeTicks(partialTick);
+        var timeline = new CelestialVisualTimeline(age, com.gang.lightpollution.SpellConfig.celestialImpactTick,
+                com.gang.lightpollution.SpellConfig.celestialLifetimeTicks, effect.hasVisualImpact());
+        float alpha = timeline.fade();
+        float lockAge = timeline.lockAge();
 
         poseStack.pushPose();
         // The anchor is kept at the target's feet. Compensate for client-side
@@ -74,38 +77,28 @@ public class CelestialJudgmentRenderer extends EntityRenderer<CelestialJudgmentE
                 target.getZ() - effect.getZ());
 
         drawDisc(poseStack, bufferSource, TOP_OUTER, bodyRadius * 1.28F,
-                topBaseY, age * 1.6F, alpha * reveal(age, 0.0F), 1.0F);
+                topBaseY, age * 1.6F, alpha * reveal(lockAge, 0.0F), 1.0F);
         drawDisc(poseStack, bufferSource, TOP_INNER_1, bodyRadius * 1.14F,
-                topBaseY + layerGap, -age * 2.1F, alpha * reveal(age, 4.0F), 1.0F);
+                topBaseY + layerGap, -age * 2.1F, alpha * reveal(lockAge, 4.0F), 1.0F);
         drawDisc(poseStack, bufferSource, TOP_INNER_2, bodyRadius * 1.00F,
-                topBaseY + layerGap * 2.0F, age * 2.8F, alpha * reveal(age, 8.0F), 1.0F);
+                topBaseY + layerGap * 2.0F, age * 2.8F, alpha * reveal(lockAge, 8.0F), 1.0F);
         drawDisc(poseStack, bufferSource, TOP_INNER_3, bodyRadius * 0.86F,
-                finalTopY, -age * 3.4F, alpha * reveal(age, 12.0F), 1.0F);
+                finalTopY, -age * 3.4F, alpha * reveal(lockAge, 12.0F), 1.0F);
 
-        float ringAlpha = alpha * Mth.clamp((age - 10.0F) / 14.0F, 0.0F, 1.0F);
+        float ringAlpha = alpha * Mth.clamp((lockAge - 10.0F) / 14.0F, 0.0F, 1.0F);
         drawRing(poseStack, bufferSource, bodyRadius * 1.08F,
                 Math.max(0.80F, height * 0.70F), height * 0.38F,
                 age * 1.9F, ringAlpha);
 
-        float footAlpha = alpha * Mth.clamp((age - 18.0F) / 12.0F, 0.0F, 1.0F);
+        float footAlpha = alpha * Mth.clamp((lockAge - 18.0F) / 12.0F, 0.0F, 1.0F);
         drawDisc(poseStack, bufferSource, FOOT_CIRCLE, bodyRadius * 1.20F,
                 0.035F, -age * 1.1F, footAlpha, 1.0F);
 
-        float beamAlpha = alpha * Mth.clamp((age - 28.0F) / 12.0F, 0.0F, 1.0F) * 0.38F;
+        float beamAlpha = alpha * Mth.clamp((lockAge - 28.0F) / 12.0F, 0.0F, 1.0F) * 0.38F;
         drawBeam(poseStack, bufferSource, Math.max(0.24F, bodyRadius * 0.22F),
                 0.08F, finalTopY + Math.max(0.25F, layerGap * 0.35F),
                 age * 1.4F, beamAlpha);
         poseStack.popPose();
-    }
-
-    private static float fadeAlpha(float age) {
-        if (age < 8.0F) {
-            return Mth.clamp(age / 8.0F, 0.0F, 1.0F);
-        }
-        if (age > 78.0F) {
-            return Mth.clamp((100.0F - age) / 22.0F, 0.0F, 1.0F);
-        }
-        return 1.0F;
     }
 
     private static float reveal(float age, float start) {

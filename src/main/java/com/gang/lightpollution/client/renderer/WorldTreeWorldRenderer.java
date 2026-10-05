@@ -2,6 +2,7 @@ package com.gang.lightpollution.client.renderer;
 
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.client.ConstellationShaders;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.gang.lightpollution.api.WorldTreeParams;
 import com.gang.lightpollution.fx.FxRegistry;
 import com.gang.lightpollution.fx.WorldTreeShape;
@@ -13,17 +14,22 @@ import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexBuffer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Vector3f;
 
 import java.util.List;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 /**
  * Draws World Tree: half-buried roots, a buttressed trunk, six orders of branches,
@@ -68,7 +74,6 @@ public final class WorldTreeWorldRenderer {
     /** Sides on a root tube. */
     private static final int ROOT_SIDES = 7;
     private static final double RENDER_DISTANCE = 240.0D;
-    private static final double RENDER_DISTANCE_SQR = RENDER_DISTANCE * RENDER_DISTANCE;
     /** Ticks the trunk's eruption shake lasts. */
     private static final float SHAKE_TICKS = 18.0F;
     /** Peak shake amplitude, in degrees. */
@@ -83,6 +88,31 @@ public final class WorldTreeWorldRenderer {
     private static final float MODE_LEAF = 0.90F;
 
     private static BufferBuilder effectBuffer = new BufferBuilder(BUFFER_CAPACITY);
+    private static final int MAX_CACHED_TREES = 8;
+    private static final long MAX_CACHED_BYTES = 64L * 1024 * 1024;
+    private static final Map<WorldTreeSource, CachedTree> MESHES = new IdentityHashMap<>();
+    private static ClientLevel cachedLevel;
+    private static ShaderInstance cachedShader;
+    private static long cachedBytes, cacheClock;
+
+    private static final class CachedTree implements AutoCloseable {
+        final WorldTreeShape.Skeleton skeleton;
+        final WorldTreeParams params;
+        final VertexBuffer wood, leaves;
+        final long bytes;
+        long used;
+
+        CachedTree(WorldTreeShape.Skeleton skeleton, WorldTreeParams params,
+                   VertexBuffer wood, VertexBuffer leaves, long bytes) {
+            this.skeleton = skeleton; this.params = params;
+            this.wood = wood; this.leaves = leaves; this.bytes = bytes;
+            this.used = cacheClock;
+        }
+
+        @Override public void close() {
+            wood.close(); leaves.close();
+        }
+    }
 
     private WorldTreeWorldRenderer() {
     }
@@ -251,11 +281,11 @@ public final class WorldTreeWorldRenderer {
         List<WorldTreeSource> effects =
                 new java.util.ArrayList<>(SpellLightEmitter.collectWorldTrees());
         effects.addAll(FxRegistry.worldTrees());
-        if (effects.isEmpty()) {
-            return;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         ShaderInstance shader = ConstellationShaders.worldTree();
+        pruneCache(minecraft.level, shader, effects);
+        cacheClock++;
+        if (effects.isEmpty()) return;
         if (minecraft.level == null || shader == null) {
             return;
         }
@@ -263,6 +293,7 @@ public final class WorldTreeWorldRenderer {
         Vec3 camera = event.getCamera().getPosition();
         float partialTick = event.getPartialTick();
 
+        long timing = PerfTracker.begin(PerfTracker.Section.GEOMETRY);
         GlStateGuard state = GlStateGuard.capture();
         PoseStack modelView = RenderSystem.getModelViewStack();
         modelView.pushPose();
@@ -273,10 +304,32 @@ public final class WorldTreeWorldRenderer {
 
             for (WorldTreeSource entity : effects) {
                 if (camera.distanceToSqr(entity.seedPoint(partialTick))
-                        > RENDER_DISTANCE_SQR) {
+                        > Math.pow(RENDER_DISTANCE + 90 * entity.shapeParams().scale(), 2)) {
                     continue;
                 }
-                float hardened = WorldTreeShape.hardened(entity.getVisualAgeTicks(partialTick));
+                float age = entity.getVisualAgeTicks(partialTick);
+                float hardened = WorldTreeShape.hardened(age);
+                boolean mature = age >= WorldTreeShape.CROWN_END_TICK
+                        && WorldTreeShape.fade(age, entity.shapeParams().lifetimeTicks()) >= 1.0F;
+                CachedTree cached = MESHES.get(entity);
+                if (cached != null && (!mature || cached.skeleton != entity.tree()
+                        || !cached.params.equals(entity.shapeParams()))) {
+                    removeCached(entity);
+                    cached = null;
+                }
+                if (mature && shader.getUniform("GeometryOffset") != null) {
+                    if (cached == null) cached = cacheTree(entity, partialTick);
+                    if (cached != null) {
+                        cached.used = cacheClock;
+                        // Terrain/API roots remain live: their positions need not become static
+                        // when the crown finishes growing.
+                        BufferBuilder roots = begin();
+                        int rootVertices = emitRoots(roots, camera, entity, partialTick);
+                        draw(roots, shader, rootVertices, hardened, true);
+                        drawCached(cached, entity.seedPoint(partialTick).subtract(camera), shader, hardened);
+                        continue;
+                    }
+                }
 
                 BufferBuilder wood = begin();
                 int vertices = 0;
@@ -297,7 +350,142 @@ public final class WorldTreeWorldRenderer {
             modelView.popPose();
             RenderSystem.applyModelViewMatrix();
             state.restore();
+            PerfTracker.end(PerfTracker.Section.GEOMETRY, timing);
         }
+    }
+
+    private static CachedTree cacheTree(WorldTreeSource source, float partialTick) {
+        // Do not evict another visible tree and rebuild it again next frame when a
+        // scene has more than eight trees. Admit a replacement after an idle frame.
+        if (MESHES.size() >= MAX_CACHED_TREES) {
+            WorldTreeSource evict = oldestIdleTree();
+            if (evict == null) return null;
+            removeCached(evict);
+        }
+        Vec3 origin = source.seedPoint(partialTick);
+        VertexBuffer wood = null, leaves = null;
+        long bytes = 0;
+        try {
+            BufferBuilder builder = begin();
+            emitTrunk(builder, origin, source, partialTick);
+            emitBranches(builder, origin, source, partialTick);
+            BufferBuilder.RenderedBuffer mesh = builder.end();
+            bytes += mesh.vertexBuffer().remaining();
+            wood = upload(mesh);
+            builder = begin();
+            emitLeaves(builder, origin, source, partialTick);
+            mesh = builder.end();
+            bytes += mesh.vertexBuffer().remaining();
+            leaves = upload(mesh);
+            if (bytes > MAX_CACHED_BYTES) {
+                wood.close(); leaves.close();
+                return null;
+            }
+            while (!MESHES.isEmpty() && (MESHES.size() >= MAX_CACHED_TREES
+                    || cachedBytes + bytes > MAX_CACHED_BYTES)) {
+                WorldTreeSource oldest = oldestIdleTree();
+                if (oldest == null) {
+                    wood.close(); leaves.close();
+                    return null;
+                }
+                removeCached(oldest);
+            }
+            CachedTree cached = new CachedTree(source.tree(), source.shapeParams(), wood, leaves, bytes);
+            MESHES.put(source, cached);
+            cachedBytes += bytes;
+            return cached;
+        } catch (RuntimeException | LinkageError failure) {
+            if (wood != null) wood.close();
+            if (leaves != null) leaves.close();
+            finish(effectBuffer);
+            throw failure;
+        } finally {
+            VertexBuffer.unbind();
+        }
+    }
+
+    private static WorldTreeSource oldestIdleTree() {
+        WorldTreeSource oldest = null;
+        long used = cacheClock - 1;
+        for (var entry : MESHES.entrySet()) {
+            if (entry.getValue().used < used) {
+                used = entry.getValue().used;
+                oldest = entry.getKey();
+            }
+        }
+        return oldest;
+    }
+
+    private static VertexBuffer upload(BufferBuilder.RenderedBuffer mesh) {
+        VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+        try {
+            buffer.bind();
+            buffer.upload(mesh); // upload consumes/releases the builder's rendered slice.
+            return buffer;
+        } catch (RuntimeException | LinkageError failure) {
+            buffer.close();
+            throw failure;
+        }
+    }
+
+    private static void drawCached(CachedTree cached, Vec3 offset, ShaderInstance shader, float hardened) {
+        try {
+            prepare(shader, hardened, true);
+            shader.getUniform("GeometryOffset").set((float) offset.x, (float) offset.y, (float) offset.z);
+            drawCachedBuffer(cached.wood, shader);
+            RenderSystem.disableCull();
+            drawCachedBuffer(cached.leaves, shader);
+        } finally {
+            shader.getUniform("GeometryOffset").set(0.0F, 0.0F, 0.0F);
+            VertexBuffer.unbind();
+        }
+    }
+
+    private static void drawCachedBuffer(VertexBuffer buffer, ShaderInstance shader) {
+        buffer.bind();
+        var modelView = RenderSystem.getModelViewMatrix();
+        var projection = RenderSystem.getProjectionMatrix();
+        int gpu = PerfTracker.beginGpu(PerfTracker.Section.GEOMETRY);
+        try {
+            buffer.drawWithShader(modelView, projection, shader);
+        } finally {
+            PerfTracker.endGpu(gpu);
+        }
+    }
+
+    private static void removeCached(WorldTreeSource source) {
+        CachedTree cached = MESHES.remove(source);
+        if (cached != null) { cachedBytes -= cached.bytes; cached.close(); }
+    }
+
+    private static void pruneCache(ClientLevel level, ShaderInstance shader, List<WorldTreeSource> sources) {
+        if (cachedLevel != level || cachedShader != shader) {
+            releaseMeshes();
+            cachedLevel = level; cachedShader = shader;
+        }
+        var present = java.util.Collections.newSetFromMap(new IdentityHashMap<WorldTreeSource, Boolean>());
+        present.addAll(sources);
+        var it = MESHES.entrySet().iterator();
+        while (it.hasNext()) {
+            var entry = it.next();
+            if (!present.contains(entry.getKey())) {
+                cachedBytes -= entry.getValue().bytes;
+                entry.getValue().close();
+                it.remove();
+            }
+        }
+    }
+
+    private static void releaseMeshes() {
+        for (CachedTree cached : MESHES.values()) cached.close();
+        MESHES.clear(); cachedBytes = 0; cacheClock = 0;
+        cachedLevel = null; cachedShader = null;
+    }
+
+    @SubscribeEvent
+    public static void logout(ClientPlayerNetworkEvent.LoggingOut event) {
+        if (RenderSystem.isOnRenderThread()) releaseMeshes();
+        else RenderSystem.recordRenderCall(WorldTreeWorldRenderer::releaseMeshes);
     }
 
     /**
@@ -447,6 +635,21 @@ public final class WorldTreeWorldRenderer {
             return;
         }
         try {
+            prepare(shader, hardened, cull);
+            BufferBuilder.RenderedBuffer mesh = builder.end();
+            int gpu = PerfTracker.beginGpu(PerfTracker.Section.GEOMETRY);
+            try {
+                BufferUploader.drawWithShader(mesh);
+            } finally {
+                PerfTracker.endGpu(gpu);
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            finish(builder);
+            throw failure;
+        }
+    }
+
+    private static void prepare(ShaderInstance shader, float hardened, boolean cull) {
             RenderSystem.enableBlend();
             RenderSystem.blendFuncSeparate(
                     GlStateManager.SourceFactor.SRC_ALPHA,
@@ -465,15 +668,11 @@ public final class WorldTreeWorldRenderer {
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
             RenderSystem.setShaderTexture(0, SpellBoltRenderer.NOISE);
             RenderSystem.setShader(() -> shader);
+            if (shader.getUniform("GeometryOffset") != null) shader.getUniform("GeometryOffset").set(0.0F, 0.0F, 0.0F);
             if (shader.getUniform("TreeState") != null) {
                 shader.getUniform("TreeState").set(
                         SpellBoltRenderer.boltTime(), hardened, 0.0F, 0.0F);
             }
-            BufferUploader.drawWithShader(builder.end());
-        } catch (RuntimeException | LinkageError failure) {
-            finish(builder);
-            throw failure;
-        }
     }
 
     private static void finish(BufferBuilder builder) {

@@ -3,6 +3,8 @@ package com.gang.lightpollution.client.renderer;
 import com.gang.lightpollution.ExampleMod;
 import com.gang.lightpollution.SpellLightConfig;
 import com.gang.lightpollution.client.GeminiKillEffectPostShaders;
+import com.gang.lightpollution.client.perf.AdaptiveVisualQuality;
+import com.gang.lightpollution.client.perf.PerfTracker;
 import com.gang.lightpollution.entity.GargantuaEntity;
 import com.gang.lightpollution.entity.CosmicHorseshoeEntity;
 import com.gang.lightpollution.entity.SingularityEntity;
@@ -163,6 +165,11 @@ public final class SpellLightPostProcessor {
         stateVolume.requestRebuild();
     }
 
+    /** Refresh only the edited block and neighbouring connected shapes. */
+    public static void requestVoxelRefresh(BlockPos position) {
+        if (position != null) stateVolume.requestRefresh(position);
+    }
+
 
 
     /**
@@ -275,13 +282,14 @@ public final class SpellLightPostProcessor {
         List<SpellLightEmitter.Light> lights = emitters.stream()
                 .filter(light -> light != null && light.intensity() > 0.01F
                         && light.radius() > 0.1F)
-                .sorted(Comparator.comparingDouble(SpellLightEmitter.Light::intensity).reversed())
+                .limit(AdaptiveVisualQuality.lightLimit(SpellLightConfig.maxLights))
                 .toList();
         if (lights.isEmpty()) {
             return false;
         }
 
         RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        long lightingStarted = PerfTracker.begin(PerfTracker.Section.LIGHTING);
         try {
             ensureSceneCopy(mainTarget.width, mainTarget.height);
             ensureVoxelGrid();
@@ -355,6 +363,8 @@ public final class SpellLightPostProcessor {
             boolean rebuildVoxelCache = collectThisFrame || stateVolumeChanged
                     || !voxelLodValid;
             if (rebuildVoxelCache) {
+                long voxelStarted = PerfTracker.begin(PerfTracker.Section.VOXEL);
+                try {
                 runVoxelizePass(voxelGrid, mainTarget.getDepthTextureId(),
                         normalTarget.getColorTextureId(), voxelHistory.getColorTextureId(),
                         projection, viewRotation, inverseProjection, inverseView,
@@ -363,6 +373,9 @@ public final class SpellLightPostProcessor {
                 voxelLodValid = true;
                 copyColor(voxelGrid, voxelHistory);
                 voxelHistoryValid = true;
+                } finally {
+                    PerfTracker.end(PerfTracker.Section.VOXEL, voxelStarted);
+                }
             }
             voxelFrame++;
             shadowFrame = (shadowFrame + 1.0F) % 1024.0F;
@@ -401,7 +414,9 @@ public final class SpellLightPostProcessor {
                 return true;
             }
 
-            // VanillaDI always executes temporal. It decides per pixel whether
+            TextureTarget current = lightPing;
+            if (filterEnabled) {
+            // Temporal decides per pixel whether
             // the previous radiance is usable, then emits a fresh history frame
             // for the spatial passes. Keeping this target separate is important:
             // the next frame must sample pre-spatial temporal radiance.
@@ -412,7 +427,7 @@ public final class SpellLightPostProcessor {
                     previousCameraPosition);
             runFrameAgePass(frameScratch, previousFrame,
                     mainTarget.getDepthTextureId(), historyValid);
-            TextureTarget current = temporalTarget;
+            current = temporalTarget;
             // VanillaDI performs four progressively wider edge-aware spatial
             // passes after temporal reprojection.  The first two preserve
             // fence/trapdoor holes; the wider passes remove the remaining
@@ -424,8 +439,9 @@ public final class SpellLightPostProcessor {
             // so it starts far cleaner and does not need the wide iterations --
             // and those are what dilute a trapdoor cutout's light patch, which
             // is only a handful of pixels across, into the surrounding shadow.
-            float[] filterRadii = {1.0F, 2.0F};
-            for (float radius : filterRadii) {
+            int spatialPasses = Math.max(0, Math.min(2, AdaptiveVisualQuality.spatialPasses()));
+            for (int pass = 0; pass < spatialPasses; pass++) {
+                float radius = 1 << pass;
                 TextureTarget destination = current == lightPing ? lightPong : lightPing;
                 runFilterPass(Pass.LIGHT_SPATIAL, current, null, destination,
                         mainTarget.getDepthTextureId(), radius, inverseProjection,
@@ -449,6 +465,10 @@ public final class SpellLightPostProcessor {
             previousProjection = new Matrix4f(projection);
             previousView = new Matrix4f(viewRotation);
             previousLightSignature = lightSignature;
+            } else {
+                // Re-enabling starts with fresh history instead of stale radiance.
+                historyValid = false;
+            }
 
             // Debug: blending the unfiltered lighting output separates a mask
             // that never had the cutout hole from one whose hole the denoiser
@@ -457,7 +477,7 @@ public final class SpellLightPostProcessor {
             // its attached depth while drawing to it is an OpenGL feedback loop.
             copyDepth(mainTarget, currentDepth);
             runBlendPass(sceneCopy.getColorTextureId(),
-                    filterEnabled ? current : lightPing, mainTarget,
+                    current, mainTarget,
                     currentDepth.getDepthTextureId(), inverseProjection,
                     inverseView, cameraPosition, partialTick);
             if (!activeLogged) {
@@ -472,12 +492,14 @@ public final class SpellLightPostProcessor {
             return false;
         } finally {
             snapshot.restore();
+            PerfTracker.end(PerfTracker.Section.LIGHTING, lightingStarted);
         }
     }
 
     /** Toggles the temporal + spatial denoise chain; returns the new state. */
     public static boolean toggleFilter() {
         filterEnabled = !filterEnabled;
+        historyValid = false;
         return filterEnabled;
     }
 
@@ -893,6 +915,7 @@ public final class SpellLightPostProcessor {
         }
 
         RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        long lensStarted = PerfTracker.begin(PerfTracker.Section.CINEMATIC);
         try {
             ensureSceneCopy(mainTarget.width, mainTarget.height);
             ensureCurrentDepth(mainTarget.width, mainTarget.height);
@@ -918,6 +941,11 @@ public final class SpellLightPostProcessor {
                 Vector3f axisEye = viewRotation.transformDirection(new Vector3f(
                         (float) axis.x, (float) axis.y, (float) axis.z)).normalize();
 
+                ScreenEffectBounds bounds = ScreenEffectBounds.sphere(projection, eye,
+                        radius * GargantuaEntity.DISK_OUTER_RADIUS * 1.35F,
+                        mainTarget.width, mainTarget.height);
+                if (bounds.empty()) continue;
+
                 copyColor(mainTarget, sceneCopy);
                 copyDepth(mainTarget, currentDepth);
                 mainTarget.bindWrite(true);
@@ -937,16 +965,18 @@ public final class SpellLightPostProcessor {
                         SpellBoltRenderer.boltTime(),
                         entity.getSwallowedCount());
                 set(shader, "DiskShape", GargantuaEntity.DISK_INNER_RADIUS,
-                        GargantuaEntity.DISK_OUTER_RADIUS, 0.004F, brightness);
+                        GargantuaEntity.DISK_OUTER_RADIUS, AdaptiveVisualQuality.decorationScale(), brightness);
                 set(shader, "InverseProjectionMat", inverseProjection);
                 set(shader, "ProjectionMat", projection);
                 RenderSystem.setShader(() -> shader);
-                drawFullscreenQuad();
+                RenderSystem.enableScissor(bounds.x(), bounds.y(), bounds.width(), bounds.height());
+                drawFullscreenQuad(PerfTracker.Section.CINEMATIC);
             }
         } catch (RuntimeException | LinkageError failure) {
             disableAfterFailure(failure);
         } finally {
             snapshot.restore();
+            PerfTracker.end(PerfTracker.Section.CINEMATIC, lensStarted);
         }
     }
 
@@ -978,6 +1008,7 @@ public final class SpellLightPostProcessor {
         }
 
         RenderStateSnapshot snapshot = RenderStateSnapshot.capture();
+        long lensStarted = PerfTracker.begin(PerfTracker.Section.CINEMATIC);
         try {
             ensureSceneCopy(mainTarget.width, mainTarget.height);
             ensureCurrentDepth(mainTarget.width, mainTarget.height);
@@ -1002,6 +1033,12 @@ public final class SpellLightPostProcessor {
                 Vector3f gapEye = viewRotation.transformDirection(new Vector3f(
                         (float) gap.x, (float) gap.y, (float) gap.z)).normalize();
 
+                // Matches the finite six-Einstein-radius support in the shader.
+                ScreenEffectBounds bounds = ScreenEffectBounds.sphere(projection, eye,
+                        CosmicHorseshoeEntity.EINSTEIN_RADIUS * 6.0F,
+                        mainTarget.width, mainTarget.height);
+                if (bounds.empty()) continue;
+
                 copyColor(mainTarget, sceneCopy);
                 copyDepth(mainTarget, currentDepth);
                 mainTarget.bindWrite(true);
@@ -1024,12 +1061,14 @@ public final class SpellLightPostProcessor {
                 set(shader, "InverseProjectionMat", inverseProjection);
                 set(shader, "ProjectionMat", projection);
                 RenderSystem.setShader(() -> shader);
-                drawFullscreenQuad();
+                RenderSystem.enableScissor(bounds.x(), bounds.y(), bounds.width(), bounds.height());
+                drawFullscreenQuad(PerfTracker.Section.CINEMATIC);
             }
         } catch (RuntimeException | LinkageError failure) {
             disableAfterFailure(failure);
         } finally {
             snapshot.restore();
+            PerfTracker.end(PerfTracker.Section.CINEMATIC, lensStarted);
         }
     }
 
@@ -1233,7 +1272,7 @@ public final class SpellLightPostProcessor {
         target.setClearColor(0.0F, 0.0F, 0.0F, 0.0F);
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, target.frameBufferId);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, target.getColorTextureId());
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F,
+        TextureUpload.image2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F,
                 width, height, 0, GL11.GL_RGBA, GL11.GL_FLOAT, (java.nio.ByteBuffer) null);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
@@ -1306,7 +1345,7 @@ public final class SpellLightPostProcessor {
                 validHistory ? 1.0F : 0.0F, shadowFrame);
         set(shader, "CameraParams", fovRadians, aspect, NEAR_PLANE, farPlane);
         set(shader, "MiscParams", (float) lightCount,
-                Math.max(8.0F, SpellLightConfig.shadowSteps), 1.0F, 0.0F);
+                AdaptiveVisualQuality.shadowSteps(SpellLightConfig.shadowSteps), 1.0F, 0.0F);
         set(shader, "LightDataParams", lightData.width(), lightData.height(),
                 lightCount, validHistory ? 1.0F : 0.0F);
         set(shader, "ProjectionMat", projection);
@@ -1362,7 +1401,7 @@ public final class SpellLightPostProcessor {
         configureFullscreenState();
         shader.setSampler("VoxelSampler", voxelTexture);
         RenderSystem.setShader(() -> shader);
-        drawFullscreenQuad();
+        drawFullscreenQuad(PerfTracker.Section.VOXEL);
     }
 
     private static void runVoxelizePass(TextureTarget destination, int depthTexture,
@@ -1398,7 +1437,7 @@ public final class SpellLightPostProcessor {
         set(shader, "InverseProjectionMat", inverseProjection);
         set(shader, "InverseViewMat", inverseView);
         RenderSystem.setShader(() -> shader);
-        drawFullscreenQuad();
+        drawFullscreenQuad(PerfTracker.Section.VOXEL);
     }
 
     private static void runFilterPass(Pass pass, TextureTarget source, TextureTarget history,
@@ -1570,6 +1609,10 @@ public final class SpellLightPostProcessor {
     }
 
     private static void drawFullscreenQuad() {
+        drawFullscreenQuad(PerfTracker.Section.LIGHTING);
+    }
+
+    private static void drawFullscreenQuad(PerfTracker.Section section) {
         finish(fullscreenBuffer);
         BufferBuilder builder = fullscreenBuffer;
         builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
@@ -1578,7 +1621,13 @@ public final class SpellLightPostProcessor {
         builder.vertex(1.0D, 1.0D, 0.0D).uv(1.0F, 1.0F).endVertex();
         builder.vertex(-1.0D, 1.0D, 0.0D).uv(0.0F, 1.0F).endVertex();
         try {
-            BufferUploader.drawWithShader(builder.end());
+            BufferBuilder.RenderedBuffer rendered = builder.end();
+            int gpu = PerfTracker.beginGpu(section);
+            try {
+                BufferUploader.drawWithShader(rendered);
+            } finally {
+                PerfTracker.endGpu(gpu);
+            }
         } catch (RuntimeException | LinkageError failure) {
             finish(builder);
             throw failure;
@@ -1602,6 +1651,7 @@ public final class SpellLightPostProcessor {
     }
 
     private static void copyColor(RenderTarget source, RenderTarget destination) {
+        RenderSystem.disableScissor();
         GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, source.frameBufferId);
         GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, destination.frameBufferId);
         GlStateManager._glBlitFrameBuffer(
@@ -1616,6 +1666,7 @@ public final class SpellLightPostProcessor {
      * which the packed-colour depth history is not.
      */
     private static void copyDepth(RenderTarget source, RenderTarget destination) {
+        RenderSystem.disableScissor();
         GlStateManager._glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, source.frameBufferId);
         GlStateManager._glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, destination.frameBufferId);
         GlStateManager._glBlitFrameBuffer(

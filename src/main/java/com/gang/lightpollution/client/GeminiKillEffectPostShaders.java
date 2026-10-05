@@ -26,6 +26,9 @@ public final class GeminiKillEffectPostShaders {
 
     @SubscribeEvent
     public static void registerShaders(RegisterShadersEvent event) {
+        // GameRenderer closes the previous shaders before this reload. Failed
+        // variants must stay absent instead of keeping a closed shader alive.
+        SHADERS.clear();
         for (Pass pass : Pass.values()) {
             ResourceLocation id = ResourceLocation.fromNamespaceAndPath(
                     ExampleMod.MODID, "gemini_kill_post_" + pass.path);

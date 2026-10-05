@@ -52,6 +52,9 @@ public final class ModNetwork {
     /** Tell nearby clients that a target took damage from one of this mod's spells. */
     public static void sendDamageText(ServerLevel level, Vec3 at, int entityId,
                                       float amount, int colour) {
+        if (!com.gang.lightpollution.performance.ServerPerformanceBudget.allowDamageText()) {
+            return;
+        }
         CHANNEL.send(
                 PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
                         at.x, at.y, at.z, TEXT_RANGE, level.dimension())),

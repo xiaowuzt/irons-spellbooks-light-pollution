@@ -1,0 +1,107 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:event_horizon",
+  "fragment": "irons_spellbooks_light_pollution:event_horizon_trace",
+  "samplers": [
+    {
+      "name": "DepthSampler"
+    },
+    {
+      "name": "NoiseSampler"
+    }
+  ],
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "uniforms": [
+    {
+      "name": "HoleCentre",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "DiskX",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "DiskY",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "DiskZ",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "State",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "DiskSettings",
+      "type": "float",
+      "count": 4,
+      "values": [
+        3,
+        1.1,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "InverseProjectionMat",
+      "type": "matrix4x4",
+      "count": 16,
+      "values": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  ]
+}

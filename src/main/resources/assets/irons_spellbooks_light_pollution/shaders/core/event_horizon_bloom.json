@@ -1,0 +1,26 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:event_horizon",
+  "fragment": "irons_spellbooks_light_pollution:event_horizon_bloom",
+  "samplers": [
+    {
+      "name": "InputSampler"
+    }
+  ],
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "uniforms": [
+    {
+      "name": "BlurStep",
+      "type": "float",
+      "count": 4,
+      "values": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

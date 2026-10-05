@@ -101,8 +101,6 @@ public final class QuasarJetWorldRenderer {
 
     private static void drawChannels(List<QuasarJetSource> jets, Vec3 camera,
                                      float partialTick, ShaderInstance shader) {
-        BufferBuilder builder = beginTube();
-        int vertices = 0;
         for (QuasarJetSource entity : jets) {
             float brightness = entity.brightness(partialTick);
             if (brightness <= 0.01F) {
@@ -112,6 +110,8 @@ public final class QuasarJetWorldRenderer {
             if (camera.distanceToSqr(centre) > RENDER_DISTANCE_SQR) {
                 continue;
             }
+            BufferBuilder builder = beginTube();
+            int vertices = 0;
             // Straight to the shared shape maths rather than through a method on the source, so a
             // spell anchor and an API instance go down the same path.
             QuasarJetParams params = entity.shapeParams();
@@ -130,8 +130,10 @@ public final class QuasarJetWorldRenderer {
                     // makes the receding one invisible, so only one is ever drawn.
                     CurveTube.MODE_JET, 1.0F,
                     Math.min(1.0F, brightness * 0.15F), alpha);
+            CinematicVisuals.strand(shader, entity.getVisualAgeTicks(partialTick),
+                    CinematicVisuals.seed(entity, centre), centre.subtract(camera));
+            draw(builder, shader, vertices, 1.0F);
         }
-        draw(builder, shader, vertices, 1.0F);
     }
 
     /** The knots and the terminal lobe, both as camera-facing discs. */

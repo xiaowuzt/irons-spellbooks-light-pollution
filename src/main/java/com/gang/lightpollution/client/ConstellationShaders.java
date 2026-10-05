@@ -67,11 +67,36 @@ public final class ConstellationShaders {
     @Nullable
     private static ShaderInstance volumetric;
 
+    @Nullable private static ShaderInstance astralVolume;
+    @Nullable private static ShaderInstance astralBody;
+    @Nullable private static ShaderInstance astralDistortion;
+    @Nullable private static ShaderInstance astralComposite;
+
+    @Nullable public static ShaderInstance astralVolume() { return astralVolume; }
+    @Nullable public static ShaderInstance astralBody() { return astralBody; }
+    @Nullable public static ShaderInstance astralDistortion() { return astralDistortion; }
+    @Nullable public static ShaderInstance astralComposite() { return astralComposite; }
+
     private ConstellationShaders() {
     }
 
     @SubscribeEvent
     public static void registerShaders(RegisterShadersEvent event) {
+        com.gang.lightpollution.client.perf.AdaptiveVisualQuality.invalidate();
+        // Clear first: a failed resource reload must not retain a closed previous ShaderInstance.
+        star = meteor = skyCollapse = convergence = secondSun = bolt = null;
+        singularity = singularityCore = leviathan = worldTree = null;
+        microquasarJet = helixKnot = magnetarField = tidalStream = quasarBeam = null;
+        pinwheelDust = crabFilament = effectCore = strand = starSurface = null;
+        ringSurface = volumetric = null;
+        astralVolume = null;
+        astralBody = null;
+        astralDistortion = null;
+        astralComposite = null;
+        register(event, "astral_volume", shader -> astralVolume = shader);
+        register(event, "astral_body", shader -> astralBody = shader);
+        register(event, "astral_distortion", shader -> astralDistortion = shader);
+        register(event, "astral_composite", shader -> astralComposite = shader);
         register(event, "constellation_star", shader -> star = shader);
         register(event, "starfall_meteor", shader -> meteor = shader);
         register(event, "sky_collapse", shader -> skyCollapse = shader);

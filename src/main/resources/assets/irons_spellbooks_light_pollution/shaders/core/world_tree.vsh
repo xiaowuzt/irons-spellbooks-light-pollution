@@ -7,6 +7,7 @@ in vec3 Normal;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
+uniform vec3 GeometryOffset;
 
 out vec4 vertexColor;
 out vec2 uvCoord;
@@ -16,9 +17,10 @@ out vec3 surfaceNormal;
 out vec3 toCamera;
 
 void main() {
-    gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
+    vec3 cameraPosition = Position + GeometryOffset;
+    gl_Position = ProjMat * ModelViewMat * vec4(cameraPosition, 1.0);
     vertexColor = Color;
     uvCoord = UV0;
     surfaceNormal = Normal;
-    toCamera = -Position;
+    toCamera = -cameraPosition;
 }

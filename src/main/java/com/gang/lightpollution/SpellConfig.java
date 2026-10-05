@@ -22,6 +22,7 @@ import java.util.Map;
 @Mod.EventBusSubscriber(modid = ExampleMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class SpellConfig {
     private static final ForgeConfigSpec.Builder BUILDER = new ForgeConfigSpec.Builder();
+    private static final int DEFAULT_MAX_ENTITIES_PER_SPELL = 16;
 
     private static final ForgeConfigSpec.IntValue CELESTIAL_COOLDOWN = intValue(
             "celestialJudgment.cooldownSeconds", 600, 0, 86_400,
@@ -82,9 +83,6 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.IntValue ECLIPSE_CAST_TIME = intValue(
             "eclipseSeverance.castTimeTicks", 20, 0, 20 * 60,
             "Eclipse Severance cast time in ticks.");
-    private static final ForgeConfigSpec.IntValue ECLIPSE_RANGE = intValue(
-            "eclipseSeverance.castRange", 40, 1, 256,
-            "Eclipse Severance target range in blocks.");
     private static final ForgeConfigSpec.DoubleValue ECLIPSE_DAMAGE = doubleValue(
             "eclipseSeverance.damage", 500.0D, 0.0D, 1_000_000.0D,
             "Eclipse Severance base damage.");
@@ -230,6 +228,31 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.DoubleValue GARGANTUA_BLAST_DAMAGE = doubleValue(
             "spells.gargantua.blastDamageFraction", 0.72D, 0.0D, 1.0D,
             "Gargantua detonation damage as a fraction of target maximum health.");
+    private static final ForgeConfigSpec.DoubleValue GARGANTUA_TIDAL_MAX = doubleValue(
+            "spells.gargantua.tidalMaxDamageFraction", 0.046D, 0.0D, 1.0D,
+            "spells.gargantua.tidalMaxDamageFraction");
+    private static final ForgeConfigSpec.DoubleValue GARGANTUA_PULL = doubleValue(
+            "spells.gargantua.pullStrength", 1.0D, 0.0D, 4.0D,
+            "spells.gargantua.pullStrength");
+    private static final ForgeConfigSpec.DoubleValue GARGANTUA_BLAST_RADIUS = doubleValue(
+            "spells.gargantua.blastRadius", 20.0D, 0.1D, 128.0D,
+            "spells.gargantua.blastRadius");
+    private static final ForgeConfigSpec.DoubleValue SINGULARITY_CRUSH_MAX = doubleValue(
+            "spells.singularity.crushMaxDamageFraction", 0.035D, 0.0D, 1.0D,
+            "spells.singularity.crushMaxDamageFraction");
+    private static final ForgeConfigSpec.DoubleValue SINGULARITY_PULL = doubleValue(
+            "spells.singularity.pullStrength", 1.0D, 0.0D, 4.0D,
+            "spells.singularity.pullStrength");
+    private static final ForgeConfigSpec.DoubleValue EVENT_HORIZON_PULL = doubleValue(
+            "spells.eventHorizon.pullStrength", 1.0D, 0.0D, 4.0D,
+            "spells.eventHorizon.pullStrength");
+    private static final ForgeConfigSpec.DoubleValue REDSHIFT_PULL = doubleValue(
+            "spells.redshiftAbyss.pullStrength", 1.0D, 0.0D, 4.0D,
+            "spells.redshiftAbyss.pullStrength");
+    private static final ForgeConfigSpec.DoubleValue REDSHIFT_VORTEX = doubleValue(
+            "spells.redshiftAbyss.vortexStrength", 0.65D, 0.0D, 2.0D,
+            "spells.redshiftAbyss.vortexStrength");
+
     private static final ForgeConfigSpec.DoubleValue CRAB_WIND_DAMAGE = doubleValue(
             "spells.crabNebula.windDamageFraction", 0.026D, 0.0D, 1.0D,
             "Crab Nebula pulsar-wind damage as a fraction of target maximum health.");
@@ -261,30 +284,35 @@ public final class SpellConfig {
     private static final ForgeConfigSpec.DoubleValue WORLD_TREE_ABSORPTION = doubleValue(
             "worldTree.absorptionHearts", 4.0D, 0.0D, 1_000.0D,
             "Absorption hearts granted to allies in the World Tree sanctuary.");
-    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_MAGIC = BUILDER
-            .comment("Prevent magic damage to allies inside the World Tree sanctuary.")
+    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_MAGIC = ConfigComments
+            .bilingual(BUILDER, "worldTree.protectMagic",
+                    "Prevent magic damage to allies inside the World Tree sanctuary.")
             .define("worldTree.protectMagic", true);
-    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_PROJECTILE = BUILDER
-            .comment("Prevent projectile damage to allies inside the World Tree sanctuary.")
+    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_PROJECTILE = ConfigComments
+            .bilingual(BUILDER, "worldTree.protectProjectile",
+                    "Prevent projectile damage to allies inside the World Tree sanctuary.")
             .define("worldTree.protectProjectile", true);
-    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_FIRE = BUILDER
-            .comment("Prevent fire damage to allies inside the World Tree sanctuary.")
+    private static final ForgeConfigSpec.BooleanValue WORLD_TREE_PROTECT_FIRE = ConfigComments
+            .bilingual(BUILDER, "worldTree.protectFire",
+                    "Prevent fire damage to allies inside the World Tree sanctuary.")
             .define("worldTree.protectFire", true);
 
-    private static final ForgeConfigSpec.IntValue SERVER_MAX_ACTIVE_ENTITIES = BUILDER
-            .comment("Maximum number of active spell entities in one server level.",
-                    "New spell casts are refused after this limit is reached.")
+    private static final ForgeConfigSpec.IntValue SERVER_MAX_ACTIVE_ENTITIES = ConfigComments
+            .bilingual(BUILDER, "server.maxActiveSpellEntities",
+                    "Maximum number of active spell entities in one server level. New spell casts are refused after this limit is reached.")
             .defineInRange("server.maxActiveSpellEntities", 64, 1, 4096);
-    private static final ForgeConfigSpec.IntValue SERVER_MAX_ENTITIES_PER_SPELL = BUILDER
-            .comment("Maximum active entities of one spell type in one server level.")
-            .defineInRange("server.maxEntitiesPerSpell", 16, 1, 1024);
-    private static final ForgeConfigSpec.IntValue SERVER_TARGET_SCAN_LIMIT = BUILDER
-            .comment("Safety cap for living targets considered by one spell pulse.")
+    private static final ForgeConfigSpec.IntValue SERVER_MAX_ENTITIES_PER_SPELL = ConfigComments
+            .bilingual(BUILDER, "server.maxEntitiesPerSpell",
+                    "Maximum active entities of one spell type in one server level.")
+            .defineInRange("server.maxEntitiesPerSpell", DEFAULT_MAX_ENTITIES_PER_SPELL, 1, 1024);
+    private static final ForgeConfigSpec.IntValue SERVER_TARGET_SCAN_LIMIT = ConfigComments
+            .bilingual(BUILDER, "server.targetScanLimit",
+                    "Safety cap for living targets considered by one spell pulse.")
             .defineInRange("server.targetScanLimit", 128, 1, 10_000);
 
     private static final Map<String, GenericValues> GENERIC_SPELLS = new LinkedHashMap<>();
 
-    /** Defaults for the shared gameplay fields used by the eighteen generic spells. */
+    /** Defaults for the shared gameplay fields used by the 23 generic spells. */
     private static GenericDefaults genericDefaults(String id) {
         return switch (id) {
             case "starless" -> new GenericDefaults(260, 12.0D, 0.16D, 0.26D, 20, 110, 150, 160, 4);
@@ -296,6 +324,11 @@ public final class SpellConfig {
             case "secondSun" -> new GenericDefaults(320, 26.0D, 0.018D, 0.61D, 15, 80, 240, 280, 32);
             case "singularity" -> new GenericDefaults(220, 22.0D, 0.006D, 0.66D, 10, 80, 160, 190, 32);
             case "leviathan" -> new GenericDefaults(190, 28.0D, 0.056D, 0.58D, 6, 70, 140, 170, 32);
+            case "schwarzschildLens" -> new GenericDefaults(240, 18D, 0D, 0D, 10, 30, 210, 230, 16);
+            case "radiantCollapse" -> new GenericDefaults(180, 14D, .02D, .22D, 10, 30, 120, 160, 32);
+            case "stasisSingularity" -> new GenericDefaults(240, 14D, .012D, .06D, 12, 30, 200, 220, 32);
+            case "redshiftAbyss" -> new GenericDefaults(320, 20.0D, 0.012D, 0.32D, 10, 40, 280, 300, 32);
+            case "eventHorizon" -> new GenericDefaults(280, 18.0D, 0.015D, 0.28D, 10, 40, 240, 260, 32);
             case "gargantua" -> new GenericDefaults(400, 28.0D, 0.013D, 0.72D, 8, 40, 260, 290, 32);
             case "cosmicHorseshoe" -> new GenericDefaults(360, 17.0D, 0.028D, 0.33D, 15, 50, 300, 330, 32);
             case "microquasar" -> new GenericDefaults(320, 22.0D, 0.048D, 0.50D, 5, 70, 220, 280, 32);
@@ -319,6 +352,11 @@ public final class SpellConfig {
         genericSpell("secondSun", 600, 2000, 60, 40);
         genericSpell("singularity", 480, 1800, 45, 36);
         genericSpell("leviathan", 440, 1750, 50, 44);
+        genericSpell("eventHorizon", 420, 1800, 50, 40);
+        genericSpell("redshiftAbyss", 480, 2000, 60, 40);
+        genericSpell("schwarzschildLens", 180, 700, 35, 40);
+        genericSpell("radiantCollapse", 240, 1100, 45, 36);
+        genericSpell("stasisSingularity", 300, 1300, 45, 36);
         genericSpell("gargantua", 540, 2200, 60, 40);
         genericSpell("cosmicHorseshoe", 320, 1250, 50, 38);
         genericSpell("microquasar", 380, 1550, 55, 42);
@@ -336,42 +374,108 @@ public final class SpellConfig {
         // spells.spells.spells.* after each pop.
         BUILDER.push("spells");
         BUILDER.push(id);
-        ForgeConfigSpec.IntValue cooldownValue = BUILDER.comment("Cooldown in seconds.")
+        ForgeConfigSpec.IntValue cooldownValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".cooldownSeconds", "Cooldown in seconds.")
                 .defineInRange("cooldownSeconds", cooldown, 0, 86_400);
-        ForgeConfigSpec.IntValue manaValue = BUILDER.comment("Mana cost.")
+        ForgeConfigSpec.IntValue manaValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".manaCost", "Mana cost.")
                 .defineInRange("manaCost", mana, 0, 100_000);
-        ForgeConfigSpec.IntValue castTimeValue = BUILDER.comment("Cast time in ticks.")
+        ForgeConfigSpec.IntValue castTimeValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".castTimeTicks", "Cast time in ticks.")
                 .defineInRange("castTimeTicks", castTime, 0, 20 * 60);
-        ForgeConfigSpec.IntValue rangeValue = BUILDER.comment("Targeting range in blocks.")
-                .defineInRange("castRange", range, 1, 256);
+        // Silhouette is a caster-following field; it has an effect radius, not a placement range.
+        ForgeConfigSpec.IntValue rangeValue = !id.equals("silhouette") ? ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".castRange", "Targeting range in blocks.")
+                .defineInRange("castRange", range, 1, 256) : null;
         GenericDefaults defaults = genericDefaults(id);
-        ForgeConfigSpec.IntValue lifetimeValue = BUILDER.comment("Gameplay lifetime in ticks.")
+        ForgeConfigSpec.IntValue lifetimeValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".lifetimeTicks", "Gameplay lifetime in ticks.")
                 .defineInRange("lifetimeTicks", defaults.lifetimeTicks(),
                         Math.max(4, defaults.phaseThreeTick() + 1), 20 * 60 * 10);
-        ForgeConfigSpec.DoubleValue radiusValue = BUILDER.comment("Gameplay effect radius in blocks.")
+        ForgeConfigSpec.DoubleValue radiusValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".effectRadius", "Gameplay effect radius in blocks.")
                 .defineInRange("effectRadius", defaults.effectRadius(), 0.1D, 256.0D);
-        ForgeConfigSpec.DoubleValue damageValue = BUILDER.comment("Primary damage fraction per pulse or contact.")
-                .defineInRange("damageFraction", defaults.damageFraction(), 0.0D, 1.0D);
-        ForgeConfigSpec.DoubleValue secondaryDamageValue = BUILDER.comment("Secondary or final damage fraction.")
-                .defineInRange("secondaryDamageFraction", defaults.secondaryDamageFraction(), 0.0D, 1.0D);
-        ForgeConfigSpec.IntValue intervalValue = BUILDER.comment("Ticks between repeated damage pulses.")
-                .defineInRange("damageIntervalTicks", defaults.damageIntervalTicks(), 1, 20 * 60);
-        ForgeConfigSpec.IntValue phaseOneValue = BUILDER.comment("First configurable phase boundary in ticks.")
-                .defineInRange("phaseOneTick", defaults.phaseOneTick(), 0, 20 * 60 * 10);
-        ForgeConfigSpec.IntValue phaseTwoValue = BUILDER.comment("Second configurable phase boundary in ticks.")
-                .defineInRange("phaseTwoTick", defaults.phaseTwoTick(), 0, 20 * 60 * 10);
-        ForgeConfigSpec.IntValue phaseThreeValue = BUILDER.comment("Third configurable phase boundary in ticks.")
-                .defineInRange("phaseThreeTick", defaults.phaseThreeTick(), 0, 20 * 60 * 10);
-        ForgeConfigSpec.IntValue maxTargetsValue = BUILDER.comment("Maximum living targets affected by one pulse.")
-                .defineInRange("maxTargets", defaults.maxTargets(), 1, 10_000);
+        // Only publish fields used by this spell. A purely optical attachment has no damage
+        // or living-target budget; one-shot damage does not have a fictitious pulse interval.
+        ForgeConfigSpec.DoubleValue damageValue = hasPrimaryDamage(id) ? ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".damageFraction", "Primary damage fraction.")
+                .defineInRange("damageFraction", defaults.damageFraction(), 0.0D, 1.0D) : null;
+        ForgeConfigSpec.DoubleValue secondaryDamageValue = hasSecondaryDamage(id) ? ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".secondaryDamageFraction", "Secondary damage fraction.")
+                .defineInRange("secondaryDamageFraction", defaults.secondaryDamageFraction(), 0.0D, 1.0D) : null;
+        ForgeConfigSpec.IntValue intervalValue = hasDamageInterval(id) ? ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".damageIntervalTicks", "Repeated damage interval.")
+                .defineInRange("damageIntervalTicks", defaults.damageIntervalTicks(), 1, 20 * 60) : null;
+        ForgeConfigSpec.IntValue phaseOneValue = phaseValue(id, 1, "phaseOneTick", defaults.phaseOneTick());
+        ForgeConfigSpec.IntValue phaseTwoValue = phaseValue(id, 2, "phaseTwoTick", defaults.phaseTwoTick());
+        ForgeConfigSpec.IntValue phaseThreeValue = phaseValue(id, 3, "phaseThreeTick", defaults.phaseThreeTick());
+        ForgeConfigSpec.IntValue maxTargetsValue = !id.equals("schwarzschildLens") ? ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".maxTargets", "Living-target limit per query.")
+                .defineInRange("maxTargets", defaults.maxTargets(), 1, 10_000) : null;
+        ForgeConfigSpec.IntValue maxEntitiesValue = ConfigComments
+                .bilingual(BUILDER, "spells." + id + ".maxActiveEntities", "Concurrent instances per level.")
+                .defineInRange("maxActiveEntities", DEFAULT_MAX_ENTITIES_PER_SPELL, 1, 1024);
         BUILDER.pop();
         BUILDER.pop();
         GENERIC_SPELLS.put(id, new GenericValues(cooldownValue, manaValue, castTimeValue, rangeValue,
                 lifetimeValue, radiusValue, damageValue, secondaryDamageValue, intervalValue,
-                phaseOneValue, phaseTwoValue, phaseThreeValue, maxTargetsValue));
+                phaseOneValue, phaseTwoValue, phaseThreeValue, maxTargetsValue, maxEntitiesValue));
     }
 
-    public static final ForgeConfigSpec SPEC = BUILDER.build();
+    /** Active phase slots only; shared meteor/body animation algorithms are not TOML fields. */
+    static int phaseMask(String id) {
+        return switch (id) {
+            case "constellation", "starfall", "skyCollapse" -> 0;
+            case "silhouette" -> 1;
+            case "leviathan" -> 2;
+            case "starless", "gargantua", "tidalDisruption" -> 7;
+            default -> 3;
+        };
+    }
+
+    private static boolean hasPrimaryDamage(String id) {
+        return !id.equals("schwarzschildLens") && !id.equals("radiantCollapse");
+    }
+
+    private static boolean hasSecondaryDamage(String id) {
+        return !id.equals("schwarzschildLens") && !id.equals("silhouette") && !id.equals("gargantua");
+    }
+
+    private static boolean hasDamageInterval(String id) {
+        return switch (id) {
+            case "starless", "starfall", "skyCollapse", "schwarzschildLens", "radiantCollapse" -> false;
+            default -> true;
+        };
+    }
+
+    private static ForgeConfigSpec.IntValue phaseValue(String id, int phase, String key, int defaultValue) {
+        return (phaseMask(id) & (1 << (phase - 1))) == 0 ? null : ConfigComments
+                .bilingual(BUILDER, "spells." + id + "." + key, "Active phase boundary after spawn.")
+                .defineInRange(key, defaultValue, 1, 20 * 60 * 10);
+    }
+
+    private static final ForgeConfigSpec.DoubleValue BH_TIME_SCALE = ConfigComments
+            .bilingual(BUILDER, "blackHole.bhTimeScale",
+                    "Localized Stasis movement/own pulse rate, NOT world TPS or third-party AI time.")
+            .defineInRange("blackHole.bhTimeScale", .45D, .2D, 1D);
+    private static final ForgeConfigSpec.DoubleValue BH_DISK_TILT = ConfigComments
+            .bilingual(BUILDER, "blackHole.bhDiskTiltDegrees",
+                    "New black-hole disk tilt in degrees from world +Y. Snapshotted on cast.")
+            .defineInRange("blackHole.bhDiskTiltDegrees", 26D, 0D, 85D);
+    private static final ForgeConfigSpec.BooleanValue BH_ABSORB_ITEMS = ConfigComments
+            .bilingual(BUILDER, "blackHole.bhAbsorbItems",
+                    "Absorb ONLY untagged stacks in the black_hole_absorbable item tag.")
+            .define("blackHole.bhAbsorbItems", true);
+    private static final ForgeConfigSpec.BooleanValue BH_BREAK_BLOCKS = ConfigComments
+            .bilingual(BUILDER, "blackHole.bhBreakBlocks",
+                    "Opt-in Stasis block absorption. Requires player owner, mobGriefing, loaded chunk, black_hole_fragile block tag, no block entity and uncancelled Forge BlockEvent.BreakEvent.")
+            .define("blackHole.bhBreakBlocks", false);
+    public static float bhTimeScale() { return value(BH_TIME_SCALE).floatValue(); }
+    public static float bhDiskTiltDegrees() { return value(BH_DISK_TILT).floatValue(); }
+    public static boolean bhAbsorbItems() { return value(BH_ABSORB_ITEMS); }
+    public static boolean bhBreakBlocks() { return value(BH_BREAK_BLOCKS); }
+
+    public static final ForgeConfigSpec SPEC = ConfigComments.build(BUILDER);
 
     public static volatile int celestialCooldownSeconds = 600;
     public static volatile int celestialManaCost = 800;
@@ -394,7 +498,6 @@ public final class SpellConfig {
     public static volatile int eclipseCooldownSeconds = 250;
     public static volatile int eclipseManaCost = 1000;
     public static volatile int eclipseCastTimeTicks = 20;
-    public static volatile int eclipseCastRange = 40;
     public static volatile double eclipseDamage = 500.0D;
     public static volatile double eclipseAttackRadius = 12.0D;
     public static volatile double eclipseAttackAngleDegrees = 150.0D;
@@ -446,6 +549,14 @@ public final class SpellConfig {
     public static volatile int starlessSwallowedDamageCap = 4;
 
     public static volatile double gargantuaBlastDamageFraction = 0.72D;
+    public static volatile double gargantuaTidalMaxDamageFraction = 0.046D;
+    public static volatile double gargantuaPullStrength = 1.0D;
+    public static volatile double gargantuaBlastRadius = 20.0D;
+    public static volatile double singularityCrushMaxDamageFraction = 0.035D;
+    public static volatile double singularityPullStrength = 1.0D;
+    public static volatile double eventHorizonPullStrength = 1.0D;
+    public static volatile double redshiftAbyssPullStrength = 1.0D;
+    public static volatile double redshiftAbyssVortexStrength = 0.65D;
     public static volatile double crabNebulaWindDamageFraction = 0.026D;
 
     public static volatile int worldTreeCooldownSeconds = 460;
@@ -461,7 +572,7 @@ public final class SpellConfig {
     public static volatile boolean worldTreeProtectProjectile = true;
     public static volatile boolean worldTreeProtectFire = true;
     public static volatile int serverMaxActiveEntities = 64;
-    public static volatile int serverMaxEntitiesPerSpell = 16;
+    public static volatile int serverMaxEntitiesPerSpell = DEFAULT_MAX_ENTITIES_PER_SPELL;
     public static volatile int serverTargetScanLimit = 128;
 
     private static boolean legacyPathWarningShown;
@@ -474,7 +585,7 @@ public final class SpellConfig {
             case "funeralNova" -> funeralNovaCooldownSeconds;
             case "chromaticAccretion" -> chromaticAccretionCooldownSeconds;
             case "worldTree" -> worldTreeCooldownSeconds;
-            default -> generic(spellId).cooldown.get();
+            default -> value(generic(spellId).cooldown);
         };
     }
 
@@ -486,7 +597,7 @@ public final class SpellConfig {
             case "funeralNova" -> funeralNovaManaCost;
             case "chromaticAccretion" -> chromaticAccretionManaCost;
             case "worldTree" -> worldTreeManaCost;
-            default -> generic(spellId).mana.get();
+            default -> value(generic(spellId).mana);
         };
     }
 
@@ -498,7 +609,7 @@ public final class SpellConfig {
             case "funeralNova" -> funeralNovaCastTimeTicks;
             case "chromaticAccretion" -> chromaticAccretionCastTimeTicks;
             case "worldTree" -> worldTreeCastTimeTicks;
-            default -> generic(spellId).castTime.get();
+            default -> value(generic(spellId).castTime);
         };
     }
 
@@ -506,11 +617,11 @@ public final class SpellConfig {
         return switch (spellId) {
             case "celestialJudgment" -> celestialTargetRange;
             case "stargraveSingularity" -> stargraveCastRange;
-            case "eclipseSeverance" -> eclipseCastRange;
+            case "eclipseSeverance" -> 0; // The slash is centered on its caster, not a ranged placement.
             case "funeralNova" -> funeralNovaCastRange;
             case "chromaticAccretion" -> chromaticAccretionCastRange;
             case "worldTree" -> worldTreeCastRange;
-            default -> generic(spellId).range.get();
+            default -> optional(generic(spellId).range, 0);
         };
     }
 
@@ -522,7 +633,7 @@ public final class SpellConfig {
             case "funeralNova" -> funeralNovaLifetimeTicks;
             case "chromaticAccretion" -> chromaticAccretionLifetimeTicks;
             case "worldTree" -> worldTreeLifetimeTicks;
-            default -> Math.max(1, generic(spellId).lifetimeTicks().get());
+            default -> Math.max(1, value(generic(spellId).lifetimeTicks()));
         };
     }
 
@@ -533,7 +644,7 @@ public final class SpellConfig {
             case "funeralNova" -> funeralNovaEffectRadius;
             case "chromaticAccretion" -> chromaticAccretionEffectRadius;
             case "worldTree" -> worldTreeEffectRadius;
-            default -> generic(spellId).effectRadius().get();
+            default -> value(generic(spellId).effectRadius());
         };
     }
 
@@ -544,7 +655,7 @@ public final class SpellConfig {
             case "eclipseSeverance" -> eclipseDamage / 20.0D;
             case "funeralNova" -> funeralNovaAccretionDamageFraction;
             case "chromaticAccretion" -> chromaticAccretionPulseDamageFraction;
-            default -> generic(spellId).damageFraction().get();
+            default -> optional(generic(spellId).damageFraction(), 0.0D);
         };
     }
 
@@ -552,26 +663,40 @@ public final class SpellConfig {
         return switch (spellId) {
             case "funeralNova" -> funeralNovaHypernovaDamageFraction;
             case "chromaticAccretion" -> chromaticAccretionCollapseDamageFraction;
-            default -> generic(spellId).secondaryDamageFraction().get();
+            default -> optional(generic(spellId).secondaryDamageFraction(), 0.0D);
         };
     }
 
     public static int damageIntervalTicks(String spellId) {
-        return Math.max(1, generic(spellId).damageIntervalTicks().get());
+        return Math.max(1, optional(generic(spellId).damageIntervalTicks(), 2));
     }
 
     public static int phaseTick(String spellId, int phase) {
+        if (phase < 1 || phase > 3 || (phaseMask(spellId) & (1 << (phase - 1))) == 0) {
+            throw new IllegalArgumentException("Inactive phase " + phase + " for " + spellId);
+        }
         GenericValues values = generic(spellId);
         int lifetime = lifetimeTicks(spellId);
-        int phaseOne = clampTimelineValue(values.phaseOneTick().get(), 0, lifetime - 3);
-        int phaseTwo = clampTimelineValue(values.phaseTwoTick().get(), phaseOne + 1, lifetime - 2);
-        int phaseThree = clampTimelineValue(values.phaseThreeTick().get(), phaseTwo + 1, lifetime - 1);
-        return switch (phase) {
-            case 1 -> phaseOne;
-            case 2 -> phaseTwo;
-            case 3 -> phaseThree;
-            default -> throw new IllegalArgumentException("phase must be 1..3");
-        };
+        ForgeConfigSpec.IntValue[] fields = {values.phaseOneTick(), values.phaseTwoTick(), values.phaseThreeTick()};
+        int remaining = Integer.bitCount(phaseMask(spellId));
+        int previous = 0;
+        for (int i = 0; i < fields.length; i++) {
+            if (fields[i] == null) continue;
+            int boundary = clampTimelineValue(value(fields[i]), previous + 1, lifetime - remaining);
+            if (i + 1 == phase) return boundary;
+            previous = boundary;
+            remaining--;
+        }
+        throw new IllegalStateException("Missing phase field for " + spellId);
+    }
+
+    private static <T> T value(ForgeConfigSpec.ConfigValue<T> field) {
+        return SPEC != null && SPEC.isLoaded() ? field.get() : field.getDefault();
+    }
+
+    /** Neutral internal snapshots for channels the concrete spell does not implement. */
+    private static <T> T optional(ForgeConfigSpec.ConfigValue<T> field, T fallback) {
+        return field == null ? fallback : value(field);
     }
 
     public static int chromaticAccretionPulseTick(int index) {
@@ -585,7 +710,7 @@ public final class SpellConfig {
     }
 
     public static int maxTargets(String spellId) {
-        return Math.max(1, generic(spellId).maxTargets().get());
+        return Math.max(1, optional(generic(spellId).maxTargets(), 1));
     }
 
     /**
@@ -616,8 +741,31 @@ public final class SpellConfig {
             case "celestialJudgment", "stargraveSingularity", "eclipseSeverance",
                     "funeralNova", "chromaticAccretion", "worldTree" ->
                     Math.max(1, serverMaxEntitiesPerSpell);
-            default -> Math.max(1, Math.min(serverMaxEntitiesPerSpell, maxTargets(spellId)));
+            default -> Math.max(1, Math.min(serverMaxEntitiesPerSpell, value(generic(spellId).maxActiveEntities())));
         };
+    }
+
+    /** Maps the matching entity registry path to the spell-specific admission budget. */
+    public static int entityLimitForRegistryPath(String registryPath) {
+        if (registryPath == null || registryPath.isBlank()) return Math.max(1, serverMaxEntitiesPerSpell);
+        StringBuilder id = new StringBuilder(registryPath.length());
+        boolean upper = false;
+        for (int i = 0; i < registryPath.length(); i++) {
+            char c = registryPath.charAt(i);
+            if (c == '_') {
+                upper = true;
+            } else {
+                id.append(upper ? Character.toUpperCase(c) : c);
+                upper = false;
+            }
+        }
+        String configId = id.toString();
+        if (!GENERIC_SPELLS.containsKey(configId) && !switch (configId) {
+            case "celestialJudgment", "stargraveSingularity", "eclipseSeverance",
+                    "funeralNova", "chromaticAccretion", "worldTree" -> true;
+            default -> false;
+        }) return Math.max(1, serverMaxEntitiesPerSpell);
+        return entityLimit(configId);
     }
 
     private static int clampTimelineValue(int value, int minimum, int maximum) {
@@ -638,17 +786,19 @@ public final class SpellConfig {
 
     private static ForgeConfigSpec.IntValue intValue(
             String path, int defaultValue, int min, int max, String comment) {
-        return BUILDER.comment(comment).defineInRange(path, defaultValue, min, max);
+        return ConfigComments.bilingual(BUILDER, path, comment)
+                .defineInRange(path, defaultValue, min, max);
     }
 
     private static ForgeConfigSpec.DoubleValue doubleValue(
             String path, double defaultValue, double min, double max, String comment) {
-        return BUILDER.comment(comment).defineInRange(path, defaultValue, min, max);
+        return ConfigComments.bilingual(BUILDER, path, comment)
+                .defineInRange(path, defaultValue, min, max);
     }
 
     @SubscribeEvent
     public static void onLoad(ModConfigEvent event) {
-        if (event.getConfig().getSpec() != SPEC) {
+        if (event.getConfig().getSpec() != SPEC || event instanceof ModConfigEvent.Unloading) {
             return;
         }
         warnLegacyGenericPath(event.getConfig());
@@ -673,7 +823,6 @@ public final class SpellConfig {
         eclipseCooldownSeconds = ECLIPSE_COOLDOWN.get();
         eclipseManaCost = ECLIPSE_MANA.get();
         eclipseCastTimeTicks = ECLIPSE_CAST_TIME.get();
-        eclipseCastRange = ECLIPSE_RANGE.get();
         eclipseDamage = ECLIPSE_DAMAGE.get();
         eclipseAttackRadius = ECLIPSE_RADIUS.get();
         eclipseAttackAngleDegrees = ECLIPSE_ANGLE.get();
@@ -726,6 +875,15 @@ public final class SpellConfig {
 
         gargantuaBlastDamageFraction = GARGANTUA_BLAST_DAMAGE.get();
         crabNebulaWindDamageFraction = CRAB_WIND_DAMAGE.get();
+        gargantuaTidalMaxDamageFraction = GARGANTUA_TIDAL_MAX.get();
+        gargantuaPullStrength = GARGANTUA_PULL.get();
+        gargantuaBlastRadius = GARGANTUA_BLAST_RADIUS.get();
+        singularityCrushMaxDamageFraction = SINGULARITY_CRUSH_MAX.get();
+        singularityPullStrength = SINGULARITY_PULL.get();
+        eventHorizonPullStrength = EVENT_HORIZON_PULL.get();
+        redshiftAbyssPullStrength = REDSHIFT_PULL.get();
+        redshiftAbyssVortexStrength = REDSHIFT_VORTEX.get();
+
 
         worldTreeCooldownSeconds = WORLD_TREE_COOLDOWN.get();
         worldTreeManaCost = WORLD_TREE_MANA.get();
@@ -814,10 +972,10 @@ public final class SpellConfig {
         }
         chromaticAccretionFormationEndTick = clampTimeline(
                 "chromaticAccretion.formationEndTick", chromaticAccretionFormationEndTick,
-                1, lifetime - 2);
+                1, lifetime - 6);
         chromaticAccretionCollapseTick = clampTimeline(
                 "chromaticAccretion.collapseTick", chromaticAccretionCollapseTick,
-                chromaticAccretionFormationEndTick + 1, lifetime - 1);
+                chromaticAccretionFormationEndTick + 5, lifetime - 1);
         int previousPulse = chromaticAccretionFormationEndTick;
         chromaticAccretionPulseOneTick = clampTimeline(
                 "chromaticAccretion.pulseOneTick", chromaticAccretionPulseOneTick,
@@ -880,19 +1038,15 @@ public final class SpellConfig {
     }
 
     private static void validateGenericTimelines() {
-        for (Map.Entry<String, GenericValues> entry : GENERIC_SPELLS.entrySet()) {
+        for (var entry : GENERIC_SPELLS.entrySet()) {
             String id = entry.getKey();
-            GenericValues values = entry.getValue();
-            int lifetime = Math.max(1, values.lifetimeTicks().get());
-            int phaseOne = values.phaseOneTick().get();
-            int phaseTwo = values.phaseTwoTick().get();
-            int phaseThree = values.phaseThreeTick().get();
-            if (phaseOne >= lifetime || phaseTwo <= phaseOne || phaseThree <= phaseTwo
-                    || phaseThree >= lifetime) {
-                ExampleMod.LOGGER.warn(
-                        "{} phase ticks ({}, {}, {}) do not fit lifetime {}; "
-                                + "runtime accessors will clamp them to a safe order.",
-                        id, phaseOne, phaseTwo, phaseThree, lifetime);
+            GenericValues fields = entry.getValue();
+            ForgeConfigSpec.IntValue[] phases = {fields.phaseOneTick(), fields.phaseTwoTick(), fields.phaseThreeTick()};
+            for (int i = 0; i < phases.length; i++) {
+                if (phases[i] != null && value(phases[i]) != phaseTick(id, i + 1)) {
+                    ExampleMod.LOGGER.warn("{} phase {}={} is outside its ordered timeline; using {} ticks at runtime.",
+                            id, i + 1, value(phases[i]), phaseTick(id, i + 1));
+                }
             }
         }
     }
@@ -909,7 +1063,8 @@ public final class SpellConfig {
             ForgeConfigSpec.IntValue phaseOneTick,
             ForgeConfigSpec.IntValue phaseTwoTick,
             ForgeConfigSpec.IntValue phaseThreeTick,
-            ForgeConfigSpec.IntValue maxTargets) {
+            ForgeConfigSpec.IntValue maxTargets,
+            ForgeConfigSpec.IntValue maxActiveEntities) {
     }
 
     private record GenericDefaults(

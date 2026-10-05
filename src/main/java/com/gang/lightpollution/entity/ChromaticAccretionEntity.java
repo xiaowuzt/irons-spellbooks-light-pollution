@@ -332,10 +332,10 @@ public final class ChromaticAccretionEntity extends Entity {
     }
 
     private void pullNearbyProjectiles(ServerLevel level) {
-        for (Entity projectile : List.copyOf(level.getEntities(
+        for (Entity projectile : level.getEntities(
                 this,
                 effectBounds().inflate(PROJECTILE_QUERY_PADDING),
-                this::canAbsorbProjectile))) {
+                this::canAbsorbProjectile)) {
             Vec3 center = projectile.getBoundingBox().getCenter();
             Vec3 toCore = this.position().subtract(center);
             double distance = toCore.length();
@@ -418,10 +418,12 @@ public final class ChromaticAccretionEntity extends Entity {
         if (getProjectileCharge() < SpellConfig.chromaticAccretionMaxProjectileCharge) {
             this.entityData.set(DATA_PROJECTILE_CHARGE, getProjectileCharge() + 1);
         }
-        level.sendParticles(
-                ParticleTypes.REVERSE_PORTAL,
-                center.x, center.y, center.z,
-                9, 0.20D, 0.20D, 0.20D, 0.05D);
+        if (com.gang.lightpollution.performance.ServerPerformanceBudget.allowAbsorptionParticles()) {
+            level.sendParticles(
+                    ParticleTypes.REVERSE_PORTAL,
+                    center.x, center.y, center.z,
+                    9, 0.20D, 0.20D, 0.20D, 0.05D);
+        }
         if (this.lastProjectileAbsorbSoundTick != this.tickCount) {
             this.lastProjectileAbsorbSoundTick = this.tickCount;
             level.playSound(

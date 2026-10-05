@@ -1,0 +1,27 @@
+{
+  "vertex": "irons_spellbooks_light_pollution:redshift_abyss",
+  "fragment": "irons_spellbooks_light_pollution:redshift_abyss_trace",
+  "samplers": [
+    { "name": "bhDepthSampler" },
+    { "name": "bhHistorySampler" },
+    { "name": "bhHistoryDepthSampler" }
+  ],
+  "attributes": [ "Position", "UV0" ],
+  "uniforms": [
+    { "name": "bhCenterRadius", "type": "float", "count": 4, "values": [ 0, 0, 0, 0 ] },
+    { "name": "bhDiskX", "type": "float", "count": 4, "values": [ 0, 0, 0, 0 ] },
+    { "name": "bhDiskY", "type": "float", "count": 4, "values": [ 0, 0, 0, 0 ] },
+    { "name": "bhDiskZ", "type": "float", "count": 4, "values": [ 0, 0, 0, 0 ] },
+    { "name": "bhDiskSettings", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+    { "name": "bhSourcePhysics", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+    { "name": "bhSourceDisk", "type": "float", "count": 4, "values": [ 2.1, 12, 0.5, 80 ] },
+    { "name": "bhSourceOptions", "type": "float", "count": 4, "values": [ 30, 1.25, 0, 0 ] },
+    { "name": "bhTemporal", "type": "float", "count": 4, "values": [ 1, 0, 0, 0 ] },
+    { "name": "bhResolution", "type": "float", "count": 4, "values": [ 1, 1, 1, 1 ] },
+    { "name": "bhInverseProjectionMatrix", "type": "matrix4x4", "count": 16,
+      "values": [ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 ] },
+    { "name": "bhTiming", "type": "float", "count": 4, "values": [ 0, 0, 0, 1 ] },
+    { "name": "bhQuality", "type": "float", "count": 4, "values": [ 200, 1, 0.85, 0 ] },
+    { "name": "bhRadii", "type": "float", "count": 4, "values": [ 20, 30, 1, 0 ] }
+  ]
+}

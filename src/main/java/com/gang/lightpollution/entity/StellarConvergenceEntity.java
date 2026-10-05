@@ -74,9 +74,6 @@ public final class StellarConvergenceEntity extends Entity
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in StellarConvergenceShape, which the renderer and the public API both read,
     // so there is one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = StellarConvergenceParams.SPELL_LIFETIME_TICKS;
@@ -153,7 +150,7 @@ public final class StellarConvergenceEntity extends Entity
     public Vec3 shellCentre(float partialTick) {
         return new Vec3(
                 Mth.lerp(partialTick, this.xOld, this.getX()),
-                Mth.lerp(partialTick, this.yOld, this.getY()) + StellarConvergenceShape.SHELL_HEIGHT,
+                Mth.lerp(partialTick, this.yOld, this.getY()) + StellarConvergenceShape.SHELL_HEIGHT * shapeParams().scale(),
                 Mth.lerp(partialTick, this.zOld, this.getZ()));
     }
 
@@ -168,7 +165,7 @@ public final class StellarConvergenceEntity extends Entity
     /** What this entity's synced state amounts to, for the shared shape maths. */
     @Override
     public StellarConvergenceParams shapeParams() {
-        return StellarConvergenceParams.of(getSeed());
+        return StellarConvergenceParams.of(getSeed()).scale((float) (configuredRadius() / 18.0D)).lifetime(configuredLifetime());
     }
 
     public static int litTick(int star) {
@@ -247,8 +244,8 @@ public final class StellarConvergenceEntity extends Entity
         // A column, not a sphere: it runs from the ground up to the constellation,
         // so height should not exempt anyone inside it.
         AABB bounds = new AABB(
-                ground.x - StellarConvergenceShape.COLUMN_RADIUS, ground.y - 2.0D, ground.z - StellarConvergenceShape.COLUMN_RADIUS,
-                ground.x + StellarConvergenceShape.COLUMN_RADIUS, ground.y + StellarConvergenceShape.SHELL_HEIGHT, ground.z + StellarConvergenceShape.COLUMN_RADIUS);
+                ground.x - (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale()), ground.y - 2.0D, ground.z - (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale()),
+                ground.x + (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale()), ground.y + (StellarConvergenceShape.SHELL_HEIGHT * shapeParams().scale()) * shapeParams().scale(), ground.z + (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale()));
         List<LivingEntity> targets = SpellConfig.limitTargets("stellarConvergence", level.getEntitiesOfClass(
                 LivingEntity.class, bounds,
                 target -> canAffect(caster, target) && withinColumn(target, ground)));
@@ -265,7 +262,7 @@ public final class StellarConvergenceEntity extends Entity
         Vec3 centre = target.getBoundingBox().getCenter();
         double dx = centre.x - ground.x;
         double dz = centre.z - ground.z;
-        return dx * dx + dz * dz <= StellarConvergenceShape.COLUMN_RADIUS * StellarConvergenceShape.COLUMN_RADIUS;
+        return dx * dx + dz * dz <= (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale()) * (StellarConvergenceShape.COLUMN_RADIUS * shapeParams().scale());
     }
 
     private void resolveBurst(ServerLevel level) {
@@ -273,12 +270,12 @@ public final class StellarConvergenceEntity extends Entity
         Vec3 ground = groundCentre(1.0F);
         List<LivingEntity> targets = SpellConfig.limitTargets("stellarConvergence", level.getEntitiesOfClass(
                 LivingEntity.class,
-                new AABB(ground.x - BURST_RADIUS, ground.y - BURST_RADIUS,
-                        ground.z - BURST_RADIUS, ground.x + BURST_RADIUS,
-                        ground.y + BURST_RADIUS, ground.z + BURST_RADIUS),
+                new AABB(ground.x - (BURST_RADIUS * shapeParams().scale()), ground.y - (BURST_RADIUS * shapeParams().scale()),
+                        ground.z - (BURST_RADIUS * shapeParams().scale()), ground.x + (BURST_RADIUS * shapeParams().scale()),
+                        ground.y + (BURST_RADIUS * shapeParams().scale()), ground.z + (BURST_RADIUS * shapeParams().scale())),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(ground)
-                                <= BURST_RADIUS * BURST_RADIUS));
+                                <= (BURST_RADIUS * shapeParams().scale()) * (BURST_RADIUS * shapeParams().scale())));
         if (targets.isEmpty()) {
             return;
         }

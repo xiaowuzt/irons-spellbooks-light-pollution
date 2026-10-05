@@ -68,17 +68,10 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
         return (float) SpellConfig.secondaryDamageFraction(CONFIG_ID);
     }
 
-    private static int configuredPhaseOne() {
-        return SpellConfig.phaseTick(CONFIG_ID, 1);
-    }
-
     private static int configuredPhaseTwo() {
         return SpellConfig.phaseTick(CONFIG_ID, 2);
     }
 
-    private static int configuredPhaseThree() {
-        return SpellConfig.phaseTick(CONFIG_ID, 3);
-    }
     // The form lives in LeviathanShape, which the renderer and the public API both read, so there is
     // one definition rather than a spell copy and an API copy that can drift.
     public static final int LIFETIME_TICKS = LeviathanParams.SPELL_LIFETIME_TICKS;
@@ -217,7 +210,7 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
     /** What this entity's synced state amounts to, for the shared shape maths. */
     @Override
     public LeviathanParams shapeParams() {
-        return LeviathanParams.of(getBearing(), getSeed());
+        return LeviathanParams.of(getBearing(), getSeed()).scale((float) (configuredRadius() / 28.0D)).lifetime(configuredLifetime());
     }
 
     public float extended(float partialTick) {
@@ -390,12 +383,12 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
             Vec3 point = spinePoint(t, 1.0F);
             List<LivingEntity> touched = SpellConfig.limitTargets("leviathan", level.getEntitiesOfClass(
                     LivingEntity.class,
-                    new AABB(point.x - SWEEP_RADIUS, point.y - SWEEP_RADIUS,
-                            point.z - SWEEP_RADIUS, point.x + SWEEP_RADIUS,
-                            point.y + SWEEP_RADIUS, point.z + SWEEP_RADIUS),
+                    new AABB(point.x - (SWEEP_RADIUS * shapeParams().scale()), point.y - (SWEEP_RADIUS * shapeParams().scale()),
+                            point.z - (SWEEP_RADIUS * shapeParams().scale()), point.x + (SWEEP_RADIUS * shapeParams().scale()),
+                            point.y + (SWEEP_RADIUS * shapeParams().scale()), point.z + (SWEEP_RADIUS * shapeParams().scale())),
                     target -> canAffect(caster, target)
                             && target.getBoundingBox().getCenter().distanceToSqr(point)
-                                    <= SWEEP_RADIUS * SWEEP_RADIUS));
+                                    <= (SWEEP_RADIUS * shapeParams().scale()) * (SWEEP_RADIUS * shapeParams().scale())));
             if (touched.isEmpty()) {
                 continue;
             }
@@ -428,11 +421,11 @@ public final class LeviathanEntity extends Entity implements LeviathanSource {
         Vec3 jaws = spinePoint(0.0F, 1.0F);
         List<LivingEntity> targets = SpellConfig.limitTargets("leviathan", level.getEntitiesOfClass(
                 LivingEntity.class,
-                new AABB(jaws.x - BITE_RADIUS, jaws.y - BITE_RADIUS, jaws.z - BITE_RADIUS,
-                        jaws.x + BITE_RADIUS, jaws.y + BITE_RADIUS, jaws.z + BITE_RADIUS),
+                new AABB(jaws.x - (BITE_RADIUS * shapeParams().scale()), jaws.y - (BITE_RADIUS * shapeParams().scale()), jaws.z - (BITE_RADIUS * shapeParams().scale()),
+                        jaws.x + (BITE_RADIUS * shapeParams().scale()), jaws.y + (BITE_RADIUS * shapeParams().scale()), jaws.z + (BITE_RADIUS * shapeParams().scale())),
                 target -> canAffect(caster, target)
                         && target.getBoundingBox().getCenter().distanceToSqr(jaws)
-                                <= BITE_RADIUS * BITE_RADIUS));
+                                <= (BITE_RADIUS * shapeParams().scale()) * (BITE_RADIUS * shapeParams().scale())));
         if (targets.isEmpty()) {
             return;
         }

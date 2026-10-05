@@ -37,6 +37,8 @@ public final class SpellDamage {
      */
     public static void apply(Entity anchor, LivingEntity target, DamageSource source,
                              float fraction) {
+        // Zero is a disabled channel, not a zero-damage hurt event that strips absorption.
+        if (!Float.isFinite(fraction) || fraction <= 0.0F) return;
         float damage = Math.max(0.0F, target.getMaxHealth() * fraction);
         float desiredHealth = Math.max(0.0F, target.getHealth() - damage);
         float before = target.getHealth();
